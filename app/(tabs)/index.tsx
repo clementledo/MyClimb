@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { GymsView } from '@/components/GymsView';
 import { OutdoorView } from '@/components/OutdoorView';
 import { SessionBanner } from '@/components/SessionBanner';
+import { UpdateBanner } from '@/components/UpdateBanner';
 import { Segmented } from '@/components/ui';
 import { colors } from '@/lib/theme';
 
@@ -14,6 +15,7 @@ export default function ClimbScreen() {
 
   return (
     <View style={s.container}>
+      <UpdateBanner />
       <SessionBanner />
       <View style={s.switcher}>
         <Segmented

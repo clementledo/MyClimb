@@ -62,6 +62,7 @@ jobs:
         run: npx expo prebuild --platform android --no-install
         env:
           CI: 1
+          MYCLIMB_BUILD: ${{ github.run_number }}
 
       - name: Fabriquer l'APK
         working-directory: android

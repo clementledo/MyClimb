@@ -3,11 +3,14 @@
 // Elle n'est jamais écrite dans le code.
 const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY ?? '';
 
+// Numéro de version donné par la fabrication GitHub (v1.0.N) : sert à détecter les mises à jour.
+const build = Number(process.env.MYCLIMB_BUILD ?? 0);
+
 module.exports = {
   expo: {
     name: 'MyClimb',
     slug: 'myclimb',
-    version: '1.0.0',
+    version: `1.0.${build}`,
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'myclimb',
@@ -25,6 +28,9 @@ module.exports = {
         monochromeImage: './assets/images/android-icon-monochrome.png',
       },
       predictiveBackGestureEnabled: false,
+      versionCode: Math.max(1, build),
+      // Pour installer les mises à jour téléchargées par l'app.
+      permissions: ['android.permission.REQUEST_INSTALL_PACKAGES'],
     },
     web: {
       bundler: 'metro',
