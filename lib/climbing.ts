@@ -29,11 +29,7 @@ export const HOLD_COLORS: { name: string; hex: string }[] = [
   { name: 'Blanc', hex: '#FFFFFF' },
 ];
 
-export const STYLES = [
-  'Dalle', 'Vertical', 'Dévers', 'Toit',
-  'Réglettes', 'Pinces', 'Plats', 'Bi-doigts',
-  'Dynamique', 'Compression', 'Talon / crochet',
-];
+export const STYLES = ['Dalle', 'Vertical', 'Dévers', 'Toit'];
 
 export type BlockResult = 'flash' | 'sent' | 'project';
 

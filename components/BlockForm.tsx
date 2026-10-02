@@ -171,7 +171,7 @@ export function BlockForm({
         </View>
       </Section>
 
-      <Section title="Styles">
+      <Section title="Profil (facultatif)">
         <View style={s.wrap}>
           {STYLES.map((st) => (
             <Chip key={st} label={st} selected={styles.includes(st)} onPress={() => toggleStyle(st)} />
