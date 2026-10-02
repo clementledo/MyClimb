@@ -17,6 +17,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Accueil',
+          headerShown: false,
           tabBarIcon: ({ color }) => <TabIcon ios="house.fill" android="home" color={color} />,
         }}
       />
