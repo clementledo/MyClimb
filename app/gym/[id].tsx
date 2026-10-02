@@ -5,7 +5,8 @@ import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { BlockRow } from '@/components/BlockRow';
 import { Button, Empty, Section, Segmented } from '@/components/ui';
-import { getGym, listBlocks, type Block } from '@/lib/db';
+import { formatPrice } from '@/lib/climbing';
+import { getGym, getGymPrices, listBlocks, type Block, type GymPrices } from '@/lib/db';
 import {
   formatDistance,
   formatDuration,
@@ -34,6 +35,7 @@ export default function GymScreen() {
   const route = routeLoading ? null : routeFor.route;
   const [details, setDetails] = useState<GymDetails | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [prices, setPrices] = useState<GymPrices>({ entry: null, subscriptions: [] });
   const [error, setError] = useState<string | null>(null);
   const map = useRef<MapView>(null);
 
@@ -62,7 +64,12 @@ export default function GymScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position, mode, params.id]);
 
-  useFocusEffect(useCallback(() => setBlocks(listBlocks(params.id)), [params.id]));
+  useFocusEffect(
+    useCallback(() => {
+      setBlocks(listBlocks(params.id));
+      setPrices(getGymPrices(params.id));
+    }, [params.id]),
+  );
 
   if (!gym) return <Empty text="Salle introuvable." />;
 
@@ -118,6 +125,32 @@ export default function GymScreen() {
           />
         </View>
 
+        <Section title="Tarifs">
+          {prices.entry === null && prices.subscriptions.length === 0 ? (
+            <Text style={s.muted}>Aucun tarif renseigné pour cette salle.</Text>
+          ) : (
+            <View style={s.prices}>
+              {prices.entry !== null && (
+                <View style={s.priceLine}>
+                  <Text style={[s.text, { fontWeight: '700' }]}>Entrée</Text>
+                  <Text style={[s.text, { fontWeight: '700' }]}>{formatPrice(prices.entry)}</Text>
+                </View>
+              )}
+              {prices.subscriptions.map((p) => (
+                <View key={p.label} style={s.priceLine}>
+                  <Text style={s.text}>{p.label}</Text>
+                  <Text style={s.text}>{formatPrice(p.amount)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Button
+            label={prices.entry === null && prices.subscriptions.length === 0 ? '+ Ajouter les tarifs' : 'Modifier les tarifs'}
+            variant="secondary"
+            onPress={() => router.push({ pathname: '/gym/prices/[id]', params: { id: gym.id } })}
+          />
+        </Section>
+
         <Section title="Infos">
           {gym.address && <Text style={s.text}>{gym.address}</Text>}
           {details ? (
@@ -169,5 +202,7 @@ const s = StyleSheet.create({
   text: { color: colors.text, fontSize: 15 },
   muted: { color: colors.muted, fontSize: 13 },
   actions: { flexDirection: 'row', gap: 8 },
+  prices: { gap: 6, padding: 12, borderRadius: 10, backgroundColor: colors.surface },
+  priceLine: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   error: { color: colors.danger },
 });

@@ -21,6 +21,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerTintColor: colors.text }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="gym/[id]" options={{ title: 'Salle' }} />
+        <Stack.Screen name="gym/prices/[id]" options={{ title: 'Tarifs', presentation: 'modal' }} />
         <Stack.Screen name="block/new" options={{ title: 'Nouveau bloc', presentation: 'modal' }} />
         <Stack.Screen name="block/[id]" options={{ title: 'Bloc' }} />
         <Stack.Screen name="block/edit/[id]" options={{ title: 'Modifier le bloc', presentation: 'modal' }} />

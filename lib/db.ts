@@ -35,6 +35,15 @@ db.execSync(`
     value TEXT NOT NULL,
     ts INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS gym_prices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    gym_id TEXT NOT NULL REFERENCES gyms(id),
+    label TEXT NOT NULL,
+    amount REAL NOT NULL,
+    is_entry INTEGER NOT NULL DEFAULT 0,
+    position INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS gym_prices_gym ON gym_prices(gym_id);
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY NOT NULL,
     value TEXT NOT NULL
@@ -164,6 +173,49 @@ export function updateBlock(id: number, b: BlockInput) {
 
 export function deleteBlock(id: number) {
   db.runSync('DELETE FROM blocks WHERE id = ?', id);
+}
+
+/** Tarifs d'une salle : le prix d'une entrée et les abonnements, saisis par l'utilisateur. */
+export type GymPrices = {
+  entry: number | null;
+  subscriptions: { label: string; amount: number }[];
+};
+
+export function getGymPrices(gymId: string): GymPrices {
+  const rows = db.getAllSync<{ label: string; amount: number; is_entry: number }>(
+    'SELECT label, amount, is_entry FROM gym_prices WHERE gym_id = ? ORDER BY position, id',
+    gymId,
+  );
+  return {
+    entry: rows.find((r) => r.is_entry)?.amount ?? null,
+    subscriptions: rows.filter((r) => !r.is_entry).map((r) => ({ label: r.label, amount: r.amount })),
+  };
+}
+
+export function saveGymPrices(gymId: string, prices: GymPrices) {
+  db.withTransactionSync(() => {
+    db.runSync('DELETE FROM gym_prices WHERE gym_id = ?', gymId);
+    if (prices.entry !== null) {
+      db.runSync(
+        "INSERT INTO gym_prices (gym_id, label, amount, is_entry, position) VALUES (?, 'Entrée', ?, 1, 0)",
+        gymId, prices.entry,
+      );
+    }
+    prices.subscriptions.forEach((sub, i) =>
+      db.runSync(
+        'INSERT INTO gym_prices (gym_id, label, amount, is_entry, position) VALUES (?, ?, ?, 0, ?)',
+        gymId, sub.label, sub.amount, i + 1,
+      ),
+    );
+  });
+}
+
+/** Prix d'une entrée pour chaque salle qui en a un. */
+export function entryPrices(): Record<string, number> {
+  const rows = db.getAllSync<{ gym_id: string; amount: number }>(
+    'SELECT gym_id, amount FROM gym_prices WHERE is_entry = 1',
+  );
+  return Object.fromEntries(rows.map((r) => [r.gym_id, r.amount]));
 }
 
 export function getSetting(key: string): string | null {

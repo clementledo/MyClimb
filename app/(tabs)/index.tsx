@@ -5,7 +5,8 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { Button, Empty, Segmented } from '@/components/ui';
-import { countBlocksByGym, getSetting, saveGym, setSetting, type Gym } from '@/lib/db';
+import { formatPrice } from '@/lib/climbing';
+import { countBlocksByGym, entryPrices, getSetting, saveGym, setSetting, type Gym } from '@/lib/db';
 import {
   ANDROID_HEADERS,
   formatDistance,
@@ -37,6 +38,10 @@ export default function GymsScreen() {
   const [timesFor, setTimesFor] = useState<{ mode: TravelMode; data: Record<string, Travel> } | null>(null);
   const times = useMemo(() => (timesFor?.mode === mode ? timesFor.data : {}), [timesFor, mode]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [sortBy, setSortBy] = useState<'distance' | 'price'>(
+    () => (getSetting('gymSort') as 'distance' | 'price') ?? 'distance',
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +74,17 @@ export default function GymsScreen() {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [position, gyms, mode]);
 
-  useFocusEffect(useCallback(() => setCounts(countBlocksByGym()), []));
+  useFocusEffect(
+    useCallback(() => {
+      setCounts(countBlocksByGym());
+      setPrices(entryPrices());
+    }, []),
+  );
+
+  const changeSort = (v: 'distance' | 'price') => {
+    setSortBy(v);
+    setSetting('gymSort', v);
+  };
 
   const changeMode = (m: TravelMode) => {
     setMode(m);
@@ -79,9 +94,14 @@ export default function GymsScreen() {
   const sorted = useMemo(() => {
     const crow = (g: Gym) =>
       position ? distanceM(position, { latitude: g.lat, longitude: g.lng }) : 0;
-    const key = (g: Gym) => times[g.id]?.durationSec ?? Number.POSITIVE_INFINITY;
-    return [...gyms].sort((a, b) => key(a) - key(b) || crow(a) - crow(b));
-  }, [gyms, times, position]);
+    const time = (g: Gym) => times[g.id]?.durationSec ?? Number.POSITIVE_INFINITY;
+    // Par prix : les salles sans tarif renseigné passent en dernier.
+    const price = (g: Gym) => prices[g.id] ?? Number.POSITIVE_INFINITY;
+    const byDistance = (a: Gym, b: Gym) => time(a) - time(b) || crow(a) - crow(b);
+    return [...gyms].sort(
+      sortBy === 'price' ? (a, b) => price(a) - price(b) || byDistance(a, b) : byDistance,
+    );
+  }, [gyms, times, position, prices, sortBy]);
 
   const open = (gym: Gym) => {
     saveGym(gym);
@@ -104,6 +124,21 @@ export default function GymsScreen() {
           value={view}
           onChange={setView}
         />
+        {view === 'list' && (
+          <View style={s.sortRow}>
+            <Text style={s.sortLabel}>Trier par</Text>
+            <View style={{ flex: 1 }}>
+              <Segmented
+                options={[
+                  { value: 'distance', label: 'Distance' },
+                  { value: 'price', label: "Prix d'entrée" },
+                ]}
+                value={sortBy}
+                onChange={changeSort}
+              />
+            </View>
+          </View>
+        )}
       </View>
 
       {error && (
@@ -147,7 +182,10 @@ export default function GymsScreen() {
                       {item.address}
                     </Text>
                   )}
-                  {n > 0 && <Text style={s.badge}>{n} bloc{n > 1 ? 's' : ''}</Text>}
+                  <Text style={s.price}>
+                    {prices[item.id] !== undefined ? `Entrée ${formatPrice(prices[item.id])}` : 'Prix non renseigné'}
+                    {n > 0 ? `  ·  ${n} bloc${n > 1 ? 's' : ''}` : ''}
+                  </Text>
                 </View>
                 <View style={s.time}>
                   {t ? (
@@ -204,7 +242,9 @@ const s = StyleSheet.create({
   photoLetter: { fontSize: 24, fontWeight: '800', color: colors.primary },
   name: { fontSize: 16, fontWeight: '600', color: colors.text },
   sub: { color: colors.muted, fontSize: 13 },
-  badge: { color: colors.primary, fontSize: 12, fontWeight: '600', marginTop: 2 },
+  price: { color: colors.primary, fontSize: 12, fontWeight: '600', marginTop: 2 },
+  sortRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sortLabel: { color: colors.muted, fontSize: 13 },
   time: { alignItems: 'flex-end', minWidth: 64 },
   duration: { fontSize: 16, fontWeight: '700', color: colors.text },
   error: { margin: 12, padding: 12, gap: 8, borderRadius: 10, backgroundColor: '#FFF5F5' },

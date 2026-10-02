@@ -42,3 +42,7 @@ export const RESULT_LABELS: Record<BlockResult, string> = {
 export function holdHex(name: string): string {
   return HOLD_COLORS.find((c) => c.name === name)?.hex ?? '#CED4DA';
 }
+
+export function formatPrice(amount: number): string {
+  return `${amount.toFixed(2).replace('.', ',').replace(',00', '')} €`;
+}
