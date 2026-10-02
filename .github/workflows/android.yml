@@ -65,7 +65,8 @@ jobs:
 
       - name: Fabriquer l'APK
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        # Seulement arm64 (Samsung S24 FE et téléphones récents) : APK environ 3 fois plus léger.
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
 
       - name: Publier l'APK
         env:
