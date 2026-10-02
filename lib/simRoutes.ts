@@ -1,9 +1,9 @@
-import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 
 import { getSetting, setSetting } from './db';
+import { DEMO_WALL_JPEG } from './demoWall';
 import { deletePhoto, photoDir } from './photos';
 import type { Pt } from './simulation';
 
@@ -84,13 +84,12 @@ export async function pickRoutePhotos(source: 'camera' | 'library'): Promise<Sim
 
 /** Voie d'exemple (photo fournie avec l'app) pour essayer la simulation sans photo. */
 export async function demoRoute(): Promise<SimRoute> {
-  const [asset] = await Asset.loadAsync(require('@/assets/images/demo-wall.jpg'));
-  // Copie de la photo fournie avec l'app, réencodée par le manipulateur d'images.
-  const img = await ImageManipulator.manipulate(asset.localUri ?? asset.uri).renderAsync();
-  const saved = await img.saveAsync({ compress: 0.9, format: SaveFormat.JPEG });
+  const bin = atob(DEMO_WALL_JPEG);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   const dest = new File(photoDir(), `sim-demo-${Date.now()}.jpg`);
-  new File(saved.uri).copy(dest);
-  if (!dest.exists) throw new Error('Photo d’exemple introuvable.');
+  dest.create();
+  dest.write(bytes);
   return {
     id: `demo-${Date.now()}`,
     photo: dest.uri,
