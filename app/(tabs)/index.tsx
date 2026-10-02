@@ -6,7 +6,7 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { Button, Empty, Segmented } from '@/components/ui';
 import { formatPrice } from '@/lib/climbing';
-import { countBlocksByGym, entryPrices, getSetting, saveGym, setSetting, type Gym } from '@/lib/db';
+import { countBlocksByGym, getSetting, saveGym, setSetting, type Gym } from '@/lib/db';
 import {
   ANDROID_HEADERS,
   formatDistance,
@@ -19,6 +19,7 @@ import {
   type Travel,
   type TravelMode,
 } from '@/lib/google';
+import { gymPrices } from '@/lib/gymPrices';
 import { currentPosition, distanceM } from '@/lib/location';
 import { colors } from '@/lib/theme';
 
@@ -38,7 +39,6 @@ export default function GymsScreen() {
   const [timesFor, setTimesFor] = useState<{ mode: TravelMode; data: Record<string, Travel> } | null>(null);
   const times = useMemo(() => (timesFor?.mode === mode ? timesFor.data : {}), [timesFor, mode]);
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [prices, setPrices] = useState<Record<string, number>>({});
   const [sortBy, setSortBy] = useState<'distance' | 'price'>(
     () => (getSetting('gymSort') as 'distance' | 'price') ?? 'distance',
   );
@@ -77,7 +77,6 @@ export default function GymsScreen() {
   useFocusEffect(
     useCallback(() => {
       setCounts(countBlocksByGym());
-      setPrices(entryPrices());
     }, []),
   );
 
@@ -96,12 +95,12 @@ export default function GymsScreen() {
       position ? distanceM(position, { latitude: g.lat, longitude: g.lng }) : 0;
     const time = (g: Gym) => times[g.id]?.durationSec ?? Number.POSITIVE_INFINITY;
     // Par prix : les salles sans tarif renseigné passent en dernier.
-    const price = (g: Gym) => prices[g.id] ?? Number.POSITIVE_INFINITY;
+    const price = (g: Gym) => gymPrices(g)?.entry ?? Number.POSITIVE_INFINITY;
     const byDistance = (a: Gym, b: Gym) => time(a) - time(b) || crow(a) - crow(b);
     return [...gyms].sort(
       sortBy === 'price' ? (a, b) => price(a) - price(b) || byDistance(a, b) : byDistance,
     );
-  }, [gyms, times, position, prices, sortBy]);
+  }, [gyms, times, position, sortBy]);
 
   const open = (gym: Gym) => {
     saveGym(gym);
@@ -160,6 +159,7 @@ export default function GymsScreen() {
           renderItem={({ item }) => {
             const t = times[item.id];
             const n = counts[item.id] ?? 0;
+            const entry = gymPrices(item)?.entry;
             return (
               <Pressable style={s.row} onPress={() => open(item)}>
                 {item.photoName ? (
@@ -183,7 +183,7 @@ export default function GymsScreen() {
                     </Text>
                   )}
                   <Text style={s.price}>
-                    {prices[item.id] !== undefined ? `Entrée ${formatPrice(prices[item.id])}` : 'Prix non renseigné'}
+                    {entry !== undefined ? `Entrée ${formatPrice(entry)}` : 'Prix non disponible'}
                     {n > 0 ? `  ·  ${n} bloc${n > 1 ? 's' : ''}` : ''}
                   </Text>
                 </View>

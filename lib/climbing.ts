@@ -44,5 +44,5 @@ export function holdHex(name: string): string {
 }
 
 export function formatPrice(amount: number): string {
-  return `${amount.toFixed(2).replace('.', ',').replace(',00', '')} €`;
+  return `${amount.toFixed(2).replace('.', ',').replace(',00', '')} $`;
 }

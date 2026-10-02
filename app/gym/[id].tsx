@@ -6,7 +6,7 @@ import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { BlockRow } from '@/components/BlockRow';
 import { Button, Empty, Section, Segmented } from '@/components/ui';
 import { formatPrice } from '@/lib/climbing';
-import { getGym, getGymPrices, listBlocks, type Block, type GymPrices } from '@/lib/db';
+import { getGym, listBlocks, type Block } from '@/lib/db';
 import {
   formatDistance,
   formatDuration,
@@ -19,6 +19,7 @@ import {
   type Route,
   type TravelMode,
 } from '@/lib/google';
+import { gymPrices } from '@/lib/gymPrices';
 import { currentPosition } from '@/lib/location';
 import { colors } from '@/lib/theme';
 
@@ -35,7 +36,6 @@ export default function GymScreen() {
   const route = routeLoading ? null : routeFor.route;
   const [details, setDetails] = useState<GymDetails | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [prices, setPrices] = useState<GymPrices>({ entry: null, subscriptions: [] });
   const [error, setError] = useState<string | null>(null);
   const map = useRef<MapView>(null);
 
@@ -67,11 +67,11 @@ export default function GymScreen() {
   useFocusEffect(
     useCallback(() => {
       setBlocks(listBlocks(params.id));
-      setPrices(getGymPrices(params.id));
     }, [params.id]),
   );
 
   if (!gym) return <Empty text="Salle introuvable." />;
+  const prices = gymPrices(gym);
 
   return (
     <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 32 }}>
@@ -126,29 +126,28 @@ export default function GymScreen() {
         </View>
 
         <Section title="Tarifs">
-          {prices.entry === null && prices.subscriptions.length === 0 ? (
-            <Text style={s.muted}>Aucun tarif renseigné pour cette salle.</Text>
-          ) : (
-            <View style={s.prices}>
-              {prices.entry !== null && (
+          {prices ? (
+            <>
+              <View style={s.prices}>
                 <View style={s.priceLine}>
                   <Text style={[s.text, { fontWeight: '700' }]}>Entrée</Text>
                   <Text style={[s.text, { fontWeight: '700' }]}>{formatPrice(prices.entry)}</Text>
                 </View>
-              )}
-              {prices.subscriptions.map((p) => (
-                <View key={p.label} style={s.priceLine}>
-                  <Text style={s.text}>{p.label}</Text>
-                  <Text style={s.text}>{formatPrice(p.amount)}</Text>
-                </View>
-              ))}
-            </View>
+                {prices.others.map((p) => (
+                  <View key={p.label} style={s.priceLine}>
+                    <Text style={[s.text, { flex: 1 }]}>{p.label}</Text>
+                    <Text style={s.text}>{formatPrice(p.amount)}</Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={s.muted} onPress={() => Linking.openURL(prices.source)}>
+                {prices.taxes ? `${prices.taxes}. ` : ''}Relevé sur le site de la salle en {prices.checkedOn}.{' '}
+                <Text style={{ color: colors.primary }}>Voir les tarifs à jour</Text>
+              </Text>
+            </>
+          ) : (
+            <Text style={s.muted}>Tarifs non disponibles pour cette salle.</Text>
           )}
-          <Button
-            label={prices.entry === null && prices.subscriptions.length === 0 ? '+ Ajouter les tarifs' : 'Modifier les tarifs'}
-            variant="secondary"
-            onPress={() => router.push({ pathname: '/gym/prices/[id]', params: { id: gym.id } })}
-          />
         </Section>
 
         <Section title="Infos">
