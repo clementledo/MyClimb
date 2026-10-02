@@ -13,7 +13,7 @@ import { colors } from '@/lib/theme';
 type Mode = 'holds' | '3d';
 type Kind = 'hands' | 'feet';
 
-const SPEEDS = [0.5, 1, 2];
+const SPEEDS = [0.5, 1, 2, 4];
 
 export default function SimulationScreen() {
   const [routes, setRoutes] = useState<SimRoute[]>(() => listSimRoutes());
