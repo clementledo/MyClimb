@@ -162,9 +162,10 @@ export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress
       removeEventListener: () => {},
       getContext: () => gl,
     };
+    // Le contexte passe par canvas.getContext et non par l'option `context` : sur Android,
+    // le contexte d'expo-gl est aussi un WebGLRenderingContext et three.js le refuserait (WebGL 1).
     const renderer = new THREE.WebGLRenderer({
       canvas: canvas as unknown as HTMLCanvasElement,
-      context: gl as unknown as WebGL2RenderingContext,
       antialias: true,
     });
     renderer.setPixelRatio(1);
