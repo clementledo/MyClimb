@@ -1,43 +1,38 @@
 import { Tabs } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
+import type { ColorValue } from 'react-native';
 
 import { colors } from '@/lib/theme';
 
-// L'app s'ouvre sur les salles, même si l'onglet Jeux est à gauche.
 export const unstable_settings = { initialRouteName: 'index' };
+
+function TabIcon({ ios, android, color }: { ios: SFSymbol; android: AndroidSymbol; color: ColorValue }) {
+  return <SymbolView name={{ ios, android, web: android }} tintColor={color} size={26} />;
+}
 
 export default function TabLayout() {
   return (
     <Tabs screenOptions={{ tabBarActiveTintColor: colors.primary }}>
       <Tabs.Screen
-        name="jeux"
+        name="index"
         options={{
-          title: 'Jeux',
-          tabBarIcon: ({ color }) => (
-            <SymbolView name={{ ios: 'dice', android: 'casino', web: 'casino' }} tintColor={color} size={26} />
-          ),
+          title: 'Accueil',
+          tabBarIcon: ({ color }) => <TabIcon ios="house.fill" android="home" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Salles',
-          tabBarIcon: ({ color }) => (
-            <SymbolView name={{ ios: 'map', android: 'map', web: 'map' }} tintColor={color} size={26} />
-          ),
-        }}
+        name="jeux"
+        options={{ title: 'Jeux', tabBarIcon: ({ color }) => <TabIcon ios="dice" android="casino" color={color} /> }}
+      />
+      <Tabs.Screen
+        name="grimper"
+        options={{ title: 'Grimper', tabBarIcon: ({ color }) => <TabIcon ios="map" android="map" color={color} /> }}
       />
       <Tabs.Screen
         name="progression"
         options={{
           title: 'Progression',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'chart.bar.fill', android: 'bar_chart', web: 'bar_chart' }}
-              tintColor={color}
-              size={26}
-            />
-          ),
+          tabBarIcon: ({ color }) => <TabIcon ios="chart.bar.fill" android="bar_chart" color={color} />,
         }}
       />
     </Tabs>

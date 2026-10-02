@@ -22,3 +22,14 @@ export function distanceM(a: LatLng, b: LatLng): number {
     Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
+
+/** Nom du lieu (ville ou quartier) à cette position, d'après le géocodeur du téléphone. */
+export async function placeName(pos: LatLng): Promise<string | null> {
+  try {
+    const [a] = await Location.reverseGeocodeAsync(pos);
+    if (!a) return null;
+    return a.city ?? a.district ?? a.subregion ?? a.region ?? null;
+  } catch {
+    return null;
+  }
+}

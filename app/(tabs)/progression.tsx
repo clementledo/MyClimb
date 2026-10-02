@@ -72,7 +72,7 @@ function StatsView() {
     return (
       <View style={s.container}>
         <Empty
-          text={'Pas encore de progression à afficher.\nChoisis une salle dans l\'onglet Salles et démarre une séance.'}
+          text={'Pas encore de progression à afficher.\nDémarre une séance depuis l\'onglet Grimper.'}
         />
       </View>
     );

@@ -35,6 +35,12 @@ db.execSync(`
     value TEXT NOT NULL,
     ts INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS spots (
+    name TEXT PRIMARY KEY NOT NULL,
+    lat REAL,
+    lng REAL,
+    last_used INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY NOT NULL,
     value TEXT NOT NULL
@@ -240,6 +246,32 @@ export function updateBlock(id: number, b: BlockInput) {
   db.runSync(
     `UPDATE blocks SET ${BLOCK_COLUMNS.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
     ...blockValues(b), id,
+  );
+}
+
+/** Spot extérieur : un site où tu as fait au moins une séance. */
+export type Spot = { name: string; lat: number | null; lng: number | null; lastUsed: number; climbs: number };
+
+/** Enregistre un spot au démarrage d'une séance ; garde sa position si on la connaît. */
+export function saveSpot(name: string, pos: { latitude: number; longitude: number } | null) {
+  db.runSync(
+    `INSERT INTO spots (name, lat, lng, last_used) VALUES (?, ?, ?, ?)
+     ON CONFLICT(name) DO UPDATE SET lat = COALESCE(excluded.lat, lat), lng = COALESCE(excluded.lng, lng),
+       last_used = excluded.last_used`,
+    name, pos?.latitude ?? null, pos?.longitude ?? null, Date.now(),
+  );
+}
+
+/** Spots extérieurs, du plus récent au plus ancien, avec le nombre de grimpes faites sur chacun. */
+export function listSpots(): Spot[] {
+  return db.getAllSync<Spot>(
+    `SELECT name, lat, lng, last_used AS lastUsed,
+       (SELECT COUNT(*) FROM blocks b WHERE b.outdoor = 1 AND b.site = s.name) AS climbs
+     FROM spots s
+     UNION ALL
+     SELECT site, NULL, NULL, MAX(created_at), COUNT(*) FROM blocks
+     WHERE outdoor = 1 AND site IS NOT NULL AND site NOT IN (SELECT name FROM spots) GROUP BY site
+     ORDER BY lastUsed DESC`,
   );
 }
 

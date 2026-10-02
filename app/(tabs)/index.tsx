@@ -1,276 +1,161 @@
-import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
+import { useCallback, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Empty, Segmented } from '@/components/ui';
-import { formatPrice } from '@/lib/climbing';
-import { countBlocksByGym, getGym, getSetting, saveGym, setSetting, type Gym } from '@/lib/db';
-import {
-  ANDROID_HEADERS,
-  formatDistance,
-  formatDuration,
-  photoUrl,
-  searchGyms,
-  travelTimes,
-  TRAVEL_MODE_LABELS,
-  type LatLng,
-  type Travel,
-  type TravelMode,
-} from '@/lib/google';
-import { gymPrices } from '@/lib/gymPrices';
-import { currentPosition, distanceM } from '@/lib/location';
+import { formatDate } from '@/components/BlockRow';
+import { sessionPlace } from '@/components/SessionBanner';
+import { Button } from '@/components/ui';
+import { DISCIPLINE_SYSTEMS, GRADES, isSent, placeKey, placeOf, type Discipline } from '@/lib/climbing';
+import { listBlocks, type Block } from '@/lib/db';
 import { getSession, type Session } from '@/lib/session';
 import { colors } from '@/lib/theme';
 
-const MODES: TravelMode[] = ['WALK', 'TRANSIT', 'DRIVE'];
-
-async function nearbyGyms() {
-  const pos = await currentPosition();
-  return { pos, gyms: await searchGyms(pos) };
+/** Meilleure réussite d'une discipline, dans le système de cotation le plus utilisé. */
+function bestSend(blocks: Block[], d: Discipline): string | null {
+  const sent = blocks.filter((b) => b.discipline === d && isSent(b.result));
+  const system = [...DISCIPLINE_SYSTEMS[d]].sort(
+    (a, b) => sent.filter((x) => x.gradeSystem === b).length - sent.filter((x) => x.gradeSystem === a).length,
+  )[0];
+  const ladder = GRADES[system];
+  const best = sent.filter((b) => b.gradeSystem === system).reduce((m, b) => Math.max(m, ladder.indexOf(b.grade)), -1);
+  return best >= 0 ? ladder[best] : null;
 }
 
-export default function GymsScreen() {
-  const [mode, setMode] = useState<TravelMode>(() => (getSetting('travelMode') as TravelMode) ?? 'WALK');
-  const [view, setView] = useState<'list' | 'map'>('list');
-  const [position, setPosition] = useState<LatLng | null>(null);
-  const [gyms, setGyms] = useState<Gym[]>([]);
-  // Temps de trajet du mode affiché ; ceux d'un autre mode sont ignorés le temps du calcul.
-  const [timesFor, setTimesFor] = useState<{ mode: TravelMode; data: Record<string, Travel> } | null>(null);
-  const times = useMemo(() => (timesFor?.mode === mode ? timesFor.data : {}), [timesFor, mode]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
+function mondayIso() {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+function since(ts: number) {
+  const min = Math.max(0, Math.round((Date.now() - ts) / 60_000));
+  return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
+}
+
+const goClimb = (where: 'gym' | 'outdoor') =>
+  router.navigate({ pathname: '/grimper', params: { where, t: String(Date.now()) } });
+
+export default function HomeScreen() {
+  const [blocks, setBlocks] = useState<Block[]>([]);
   const [session, setSession] = useState<Session | null>(null);
-  const [sortBy, setSortBy] = useState<'distance' | 'price'>(
-    () => (getSetting('gymSort') as 'distance' | 'price') ?? 'distance',
-  );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchGyms = useCallback(
-    () =>
-      nearbyGyms()
-        .then(({ pos, gyms }) => {
-          setPosition(pos);
-          setGyms(gyms);
-        })
-        .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-        .finally(() => setLoading(false)),
-    [],
-  );
-
-  const reload = () => {
-    setLoading(true);
-    setError(null);
-    fetchGyms();
-  };
-
-  useEffect(() => {
-    fetchGyms();
-  }, [fetchGyms]);
-
-  useEffect(() => {
-    if (!position || gyms.length === 0) return;
-    travelTimes(position, gyms, mode)
-      .then((data) => setTimesFor({ mode, data }))
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [position, gyms, mode]);
 
   useFocusEffect(
     useCallback(() => {
-      setCounts(countBlocksByGym());
+      setBlocks(listBlocks());
       setSession(getSession());
     }, []),
   );
 
-  const changeSort = (v: 'distance' | 'price') => {
-    setSortBy(v);
-    setSetting('gymSort', v);
-  };
-
-  const changeMode = (m: TravelMode) => {
-    setMode(m);
-    setSetting('travelMode', m);
-  };
-
-  const sorted = useMemo(() => {
-    const crow = (g: Gym) =>
-      position ? distanceM(position, { latitude: g.lat, longitude: g.lng }) : 0;
-    const time = (g: Gym) => times[g.id]?.durationSec ?? Number.POSITIVE_INFINITY;
-    // Par prix : les salles sans tarif renseigné passent en dernier.
-    const price = (g: Gym) => gymPrices(g)?.entry ?? Number.POSITIVE_INFINITY;
-    const byDistance = (a: Gym, b: Gym) => time(a) - time(b) || crow(a) - crow(b);
-    return [...gyms].sort(
-      sortBy === 'price' ? (a, b) => price(a) - price(b) || byDistance(a, b) : byDistance,
-    );
-  }, [gyms, times, position, sortBy]);
-
-  const open = (gym: Gym) => {
-    saveGym(gym);
-    router.push({ pathname: '/gym/[id]', params: { id: gym.id, mode } });
-  };
+  // Dernière séance : les grimpes du dernier jour, au même endroit.
+  const last = blocks[0];
+  const lastSession = last ? blocks.filter((b) => b.date === last.date && placeKey(b) === placeKey(last)) : [];
+  const monday = mondayIso();
+  const thisWeek = blocks.filter((b) => b.date >= monday);
+  const weekSessions = new Set(thisWeek.map((b) => `${b.date}|${placeKey(b)}`)).size;
+  const bestBloc = bestSend(blocks, 'bloc');
+  const bestVoie = bestSend(blocks, 'voie');
 
   return (
-    <View style={s.container}>
+    <ScrollView style={s.container} contentContainerStyle={s.content}>
       {session && (
-        <Pressable style={s.session} onPress={() => router.push('/session')}>
-          <Text style={s.sessionText} numberOfLines={1}>
-            Séance en cours ·{' '}
-            {session.gymId ? (getGym(session.gymId)?.name ?? 'Salle') : (session.site ?? 'Extérieur')}
+        <View style={s.session}>
+          <Text style={s.sessionTitle}>Séance en cours</Text>
+          <Text style={s.sessionText}>
+            {sessionPlace(session)} · depuis {since(session.startedAt)}
           </Text>
-          <Text style={s.sessionAction}>Reprendre</Text>
-        </Pressable>
-      )}
-      <View style={s.controls}>
-        <Segmented
-          options={MODES.map((m) => ({ value: m, label: TRAVEL_MODE_LABELS[m] }))}
-          value={mode}
-          onChange={changeMode}
-        />
-        <Segmented
-          options={[
-            { value: 'list', label: 'Liste' },
-            { value: 'map', label: 'Carte' },
-          ]}
-          value={view}
-          onChange={setView}
-        />
-        {view === 'list' && (
-          <View style={s.sortRow}>
-            <Text style={s.sortLabel}>Trier par</Text>
-            <View style={{ flex: 1 }}>
-              <Segmented
-                options={[
-                  { value: 'distance', label: 'Distance' },
-                  { value: 'price', label: "Prix d'entrée" },
-                ]}
-                value={sortBy}
-                onChange={changeSort}
-              />
-            </View>
-          </View>
-        )}
-      </View>
-
-      {error && (
-        <View style={s.error}>
-          <Text style={s.errorText}>{error}</Text>
-          <Button label="Réessayer" variant="secondary" onPress={reload} />
+          <Button label="Reprendre la séance" variant="secondary" onPress={() => router.push('/session')} />
         </View>
       )}
 
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
-      ) : view === 'list' ? (
-        <FlatList
-          data={sorted}
-          keyExtractor={(g) => g.id}
-          onRefresh={reload}
-          refreshing={false}
-          ListEmptyComponent={!error ? <Empty text="Aucune salle trouvée autour de toi." /> : null}
-          renderItem={({ item }) => {
-            const t = times[item.id];
-            const n = counts[item.id] ?? 0;
-            const entry = gymPrices(item)?.entry;
-            return (
-              <Pressable style={s.row} onPress={() => open(item)}>
-                {item.photoName ? (
-                  <Image
-                    source={{ uri: photoUrl(item.photoName), headers: ANDROID_HEADERS }}
-                    style={s.photo}
-                    contentFit="cover"
-                    cachePolicy="disk"
-                    transition={150}
-                  />
-                ) : (
-                  <View style={[s.photo, s.photoEmpty]}>
-                    <Text style={s.photoLetter}>{item.name.charAt(0).toUpperCase()}</Text>
-                  </View>
-                )}
-                <View style={{ flex: 1 }}>
-                  <Text style={s.name}>{item.name}</Text>
-                  {item.address && (
-                    <Text style={s.sub} numberOfLines={1}>
-                      {item.address}
-                    </Text>
-                  )}
-                  <Text style={s.price}>
-                    {entry !== undefined ? `Entrée ${formatPrice(entry)}` : 'Prix non disponible'}
-                    {n > 0 ? `  ·  ${n} grimpe${n > 1 ? 's' : ''}` : ''}
-                  </Text>
-                </View>
-                <View style={s.time}>
-                  {t ? (
-                    <>
-                      <Text style={s.duration}>{formatDuration(t.durationSec)}</Text>
-                      <Text style={s.sub}>{formatDistance(t.distanceM)}</Text>
-                    </>
-                  ) : (
-                    <ActivityIndicator size="small" color={colors.muted} />
-                  )}
-                </View>
-              </Pressable>
-            );
-          }}
-        />
+      <View style={s.grid}>
+        <Shortcut icon="fitness_center" ios="figure.climbing" label="Grimper en salle" onPress={() => goClimb('gym')} />
+        <Shortcut icon="landscape" ios="mountain.2" label="Grimper dehors" onPress={() => goClimb('outdoor')} />
+        <Shortcut icon="bar_chart" ios="chart.bar.fill" label="Progression" onPress={() => router.navigate('/progression')} />
+        <Shortcut icon="casino" ios="dice" label="Jeux" onPress={() => router.navigate('/jeux')} />
+      </View>
+
+      {blocks.length === 0 ? (
+        <Text style={s.muted}>
+          Choisis une salle dans Grimper en salle et démarre ta première séance : ton résumé apparaîtra ici.
+        </Text>
       ) : (
-        position && (
-          <MapView
-            style={{ flex: 1 }}
-            provider={PROVIDER_GOOGLE}
-            showsUserLocation
-            initialRegion={{ ...position, latitudeDelta: 0.15, longitudeDelta: 0.15 }}>
-            {sorted.map((g) => (
-              <Marker
-                key={g.id}
-                coordinate={{ latitude: g.lat, longitude: g.lng }}
-                title={g.name}
-                description={times[g.id] ? formatDuration(times[g.id].durationSec) : undefined}
-                pinColor={colors.primary}
-                onCalloutPress={() => open(g)}
-              />
-            ))}
-          </MapView>
-        )
+        <View style={s.summary}>
+          <Text style={s.title}>Résumé</Text>
+          {last && (
+            <Line
+              label="Dernière séance"
+              value={`${formatDate(last.date)} · ${placeOf(last)} · ${lastSession.length} grimpe${
+                lastSession.length > 1 ? 's' : ''
+              }, ${lastSession.filter((b) => isSent(b.result)).length} réussie${
+                lastSession.filter((b) => isSent(b.result)).length > 1 ? 's' : ''
+              }`}
+            />
+          )}
+          <Line
+            label="Cette semaine"
+            value={`${weekSessions} séance${weekSessions > 1 ? 's' : ''} · ${thisWeek.length} grimpe${
+              thisWeek.length > 1 ? 's' : ''
+            }`}
+          />
+          {bestBloc && <Line label="Meilleur bloc réussi" value={bestBloc} />}
+          {bestVoie && <Line label="Meilleure voie réussie" value={bestVoie} />}
+        </View>
       )}
+    </ScrollView>
+  );
+}
+
+function Shortcut({
+  icon,
+  ios,
+  label,
+  onPress,
+}: {
+  icon: AndroidSymbol;
+  ios: SFSymbol;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={({ pressed }) => [s.shortcut, pressed && { opacity: 0.7 }]} onPress={onPress}>
+      <SymbolView name={{ ios, android: icon, web: icon }} tintColor={colors.primary} size={34} />
+      <Text style={s.shortcutLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function Line({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={s.line}>
+      <Text style={s.lineLabel}>{label}</Text>
+      <Text style={s.lineValue}>{value}</Text>
     </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  controls: { padding: 12, gap: 8 },
-  session: {
-    flexDirection: 'row',
+  content: { padding: 16, gap: 20, paddingBottom: 40 },
+  session: { padding: 16, gap: 6, borderRadius: 14, backgroundColor: colors.primary },
+  sessionTitle: { color: '#fff', fontSize: 13, fontWeight: '600', opacity: 0.9 },
+  sessionText: { color: '#fff', fontSize: 18, fontWeight: '800', marginBottom: 6 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  shortcut: {
+    flexBasis: '46%',
+    flexGrow: 1,
+    aspectRatio: 1.3,
+    borderRadius: 16,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 12,
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    gap: 10,
   },
-  sessionText: { flex: 1, color: '#fff', fontWeight: '600' },
-  sessionAction: { color: '#fff', fontWeight: '800' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    gap: 12,
-  },
-  photo: { width: 64, height: 64, borderRadius: 10, backgroundColor: colors.surface },
-  photoEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
-  photoLetter: { fontSize: 24, fontWeight: '800', color: colors.primary },
-  name: { fontSize: 16, fontWeight: '600', color: colors.text },
-  sub: { color: colors.muted, fontSize: 13 },
-  price: { color: colors.primary, fontSize: 12, fontWeight: '600', marginTop: 2 },
-  sortRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sortLabel: { color: colors.muted, fontSize: 13 },
-  time: { alignItems: 'flex-end', minWidth: 64 },
-  duration: { fontSize: 16, fontWeight: '700', color: colors.text },
-  error: { margin: 12, padding: 12, gap: 8, borderRadius: 10, backgroundColor: '#FFF5F5' },
-  errorText: { color: colors.danger },
+  shortcutLabel: { fontSize: 15, fontWeight: '700', color: colors.text },
+  summary: { gap: 10 },
+  title: { fontWeight: '700', fontSize: 15, color: colors.text },
+  line: { padding: 12, borderRadius: 10, backgroundColor: colors.surface, gap: 2 },
+  lineLabel: { color: colors.muted, fontSize: 13 },
+  lineValue: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  muted: { color: colors.muted, lineHeight: 20 },
 });

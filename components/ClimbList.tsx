@@ -1,9 +1,9 @@
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BlockRow } from '@/components/BlockRow';
-import { Button, Chip, Empty } from '@/components/ui';
+import { Chip, Empty } from '@/components/ui';
 import { GRADES, isSent, placeKey, placeOf, RESULT_LABELS, type Discipline } from '@/lib/climbing';
 import { listBlocks, type Block } from '@/lib/db';
 import { colors } from '@/lib/theme';
@@ -91,19 +91,10 @@ export function ClimbList() {
           <Empty
             text={
               blocks.length === 0
-                ? 'Aucune grimpe pour l\'instant.\nChoisis une salle dans l\'onglet Salles et démarre une séance.'
+                ? 'Aucune grimpe pour l\'instant.\nDémarre une séance depuis l\'onglet Grimper.'
                 : 'Aucune grimpe ne correspond à ces filtres.'
             }
           />
-        }
-        ListFooterComponent={
-          <View style={s.footer}>
-            <Button
-              label="Démarrer une séance en extérieur"
-              variant="secondary"
-              onPress={() => router.push('/session/outdoor')}
-            />
-          </View>
         }
         contentContainerStyle={{ paddingBottom: 32 }}
       />
@@ -115,5 +106,4 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   filters: { paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   chips: { gap: 8, paddingHorizontal: 12 },
-  footer: { padding: 16 },
 });
