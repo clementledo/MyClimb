@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -6,8 +7,10 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Button, Empty, Segmented } from '@/components/ui';
 import { countBlocksByGym, getSetting, saveGym, setSetting, type Gym } from '@/lib/db';
 import {
+  ANDROID_HEADERS,
   formatDistance,
   formatDuration,
+  photoUrl,
   searchGyms,
   travelTimes,
   TRAVEL_MODE_LABELS,
@@ -124,6 +127,19 @@ export default function GymsScreen() {
             const n = counts[item.id] ?? 0;
             return (
               <Pressable style={s.row} onPress={() => open(item)}>
+                {item.photoName ? (
+                  <Image
+                    source={{ uri: photoUrl(item.photoName), headers: ANDROID_HEADERS }}
+                    style={s.photo}
+                    contentFit="cover"
+                    cachePolicy="disk"
+                    transition={150}
+                  />
+                ) : (
+                  <View style={[s.photo, s.photoEmpty]}>
+                    <Text style={s.photoLetter}>{item.name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={s.name}>{item.name}</Text>
                   {item.address && (
@@ -183,6 +199,9 @@ const s = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: 12,
   },
+  photo: { width: 64, height: 64, borderRadius: 10, backgroundColor: colors.surface },
+  photoEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
+  photoLetter: { fontSize: 24, fontWeight: '800', color: colors.primary },
   name: { fontSize: 16, fontWeight: '600', color: colors.text },
   sub: { color: colors.muted, fontSize: 13 },
   badge: { color: colors.primary, fontSize: 12, fontWeight: '600', marginTop: 2 },

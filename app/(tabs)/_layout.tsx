@@ -28,6 +28,19 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="progression"
+        options={{
+          title: 'Progression',
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name={{ ios: 'chart.bar.fill', android: 'bar_chart', web: 'bar_chart' }}
+              tintColor={color}
+              size={26}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

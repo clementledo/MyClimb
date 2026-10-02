@@ -69,10 +69,18 @@ export function Button({
         styles.button,
         variant === 'secondary' && styles.buttonSecondary,
         variant === 'danger' && styles.buttonDanger,
-        (pressed || disabled) && { opacity: 0.6 },
+        pressed && { opacity: 0.6 },
+        disabled && styles.buttonDisabled,
         style,
       ]}>
-      <Text style={[styles.buttonText, variant === 'secondary' && { color: colors.primary }]}>{label}</Text>
+      <Text
+        style={[
+          styles.buttonText,
+          variant === 'secondary' && { color: colors.primary },
+          disabled && { color: colors.muted },
+        ]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -124,6 +132,7 @@ export const styles = StyleSheet.create({
   },
   buttonSecondary: { backgroundColor: colors.primarySoft },
   buttonDanger: { backgroundColor: colors.danger },
+  buttonDisabled: { backgroundColor: colors.surface },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   section: { gap: 8 },
   sectionTitle: { fontWeight: '700', fontSize: 15, color: colors.text },

@@ -103,7 +103,20 @@ export default function GymScreen() {
         </View>
         {error && <Text style={s.error}>{error}</Text>}
 
-        <Button label="Y aller" onPress={() => Linking.openURL(navigationUrl(gym, mode))} />
+        <View style={s.actions}>
+          <Button
+            label="Y aller"
+            style={{ flex: 1 }}
+            onPress={() => Linking.openURL(navigationUrl(gym, mode))}
+          />
+          <Button
+            label={details && !details.website ? 'Pas de site web' : 'Site web'}
+            variant="secondary"
+            style={{ flex: 1 }}
+            disabled={!details?.website}
+            onPress={() => details?.website && Linking.openURL(details.website)}
+          />
+        </View>
 
         <Section title="Infos">
           {gym.address && <Text style={s.text}>{gym.address}</Text>}
@@ -125,11 +138,6 @@ export default function GymScreen() {
                   {h}
                 </Text>
               ))}
-              {details.website && (
-                <Text style={s.link} onPress={() => Linking.openURL(details.website!)}>
-                  Site de la salle
-                </Text>
-              )}
             </>
           ) : (
             <ActivityIndicator color={colors.muted} style={{ alignSelf: 'flex-start' }} />
@@ -160,6 +168,6 @@ const s = StyleSheet.create({
   duration: { fontSize: 22, fontWeight: '800' },
   text: { color: colors.text, fontSize: 15 },
   muted: { color: colors.muted, fontSize: 13 },
-  link: { color: colors.primary, fontWeight: '600' },
+  actions: { flexDirection: 'row', gap: 8 },
   error: { color: colors.danger },
 });

@@ -47,6 +47,8 @@ export type Gym = {
   address: string | null;
   lat: number;
   lng: number;
+  /** Référence Google de la première photo de la salle (non stockée en base). */
+  photoName?: string | null;
 };
 
 export type Block = {

@@ -6,7 +6,7 @@ const API_KEY: string = Constants.expoConfig?.extra?.googleMapsApiKey ?? '';
 
 // Identité de l'app Android, exigée par Google quand la clé est restreinte à cette app.
 // L'empreinte SHA-1 sera ajoutée quand la clé de signature définitive existera.
-const ANDROID_HEADERS = {
+export const ANDROID_HEADERS = {
   'X-Android-Package': 'com.clementledo.myclimb',
 };
 
@@ -69,7 +69,7 @@ const seconds = (d: string | undefined) => (d ? parseInt(d, 10) : NaN);
 
 /** Salles d'escalade autour de `origin` (Places API New, recherche texte). */
 export async function searchGyms(origin: LatLng): Promise<Gym[]> {
-  const key = `gyms:${posKey(origin, 0.01)}`;
+  const key = `gyms-v2:${posKey(origin, 0.01)}`;
   const cached = readCache<Gym[]>(key, GYM_LIST_TTL);
   if (cached) return cached;
 
@@ -79,11 +79,12 @@ export async function searchGyms(origin: LatLng): Promise<Gym[]> {
       displayName?: { text: string };
       formattedAddress?: string;
       location: { latitude: number; longitude: number };
+      photos?: { name: string }[];
     }[];
   };
   const data = await post<Resp>(
     'https://places.googleapis.com/v1/places:searchText',
-    'places.id,places.displayName,places.formattedAddress,places.location',
+    'places.id,places.displayName,places.formattedAddress,places.location,places.photos',
     {
       textQuery: "salle d'escalade bloc",
       languageCode: 'fr',
@@ -97,6 +98,7 @@ export async function searchGyms(origin: LatLng): Promise<Gym[]> {
     address: p.formattedAddress ?? null,
     lat: p.location.latitude,
     lng: p.location.longitude,
+    photoName: p.photos?.[0]?.name ?? null,
   }));
   writeCache(key, gyms);
   return gyms;
@@ -207,6 +209,11 @@ export async function gymDetails(placeId: string): Promise<GymDetails> {
   };
   writeCache(key, details);
   return details;
+}
+
+/** Adresse de la photo d'une salle (Place Photos), à la taille voulue. */
+export function photoUrl(photoName: string, maxWidthPx = 240): string {
+  return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidthPx}&key=${API_KEY}`;
 }
 
 /** Lien qui ouvre Google Maps en navigation vers la salle. */
