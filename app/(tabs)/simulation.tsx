@@ -4,7 +4,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vi
 
 import { Climb3D, type Progress } from '@/components/Climb3D';
 import { Button, Segmented } from '@/components/ui';
-import { listSimRoutes, pickRoutePhotos, removeSimRoute, saveSimRoutes, type SimRoute } from '@/lib/simRoutes';
+import { demoRoute, listSimRoutes, pickRoutePhotos, removeSimRoute, saveSimRoutes, type SimRoute } from '@/lib/simRoutes';
 import type { Pt } from '@/lib/simulation';
 import { colors } from '@/lib/theme';
 
@@ -39,12 +39,22 @@ export default function SimulationScreen() {
       Alert.alert('Photo', e instanceof Error ? e.message : String(e));
     }
   };
+  const addDemo = async () => {
+    try {
+      const demo = await demoRoute();
+      update([...routes, demo]);
+      setCurrentId(demo.id);
+      setMode('holds');
+    } catch (e) {
+      Alert.alert('Exemple', e instanceof Error ? e.message : String(e));
+    }
+  };
   const askAdd = () =>
     Alert.alert('Ajouter une voie', undefined, [
       { text: 'Prendre une photo', onPress: () => add('camera') },
       { text: 'Choisir des photos', onPress: () => add('library') },
-      { text: 'Annuler', style: 'cancel' },
-    ]);
+      { text: 'Voie d’exemple', onPress: addDemo },
+    ], { cancelable: true });
   const askRemove = (r: SimRoute) =>
     Alert.alert('Supprimer cette voie ?', 'La photo et les prises placées seront effacées.', [
       { text: 'Annuler', style: 'cancel' },
@@ -70,6 +80,9 @@ export default function SimulationScreen() {
           </Text>
           <Button label="Prendre une photo" onPress={() => add('camera')} />
           <Button label="Choisir des photos" variant="secondary" onPress={() => add('library')} />
+          <Pressable onPress={addDemo} hitSlop={8}>
+            <Text style={s.demo}>Essayer avec une voie d’exemple</Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -332,6 +345,7 @@ const s = StyleSheet.create({
   },
   row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   flex: { flex: 1 },
+  demo: { color: colors.primary, textAlign: 'center', fontWeight: '600', paddingTop: 4 },
   remove: { color: colors.danger, textAlign: 'center', fontWeight: '600', paddingVertical: 8 },
   emptyWrap: { justifyContent: 'center', padding: 24 },
   emptyCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 24, gap: 14 },

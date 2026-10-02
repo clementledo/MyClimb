@@ -1,0 +1,67 @@
+name: Test émulateur
+
+# Fabrique un APK pour émulateur (x86_64) depuis la branche de travail et lance l'app
+# dans un émulateur Android. Ne publie rien : les captures et le journal sont en artefact.
+on:
+  push:
+    branches: [wip]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY || vars.GOOGLE_MAPS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Générer le projet Android
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: 1
+          MYCLIMB_BUILD: 999
+
+      - name: Fabriquer l'APK (émulateur)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
+
+      - run: cp android/app/build/outputs/apk/release/app-release.apk app.apk
+
+      - name: Activer KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Lancer l'app dans l'émulateur
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: bash e2e/run.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e
+          path: e2e-out

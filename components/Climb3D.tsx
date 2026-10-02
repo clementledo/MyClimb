@@ -110,6 +110,8 @@ function orbitGestures(cam: Cam) {
 
 export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress, onEnd }: Props) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  // Erreur du moteur 3D : affichée au lieu de faire planter l'app.
+  const [failure, setFailure] = useState<string | null>(null);
   const live = useRef({ playing, speed, onProgress, onEnd, plan: plan(route), t: -0.6, dirty: true });
   // Caméra : objet modifié par les gestes et lu par la boucle de rendu.
   const [cam] = useState(() => ({ ...DEFAULT_CAM }));
@@ -132,6 +134,15 @@ export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress
   useEffect(() => () => cleanup.current(), []);
 
   const onContextCreate = (gl: ExpoWebGLRenderingContext) => {
+    try {
+      setup(gl);
+    } catch (e) {
+      cleanup.current();
+      setFailure(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const setup = (gl: ExpoWebGLRenderingContext) => {
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
     if (Platform.OS !== 'web') {
@@ -322,6 +333,15 @@ export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress
 
     const loop = () => {
       if (disposed) return;
+      try {
+        step();
+      } catch (e) {
+        disposed = true;
+        setFailure(e instanceof Error ? e.message : String(e));
+      }
+    };
+
+    const step = () => {
       const now = Date.now();
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
@@ -390,7 +410,15 @@ export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress
   return (
     <View style={s.container}>
       <GLView style={s.gl} onContextCreate={onContextCreate} {...pan.panHandlers} />
-      {status === 'loading' && (
+      {failure !== null && (
+        <View style={s.overlay}>
+          <Text style={s.failTitle}>La 3D n’a pas pu démarrer</Text>
+          <Text style={s.failText} selectable>
+            {failure}
+          </Text>
+        </View>
+      )}
+      {failure === null && status === 'loading' && (
         <View style={s.overlay} pointerEvents="none">
           <ActivityIndicator color={colors.primary} />
           <Text style={s.overlayText}>Préparation du mur…</Text>
@@ -415,6 +443,8 @@ const s = StyleSheet.create({
     gap: 8,
     backgroundColor: 'rgba(233,237,242,0.6)',
   },
+  failTitle: { color: colors.danger, fontWeight: '700', fontSize: 16 },
+  failText: { color: colors.muted, fontSize: 12, paddingHorizontal: 20, textAlign: 'center' },
   overlayText: { color: colors.muted, fontWeight: '600' },
   error: { position: 'absolute', top: 12, alignSelf: 'center', color: colors.danger, fontWeight: '600' },
 });

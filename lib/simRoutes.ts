@@ -1,3 +1,4 @@
+import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
@@ -79,4 +80,32 @@ export async function pickRoutePhotos(source: 'camera' | 'library'): Promise<Sim
     });
   }
   return routes;
+}
+
+/** Voie d'exemple (photo fournie avec l'app) pour essayer la simulation sans photo. */
+export async function demoRoute(): Promise<SimRoute> {
+  const [asset] = await Asset.loadAsync(require('@/assets/images/demo-wall.jpg'));
+  const dest = new File(photoDir(), `sim-demo-${Date.now()}.jpg`);
+  new File(asset.localUri ?? asset.uri).copy(dest);
+  return {
+    id: `demo-${Date.now()}`,
+    photo: dest.uri,
+    width: 900,
+    height: 1200,
+    size: 1,
+    hands: [
+      { x: 0.45, y: 0.62 },
+      { x: 0.62, y: 0.48 },
+      { x: 0.38, y: 0.36 },
+      { x: 0.58, y: 0.22 },
+      { x: 0.5, y: 0.08 },
+    ],
+    feet: [
+      { x: 0.4, y: 0.9 },
+      { x: 0.6, y: 0.84 },
+      { x: 0.42, y: 0.72 },
+      { x: 0.63, y: 0.66 },
+      { x: 0.4, y: 0.52 },
+    ],
+  };
 }
