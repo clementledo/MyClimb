@@ -18,6 +18,9 @@ jobs:
     env:
       # Clé Google Maps : secret du dépôt (Settings > Secrets and variables > Actions).
       GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY || vars.GOOGLE_MAPS_API_KEY }}
+      # Numéro de version (v1.0.N), lu par app.config.js à la génération du projet et au moment
+      # où Gradle emballe le code JS : il doit être défini pour tout le job.
+      MYCLIMB_BUILD: ${{ github.run_number }}
       # Signature de l'APK : secrets optionnels. Sans eux, l'APK est signé avec la clé de
       # débogage du modèle Expo, identique d'une fabrication à l'autre mais publique.
       MYCLIMB_KEYSTORE_BASE64: ${{ secrets.MYCLIMB_KEYSTORE_BASE64 }}
@@ -62,7 +65,6 @@ jobs:
         run: npx expo prebuild --platform android --no-install
         env:
           CI: 1
-          MYCLIMB_BUILD: ${{ github.run_number }}
 
       - name: Fabriquer l'APK
         working-directory: android

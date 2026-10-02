@@ -19,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY || vars.GOOGLE_MAPS_API_KEY }}
+      # Numéro de version (v1.0.N), lu par app.config.js à la génération du projet et au moment
+      # où Gradle emballe le code JS : il doit être défini pour tout le job.
+      MYCLIMB_BUILD: 999
     steps:
       - uses: actions/checkout@v5
 
@@ -39,7 +42,6 @@ jobs:
         run: npx expo prebuild --platform android --no-install
         env:
           CI: 1
-          MYCLIMB_BUILD: 999
 
       - name: Fabriquer l'APK (émulateur)
         working-directory: android
