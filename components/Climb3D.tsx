@@ -6,37 +6,14 @@ import { ActivityIndicator, PanResponder, Platform, StyleSheet, Text, View } fro
 import * as THREE from 'three';
 
 import type { SimRoute } from '@/lib/simRoutes';
-import { contactsAt, defaultHeight, planMoves, skeleton, type Limb, type Move, type P3 } from '@/lib/simulation';
+import type { Plan } from '@/lib/planner';
+import { contactsAt, skeleton, type P3 } from '@/lib/simulation';
 import { colors } from '@/lib/theme';
 
-/** Hauteur du mur dans la scène, quelle que soit la photo (en mètres environ). */
-const WALL_H = 4;
 /** Mouvements par seconde à la vitesse normale. */
 const MOVES_PER_S = 0.8;
 
-const LIMB_LABELS: Record<Limb, string> = {
-  lh: 'Main gauche',
-  rh: 'Main droite',
-  lf: 'Pied gauche',
-  rf: 'Pied droit',
-};
-
-export type Progress = { index: number; total: number; label: string };
-
-function moveLabel(moves: Move[], index: number, holds: number) {
-  const m = moves[index];
-  if (!m) return 'Top !';
-  if (m.hold === undefined) return `${LIMB_LABELS[m.limb]} se replace`;
-  return `${LIMB_LABELS[m.limb]} → ${m.hold === holds - 1 ? 'top' : `prise ${m.hold + 1}`}`;
-}
-
-function plan(route: SimRoute) {
-  const W = (WALL_H * route.width) / route.height;
-  const hands = route.hands.map((p) => ({ x: p.x * W, y: p.y * WALL_H }));
-  const feet = route.feet.map((p) => ({ x: p.x * W, y: p.y * WALL_H }));
-  const height = defaultHeight(hands, WALL_H) * route.size;
-  return { W, height, hands, feet, ...planMoves(hands, feet, height) };
-}
+export type Progress = { index: number; total: number };
 
 /** Photo réduite, décodée en pixels pour servir de texture au mur. */
 async function loadWallTexture(route: SimRoute) {
@@ -66,12 +43,17 @@ async function loadWallTexture(route: SimRoute) {
 
 type Props = {
   route: SimRoute;
+  plan: Plan;
   playing: boolean;
   speed: number;
   /** Change pour relancer la grimpe depuis le début. */
   restartKey: number;
   /** Change pour remettre la caméra de face. */
   viewKey: number;
+  /** Aller à un mouvement précis (`n` change à chaque demande). */
+  seek: { t: number; n: number };
+  /** Jouer un seul mouvement puis s'arrêter (`n` change à chaque demande). */
+  step: number;
   onProgress: (p: Progress) => void;
   onEnd: () => void;
 };
@@ -108,11 +90,11 @@ function orbitGestures(cam: Cam) {
   });
 }
 
-export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress, onEnd }: Props) {
+export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek, step, onProgress, onEnd }: Props) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   // Erreur du moteur 3D : affichée au lieu de faire planter l'app.
   const [failure, setFailure] = useState<string | null>(null);
-  const live = useRef({ playing, speed, onProgress, onEnd, plan: plan(route), t: -0.6, dirty: true });
+  const live = useRef({ playing, speed, onProgress, onEnd, plan, t: -0.6, dirty: true, stopAt: null as number | null });
   // Caméra : objet modifié par les gestes et lu par la boucle de rendu.
   const [cam] = useState(() => ({ ...DEFAULT_CAM }));
   const [pan] = useState(() => orbitGestures(cam));
@@ -121,8 +103,18 @@ export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress
     Object.assign(live.current, { playing, speed, onProgress, onEnd });
   }, [playing, speed, onProgress, onEnd]);
   useEffect(() => {
-    Object.assign(live.current, { plan: plan(route), dirty: true });
-  }, [route]);
+    Object.assign(live.current, { plan, dirty: true });
+  }, [plan]);
+  useEffect(() => {
+    if (seek.n > 0) Object.assign(live.current, { t: seek.t, stopAt: null });
+  }, [seek]);
+  useEffect(() => {
+    if (step > 0) {
+      const L = live.current;
+      L.stopAt = Math.min(L.plan.moves.length, Math.floor(Math.max(0, L.t) + 1e-6) + 1);
+      if (L.t < 0) L.t = 0;
+    }
+  }, [step]);
   useEffect(() => {
     live.current.t = -0.6;
   }, [restartKey]);
@@ -188,22 +180,23 @@ export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress
     scene.add(sun, sun.target);
 
     // Mur, sol et tapis.
-    const { W } = live.current.plan;
     const wallMat = new THREE.MeshLambertMaterial({ color: '#cfd4da' });
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(W, WALL_H), wallMat);
-    wall.position.set(0, WALL_H / 2, 0);
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), wallMat);
     wall.receiveShadow = true;
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshLambertMaterial({ color: '#d9dde3' }));
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     const pad = new THREE.Mesh(
-      new THREE.BoxGeometry(Math.max(2, W * 0.9), 0.25, 1.4),
+      new THREE.BoxGeometry(1, 0.25, 1.4),
       new THREE.MeshLambertMaterial({ color: '#34507F' }),
     );
     pad.position.set(0, 0.125, 0.75);
     pad.receiveShadow = true;
     scene.add(wall, floor, pad);
-    const toWorld = (p: P3) => new THREE.Vector3(p.x - W / 2, WALL_H - p.y, p.z);
+    const toWorld = (p: P3) => {
+      const { W, H } = live.current.plan;
+      return new THREE.Vector3(p.x - W / 2, H - p.y, p.z);
+    };
 
     // Bonhomme : formes unitaires, redimensionnées à chaque image.
     const cyl = new THREE.CylinderGeometry(1, 1, 1, 14);
@@ -277,8 +270,8 @@ export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress
     const pose = (t: number) => {
       const p = live.current.plan;
       const hgt = p.height;
-      const { c, moving, lift } = contactsAt(p.start, p.moves, t);
-      const s = skeleton(c, hgt, moving, lift);
+      const { c, types, moving, lift } = contactsAt(p.start, p.startTypes, p.moves, t);
+      const s = skeleton(c, hgt, moving, lift, types);
       const chest = toWorld(s.chest);
       const pelvis = toWorld(s.pelvis);
       const neckP = toWorld(s.neck);
@@ -324,7 +317,7 @@ export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress
     };
 
     // La caméra suit le grimpeur en douceur.
-    const target = new THREE.Vector3(0, WALL_H / 2, 0);
+    const target = new THREE.Vector3(0, live.current.plan.H / 2, 0);
     let first = true;
     let last = Date.now();
     let lastIndex = -1;
@@ -350,20 +343,28 @@ export function Climb3D({ route, playing, speed, restartKey, viewKey, onProgress
       if (L.dirty) {
         L.dirty = false;
         buildHolds();
-        const span = Math.max(W, WALL_H) * 0.8;
-        sun.position.set(span * 0.6, WALL_H + span * 0.7, span * 1.2);
-        sun.target.position.set(0, WALL_H / 2, 0);
+        const { W, H } = L.plan;
+        wall.scale.set(W, H, 1);
+        wall.position.set(0, H / 2, 0);
+        pad.scale.set(Math.max(2, W * 0.9), 1, 1);
+        const span = Math.max(W, H) * 0.8;
+        sun.position.set(span * 0.6, H + span * 0.7, span * 1.2);
+        sun.target.position.set(0, H / 2, 0);
         Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 0.1, far: span * 5 });
         sun.shadow.camera.updateProjectionMatrix();
       }
       const total = L.plan.moves.length;
-      if (L.playing) L.t += dt * MOVES_PER_S * L.speed;
+      if (L.playing || L.stopAt !== null) L.t += dt * MOVES_PER_S * L.speed;
+      if (L.stopAt !== null && L.t >= L.stopAt) {
+        L.t = L.stopAt;
+        L.stopAt = null;
+      }
       if (L.t < -0.6) L.t = -0.6;
       const t = Math.min(L.t, total);
       const index = Math.max(0, Math.min(total, Math.floor(t)));
       if (index !== lastIndex) {
         lastIndex = index;
-        L.onProgress({ index, total, label: moveLabel(L.plan.moves, index, L.plan.hands.length) });
+        L.onProgress({ index, total });
       }
       if (L.t >= total + 0.6 && L.playing && !ended) {
         ended = true;

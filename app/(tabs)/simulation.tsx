@@ -1,18 +1,19 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Climb3D, type Progress } from '@/components/Climb3D';
-import { Button, Segmented } from '@/components/ui';
+import { Button, Chip, Segmented } from '@/components/ui';
+import { getSetting, setSetting } from '@/lib/db';
+import { HOLD_TYPES, planRoute } from '@/lib/planner';
 import { demoRoute, listSimRoutes, pickRoutePhotos, removeSimRoute, saveSimRoutes, type SimRoute } from '@/lib/simRoutes';
-import type { Pt } from '@/lib/simulation';
+import type { HoldType, Pt } from '@/lib/simulation';
 import { colors } from '@/lib/theme';
 
 type Mode = 'holds' | '3d';
 type Kind = 'hands' | 'feet';
 
 const SPEEDS = [0.5, 1, 2];
-const SIZES = [0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.35];
 
 export default function SimulationScreen() {
   const [routes, setRoutes] = useState<SimRoute[]>(() => listSimRoutes());
@@ -111,7 +112,7 @@ export default function SimulationScreen() {
         <Segmented
           options={[
             { value: 'holds', label: 'Prises' },
-            { value: '3d', label: 'Grimpe en 3D' },
+            { value: '3d', label: 'Méthode 3D' },
           ]}
           value={ready ? mode : 'holds'}
           onChange={(m) => {
@@ -139,6 +140,8 @@ export default function SimulationScreen() {
 
 /* ---------- Placement des prises ---------- */
 
+type Selected = { kind: Kind; index: number } | null;
+
 function HoldsEditor({
   route,
   onChange,
@@ -152,21 +155,35 @@ function HoldsEditor({
 }) {
   const { width } = useWindowDimensions();
   const [kind, setKind] = useState<Kind>('hands');
+  const [selected, setSelected] = useState<Selected>(null);
   const w = width - 32;
   const h = (w * route.height) / route.width;
 
   const tap = (x: number, y: number) => {
-    // Toucher une prise déjà placée la retire.
+    // Toucher une prise déjà placée ouvre ses réglages.
     const near = (p: Pt) => Math.hypot(p.x * w - x, p.y * h - y) < 18;
     const hi = route.hands.findIndex(near);
-    if (hi >= 0) return onChange({ hands: route.hands.filter((_, i) => i !== hi) });
+    if (hi >= 0) return setSelected({ kind: 'hands', index: hi });
     const fi = route.feet.findIndex(near);
-    if (fi >= 0) return onChange({ feet: route.feet.filter((_, i) => i !== fi) });
+    if (fi >= 0) return setSelected({ kind: 'feet', index: fi });
     const p = { x: x / w, y: y / h };
     onChange(kind === 'hands' ? { hands: [...route.hands, p] } : { feet: [...route.feet, p] });
   };
   const undo = () =>
     onChange(kind === 'hands' ? { hands: route.hands.slice(0, -1) } : { feet: route.feet.slice(0, -1) });
+
+  const setType = (type: HoldType | undefined) => {
+    if (selected?.kind !== 'hands') return;
+    onChange({ hands: route.hands.map((p, i) => (i === selected.index ? { x: p.x, y: p.y, type } : p)) });
+    setSelected(null);
+  };
+  const removeSelected = () => {
+    if (!selected) return;
+    if (selected.kind === 'hands') onChange({ hands: route.hands.filter((_, i) => i !== selected.index) });
+    else onChange({ feet: route.feet.filter((_, i) => i !== selected.index) });
+    setSelected(null);
+  };
+  const selectedHold = selected?.kind === 'hands' ? route.hands[selected.index] : null;
 
   return (
     <ScrollView contentContainerStyle={s.editor}>
@@ -181,8 +198,8 @@ function HoldsEditor({
       <Text style={s.hint}>
         {kind === 'hands'
           ? 'Touche les prises de main dans l’ordre : la 1re est le départ, la dernière le top.'
-          : 'Touche les prises de pied, dans n’importe quel ordre. Sans pieds, le grimpeur pose les pieds sur le mur.'}
-        {' '}Touche une prise placée pour la retirer.
+          : 'Touche les prises de pied, dans n’importe quel ordre. Les prises de main déjà dépassées servent aussi de pieds.'}
+        {' '}Touche une prise placée pour choisir son type (facultatif) ou la retirer.
       </Text>
       <Pressable onPress={(e) => tap(e.nativeEvent.locationX, e.nativeEvent.locationY)}>
         <View style={{ width: w, height: h }}>
@@ -191,8 +208,9 @@ function HoldsEditor({
             <View
               key={`f${i}`}
               pointerEvents="none"
-              style={[s.foot, { left: p.x * w - 9, top: p.y * h - 9 }]}
-            />
+              style={[s.foot, { left: p.x * w - 11, top: p.y * h - 11 }]}>
+              <Text style={s.footText}>{i + 1}</Text>
+            </View>
           ))}
           {route.hands.map((p, i) => (
             <View
@@ -204,6 +222,11 @@ function HoldsEditor({
                 { left: p.x * w - 14, top: p.y * h - 14 },
               ]}>
               <Text style={s.handText}>{i + 1}</Text>
+              {p.type && (
+                <View style={s.typeBadge}>
+                  <Text style={s.typeBadgeText}>{HOLD_TYPES[p.type].short}</Text>
+                </View>
+              )}
             </View>
           ))}
         </View>
@@ -217,64 +240,152 @@ function HoldsEditor({
           onPress={() => onChange({ hands: [], feet: [] })}
         />
       </View>
-      <Button label="Lancer la grimpe en 3D" disabled={route.hands.length < 2} onPress={onPlay} />
+      <Button label="Voir la méthode en 3D" disabled={route.hands.length < 2} onPress={onPlay} />
       <Pressable onPress={onRemove} hitSlop={8}>
         <Text style={s.remove}>Supprimer cette voie</Text>
       </Pressable>
+
+      <Modal visible={selected !== null} transparent animationType="fade" onRequestClose={() => setSelected(null)}>
+        <Pressable style={s.backdrop} onPress={() => setSelected(null)}>
+          <Pressable style={s.sheet} onPress={() => {}}>
+            <Text style={s.sheetTitle}>
+              {selected?.kind === 'hands' ? `Prise de main ${selected.index + 1}` : `Prise de pied ${(selected?.index ?? 0) + 1}`}
+            </Text>
+            {selected?.kind === 'hands' && (
+              <>
+                <Text style={s.hint}>Type de prise (facultatif) : le grimpeur se place en conséquence.</Text>
+                <View style={s.chips}>
+                  <Chip label="Aucun" selected={!selectedHold?.type} onPress={() => setType(undefined)} />
+                  {(Object.keys(HOLD_TYPES) as HoldType[]).map((t) => (
+                    <Chip key={t} label={HOLD_TYPES[t].label} selected={selectedHold?.type === t} onPress={() => setType(t)} />
+                  ))}
+                </View>
+              </>
+            )}
+            <Button label="Retirer cette prise" variant="danger" onPress={removeSelected} />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
 
-/* ---------- Lecture en 3D ---------- */
+/* ---------- Méthode en 3D ---------- */
+
+const HEIGHT_KEY = 'climberHeight';
+const readHeight = () => {
+  const v = Number(getSetting(HEIGHT_KEY));
+  return v >= 1.2 && v <= 2.2 ? v : 1.75;
+};
 
 function Player({ route, onSize }: { route: SimRoute; onSize: (size: number) => void }) {
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [restartKey, setRestartKey] = useState(0);
   const [viewKey, setViewKey] = useState(0);
-  const [progress, setProgress] = useState<Progress>({ index: 0, total: 0, label: '' });
-  const finished = progress.total > 0 && progress.index >= progress.total;
+  const [seek, setSeek] = useState({ t: -0.6, n: 0 });
+  const [step, setStep] = useState(0);
+  const [height, setHeight] = useState(readHeight);
+  const [progress, setProgress] = useState<Progress>({ index: 0, total: 0 });
 
-  const sizeIdx = SIZES.reduce((best, v, i) => (Math.abs(v - route.size) < Math.abs(SIZES[best] - route.size) ? i : best), 0);
+  const plan = planRoute(route, height);
+  const total = plan.moves.length;
+  const index = Math.min(progress.index, total);
+  const finished = index >= total;
+  const move = plan.moves[index];
+
+  const changeHeight = (d: number) => {
+    const v = Math.round(Math.min(2.2, Math.max(1.2, height + d)) * 100) / 100;
+    setHeight(v);
+    setSetting(HEIGHT_KEY, String(v));
+  };
+  const goTo = (i: number) => {
+    setPlaying(false);
+    setSeek((x) => ({ t: Math.max(0, Math.min(total, i)), n: x.n + 1 }));
+  };
 
   return (
     <View style={s.player}>
-      <Climb3D
-        route={route}
-        playing={playing}
-        speed={speed}
-        restartKey={restartKey}
-        viewKey={viewKey}
-        onProgress={setProgress}
-        onEnd={() => setPlaying(false)}
-      />
-      <View style={s.caption}>
-        <Text style={s.captionText} numberOfLines={1}>
-          {progress.label}
-        </Text>
-        <Text style={s.captionCount}>
-          {Math.min(progress.index + 1, progress.total)}/{progress.total}
-        </Text>
+      <View style={s.glWrap}>
+        <Climb3D
+          route={route}
+          plan={plan}
+          playing={playing}
+          speed={speed}
+          restartKey={restartKey}
+          viewKey={viewKey}
+          seek={seek}
+          step={step}
+          onProgress={setProgress}
+          onEnd={() => setPlaying(false)}
+        />
       </View>
+
+      <View style={s.stepCard}>
+        <View style={s.stepHead}>
+          <Text style={s.stepTitle} numberOfLines={2}>
+            {finished ? 'Top !' : index === 0 && progress.total === 0 ? 'Départ' : move?.title}
+          </Text>
+          <Text style={s.stepCount}>
+            {Math.min(index + 1, total)}/{total}
+          </Text>
+        </View>
+        {index === 0 && <Text style={s.stepStart}>{plan.startText}</Text>}
+        {!finished &&
+          move?.alerts.map((a) => (
+            <View key={a} style={s.alert}>
+              <Text style={s.alertText}>⚠ {a}</Text>
+            </View>
+          ))}
+        {!finished &&
+          move?.tips.map((t) => (
+            <Text key={t} style={s.tip}>
+              • {t}
+            </Text>
+          ))}
+      </View>
+
       <View style={s.row}>
-        <Ctrl label="⟲ Rejouer" onPress={() => { setRestartKey((k) => k + 1); setPlaying(true); }} />
+        <Ctrl label="⏮" onPress={() => goTo(index - 1)} disabled={index === 0} />
         <Ctrl
-          label={playing ? '❚❚ Pause' : '▶ Lecture'}
+          label={playing ? '❚❚ Pause' : '▶ Tout jouer'}
           primary
           onPress={() => {
             if (finished && !playing) setRestartKey((k) => k + 1);
             setPlaying(!playing);
           }}
         />
-        <Ctrl label={`× ${String(speed).replace('.', ',')}`} onPress={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])} />
+        <Ctrl
+          label="Étape ⏭"
+          disabled={finished}
+          onPress={() => {
+            setPlaying(false);
+            setStep((k) => k + 1);
+          }}
+        />
       </View>
       <View style={s.row}>
-        <Text style={s.sizeLabel}>Taille du grimpeur</Text>
-        <Ctrl label="−" disabled={sizeIdx === 0} onPress={() => onSize(SIZES[sizeIdx - 1])} />
-        <Ctrl label="+" disabled={sizeIdx === SIZES.length - 1} onPress={() => onSize(SIZES[sizeIdx + 1])} />
+        <Ctrl label="⟲" onPress={() => { setPlaying(false); setRestartKey((k) => k + 1); }} />
+        <Ctrl
+          label={`× ${String(speed).replace('.', ',')}`}
+          onPress={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}
+        />
         <Ctrl label="Vue de face" onPress={() => setViewKey((k) => k + 1)} />
       </View>
-      <Text style={s.hint}>Glisse un doigt pour tourner autour du mur, pince pour zoomer.</Text>
+      <View style={s.row}>
+        <Text style={s.sizeLabel}>Ta taille : {String(height.toFixed(2)).replace('.', ',')} m</Text>
+        <Ctrl label="−" onPress={() => changeHeight(-0.05)} />
+        <Ctrl label="+" onPress={() => changeHeight(0.05)} />
+      </View>
+      <View style={s.row}>
+        <Text style={s.sizeLabel}>Mur : {plan.H.toFixed(1).replace('.', ',')} m</Text>
+        <Ctrl label="−" onPress={() => onSize(Math.min(2, route.size * 1.1))} />
+        <Ctrl label="+" onPress={() => onSize(Math.max(0.5, route.size / 1.1))} />
+      </View>
+      <Text style={s.hint}>
+        La hauteur du mur est estimée d’après l’écart entre les prises ; corrige-la si le grimpeur paraît trop grand
+        ou trop petit. Un doigt fait tourner la caméra, deux doigts zooment.
+      </Text>
     </View>
   );
 }
@@ -336,13 +447,40 @@ const s = StyleSheet.create({
   handText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   foot: {
     position: 'absolute',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#1C7ED6',
     borderWidth: 2,
     borderColor: '#fff',
   },
+  footText: { color: '#fff', fontWeight: '800', fontSize: 10 },
+  typeBadge: {
+    position: 'absolute',
+    right: -10,
+    top: -8,
+    minWidth: 18,
+    paddingHorizontal: 3,
+    borderRadius: 8,
+    backgroundColor: '#1A1A1A',
+    alignItems: 'center',
+  },
+  typeBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: colors.background, padding: 20, paddingBottom: 32, gap: 14, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  sheetTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  glWrap: { flex: 1, minHeight: 220 },
+  stepCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, gap: 6 },
+  stepHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  stepTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: colors.text },
+  stepCount: { color: colors.muted, fontWeight: '600' },
+  stepStart: { color: colors.text, fontSize: 13, lineHeight: 18 },
+  tip: { color: colors.text, fontSize: 13, lineHeight: 18 },
+  alert: { alignSelf: 'flex-start', backgroundColor: '#FFF3BF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  alertText: { color: '#8A5A00', fontWeight: '700', fontSize: 13 },
   row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   flex: { flex: 1 },
   demo: { color: colors.primary, textAlign: 'center', fontWeight: '600', paddingTop: 4 },
@@ -351,13 +489,10 @@ const s = StyleSheet.create({
   emptyCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 24, gap: 14 },
   emptyTitle: { fontSize: 22, fontWeight: '800', color: colors.text },
   emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22, marginBottom: 6 },
-  player: { flex: 1, padding: 16, gap: 10 },
-  caption: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  captionText: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text },
-  captionCount: { color: colors.muted, fontWeight: '600' },
+  player: { flex: 1, padding: 12, gap: 8 },
   ctrl: {
     flex: 1,
-    paddingVertical: 11,
+    paddingVertical: 9,
     borderRadius: 10,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',

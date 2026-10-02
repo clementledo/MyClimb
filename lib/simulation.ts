@@ -10,7 +10,22 @@ export type Pt = { x: number; y: number };
 export type Limb = 'lh' | 'rh' | 'lf' | 'rf';
 export type Contacts = Record<Limb, Pt>;
 /** `hold` : numéro de la prise de main visée (à partir de 0). */
-export type Move = { limb: Limb; from: Pt; to: Pt; hold?: number };
+/** Types de prises de main (facultatifs). `lat_g` : latérale qu'on tire vers la gauche. */
+export type HoldType = 'bac' | 'reglette' | 'plat' | 'pince' | 'inversee' | 'lat_g' | 'lat_d';
+export type Hold = Pt & { type?: HoldType };
+export type HandTypes = { lh?: HoldType; rh?: HoldType };
+
+/** Un mouvement de la méthode, avec ce qu'il faut afficher pour aider. */
+export type Move = {
+  limb: Limb;
+  from: Pt;
+  to: Pt;
+  /** Type de la prise de main visée. */
+  type?: HoldType;
+  title: string;
+  tips: string[];
+  alerts: string[];
+};
 
 /** Proportions du corps, en fraction de la taille du grimpeur. */
 export function body(height: number) {
@@ -27,12 +42,12 @@ export function body(height: number) {
   };
 }
 
-const add = (a: Pt, b: Pt): Pt => ({ x: a.x + b.x, y: a.y + b.y });
-const sub = (a: Pt, b: Pt): Pt => ({ x: a.x - b.x, y: a.y - b.y });
+export const add = (a: Pt, b: Pt): Pt => ({ x: a.x + b.x, y: a.y + b.y });
+export const sub = (a: Pt, b: Pt): Pt => ({ x: a.x - b.x, y: a.y - b.y });
 const mul = (a: Pt, k: number): Pt => ({ x: a.x * k, y: a.y * k });
 const len = (a: Pt) => Math.hypot(a.x, a.y);
-const dist = (a: Pt, b: Pt) => len(sub(a, b));
-const mid = (a: Pt, b: Pt): Pt => mul(add(a, b), 0.5);
+export const dist = (a: Pt, b: Pt) => len(sub(a, b));
+export const mid = (a: Pt, b: Pt): Pt => mul(add(a, b), 0.5);
 const lerp = (a: Pt, b: Pt, t: number): Pt => add(a, mul(sub(b, a), t));
 
 /** Rapproche `p` de `target` pour que la distance ne dépasse pas `max`. */
@@ -41,25 +56,23 @@ function clampTo(p: Pt, target: Pt, max: number): Pt {
   return d <= max ? p : lerp(target, p, max / d);
 }
 
-/** Taille de grimpeur par défaut : proportionnelle à l'écart moyen entre deux prises de main. */
-export function defaultHeight(hands: Pt[], imageHeight: number) {
-  const gaps = hands.slice(1).map((p, i) => dist(p, hands[i])).sort((a, b) => a - b);
-  const median = gaps.length ? gaps[Math.floor(gaps.length / 2)] : imageHeight * 0.2;
-  return Math.min(imageHeight * 0.6, Math.max(imageHeight * 0.2, median * 2.4));
-}
-
 /** Pose d'équilibre : épaules sous les mains, bassin vers les pieds, membres à portée. */
-function hipCenter(c: Contacts, height: number) {
+function hipCenter(c: Contacts, height: number, types: HandTypes = {}) {
   const b = body(height);
+  // Latérale : le corps se décale du côté où l'on tire. Inversée ou plat : le corps descend.
+  const pull = (t?: HoldType) => (t === 'lat_g' ? -1 : t === 'lat_d' ? 1 : 0);
+  const sideShift = (pull(types.lh) + pull(types.rh)) * 0.1 * height;
+  const low = (t?: HoldType) => (t === 'inversee' ? 0.3 : t === 'plat' ? 0.12 : 0);
+  const drop = Math.max(low(types.lh), low(types.rh));
   const arm = b.upperArm + b.forearm;
   const leg = b.thigh + b.shin;
   const hands = mid(c.lh, c.rh);
   const feet = mid(c.lf, c.rf);
-  let shoulders = add(hands, { x: 0, y: arm * 0.8 });
+  let shoulders = add(hands, { x: sideShift, y: arm * (0.8 + drop) });
   let hips = add(shoulders, { x: 0, y: b.torso });
   for (let i = 0; i < 4; i++) {
     // Le bassin reste à portée des pieds, les épaules à portée des mains.
-    hips = clampTo(hips, add(feet, { x: 0, y: -leg * 0.15 }), leg * 0.9);
+    hips = clampTo(hips, add(feet, { x: sideShift, y: -leg * 0.15 }), leg * 0.9);
     // Le bassin reste au-dessus du pied le plus haut, sinon les jambes se replient à l'horizontale.
     hips = { x: hips.x, y: Math.min(hips.y, Math.min(c.lf.y, c.rf.y) - leg * 0.3) };
     shoulders = add(hips, mul(norm(sub(hands, hips), { x: 0, y: -1 }), b.torso));
@@ -75,87 +88,27 @@ function norm(v: Pt, fallback: Pt): Pt {
   return l < 1e-6 ? fallback : mul(v, 1 / l);
 }
 
-/** Pieds : la prise de pied la plus proche de l'endroit naturel, sinon en adhérence sur le mur. */
-function footTarget(side: -1 | 1, hips: Pt, feet: Pt[], height: number, taken: Pt | null): Pt {
-  const b = body(height);
-  const leg = b.thigh + b.shin;
-  const ideal = add(hips, { x: side * b.hips * 1.2, y: leg * 0.8 });
-  const candidates = feet.filter(
-    (f) => f !== taken && f.y > hips.y + leg * 0.35 && dist(f, hips) < leg * 0.98 && (f.x - hips.x) * side > -b.hips,
-  );
-  if (candidates.length === 0) return ideal;
-  return candidates.reduce((a, f) => (dist(f, ideal) < dist(a, ideal) ? f : a));
-}
-
-/** Suite de mouvements pour enchaîner les prises de main, du départ au top. */
-export function planMoves(hands: Pt[], feet: Pt[], height: number): { start: Contacts; moves: Move[] } {
-  const b = body(height);
-  const h0 = hands[0];
-  const start0: Contacts = {
-    lh: add(h0, { x: -b.shoulders * 0.1, y: 0 }),
-    rh: add(h0, { x: b.shoulders * 0.1, y: 0 }),
-    lf: h0,
-    rf: h0,
-  };
-  const { hips } = hipCenter({ ...start0, lf: add(h0, { x: 0, y: height }), rf: add(h0, { x: 0, y: height }) }, height);
-  start0.lf = footTarget(-1, hips, feet, height, null);
-  start0.rf = footTarget(1, hips, feet, height, start0.lf);
-
-  const moves: Move[] = [];
-  const c: Contacts = { ...start0 };
-  const go = (limb: Limb, to: Pt, hold?: number) => {
-    if (dist(c[limb], to) < height * 0.005) return;
-    moves.push({ limb, from: c[limb], to, hold });
-    c[limb] = to;
-  };
-
-  let lastHand: 'lh' | 'rh' | null = null;
-  for (let i = 1; i < hands.length; i++) {
-    const target = hands[i];
-    // La main qui part est celle qui n'est pas sur la dernière prise ; au départ, selon le côté.
-    const hand: 'lh' | 'rh' =
-      lastHand === null ? (target.x >= h0.x ? 'rh' : 'lh') : lastHand === 'lh' ? 'rh' : 'lh';
-    // Remonter les pieds avant un grand mouvement, puis lancer la main.
-    const next = { ...c, [hand]: target };
-    const { hips: nh } = hipCenter(next, height);
-    const lf = footTarget(-1, nh, feet, height, null);
-    const rf = footTarget(1, nh, feet, height, lf);
-    const far = dist(c[hand], target) > (b.upperArm + b.forearm) * 0.9;
-    if (far) {
-      go('lf', lf);
-      go('rf', rf);
-    }
-    go(hand, target, i);
-    if (!far) {
-      go('lf', lf);
-      go('rf', rf);
-    }
-    lastHand = hand;
-  }
-  // Au top : les deux mains sur la dernière prise.
-  if (hands.length > 1 && lastHand) {
-    const top = hands[hands.length - 1];
-    const other = lastHand === 'lh' ? 'rh' : 'lh';
-    go(other, add(top, { x: (other === 'lh' ? -1 : 1) * b.shoulders * 0.12, y: 0 }), hands.length - 1);
-  }
-  return { start: start0, moves };
-}
-
 /** Contacts au temps `t` (en nombre de mouvements, ex. 2.5 = milieu du 3e) ; `lift` = décollement du mur (0 à 1). */
 export function contactsAt(
   start: Contacts,
+  startTypes: HandTypes,
   moves: Move[],
   t: number,
-): { c: Contacts; moving: Limb | null; lift: number; index: number } {
+): { c: Contacts; types: HandTypes; moving: Limb | null; lift: number; index: number } {
   const c: Contacts = { ...start };
+  const types: HandTypes = { ...startTypes };
   const done = Math.min(moves.length, Math.max(0, Math.floor(t)));
-  for (let i = 0; i < done; i++) c[moves[i].limb] = moves[i].to;
+  for (let i = 0; i < done; i++) {
+    const m = moves[i];
+    c[m.limb] = m.to;
+    if (m.limb === 'lh' || m.limb === 'rh') types[m.limb] = m.type;
+  }
   const current = moves[done];
-  if (!current || t >= moves.length) return { c, moving: null, lift: 0, index: moves.length };
+  if (!current || t >= moves.length) return { c, types, moving: null, lift: 0, index: moves.length };
   const p = Math.max(0, t - done);
   const e = p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
   c[current.limb] = lerp(current.from, current.to, e);
-  return { c, moving: current.limb, lift: Math.sin(Math.PI * e), index: done };
+  return { c, types, moving: current.limb, lift: Math.sin(Math.PI * e), index: done };
 }
 
 /* ---------- Squelette en 3D ---------- */
@@ -197,11 +150,17 @@ export type Skeleton = {
  * Squelette en 3D : x et y sur le mur (y vers le bas), z = distance au mur.
  * Les mains et les pieds sont sur le mur, le corps s'en écarte d'autant que les membres le permettent.
  */
-export function skeleton(c: Contacts, height: number, moving: Limb | null = null, lift = 0): Skeleton {
+export function skeleton(
+  c: Contacts,
+  height: number,
+  moving: Limb | null = null,
+  lift = 0,
+  types: HandTypes = {},
+): Skeleton {
   const b = body(height);
   const arm = b.upperArm + b.forearm;
   const leg = b.thigh + b.shin;
-  const { shoulders, hips } = hipCenter(c, height);
+  const { shoulders, hips } = hipCenter(c, height, types);
 
   const onWall = 0.03 * height;
   const contact = (l: Limb) => v3(c[l], onWall + (moving === l ? lift * 0.14 * height : 0));
