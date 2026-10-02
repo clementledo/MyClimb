@@ -1,7 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 
-const photoDir = () => {
+export const photoDir = () => {
   const dir = new Directory(Paths.document, 'photos');
   if (!dir.exists) dir.create({ intermediates: true });
   return dir;

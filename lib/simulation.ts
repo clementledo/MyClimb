@@ -1,15 +1,16 @@
 /**
  * Simulation d'un grimpeur sur une photo de voie : à partir des prises de main (dans l'ordre)
  * et des prises de pied, on calcule une suite de mouvements, puis la posture du corps à
- * chaque instant (bras et jambes en cinématique inverse à deux segments).
+ * chaque instant, en 3D (bras et jambes en cinématique inverse à deux segments).
  *
- * Les coordonnées sont en pixels d'affichage, y vers le bas.
+ * Coordonnées sur le mur avec y vers le bas, z = distance au mur.
  */
 
 export type Pt = { x: number; y: number };
 export type Limb = 'lh' | 'rh' | 'lf' | 'rf';
 export type Contacts = Record<Limb, Pt>;
-export type Move = { limb: Limb; from: Pt; to: Pt };
+/** `hold` : numéro de la prise de main visée (à partir de 0). */
+export type Move = { limb: Limb; from: Pt; to: Pt; hold?: number };
 
 /** Proportions du corps, en fraction de la taille du grimpeur. */
 export function body(height: number) {
@@ -59,6 +60,8 @@ function hipCenter(c: Contacts, height: number) {
   for (let i = 0; i < 4; i++) {
     // Le bassin reste à portée des pieds, les épaules à portée des mains.
     hips = clampTo(hips, add(feet, { x: 0, y: -leg * 0.15 }), leg * 0.9);
+    // Le bassin reste au-dessus du pied le plus haut, sinon les jambes se replient à l'horizontale.
+    hips = { x: hips.x, y: Math.min(hips.y, Math.min(c.lf.y, c.rf.y) - leg * 0.3) };
     shoulders = add(hips, mul(norm(sub(hands, hips), { x: 0, y: -1 }), b.torso));
     shoulders = clampTo(shoulders, c.lh, arm * 0.98);
     shoulders = clampTo(shoulders, c.rh, arm * 0.98);
@@ -76,9 +79,9 @@ function norm(v: Pt, fallback: Pt): Pt {
 function footTarget(side: -1 | 1, hips: Pt, feet: Pt[], height: number, taken: Pt | null): Pt {
   const b = body(height);
   const leg = b.thigh + b.shin;
-  const ideal = add(hips, { x: side * b.hips * 1.2, y: leg * 0.75 });
+  const ideal = add(hips, { x: side * b.hips * 1.2, y: leg * 0.8 });
   const candidates = feet.filter(
-    (f) => f !== taken && f.y > hips.y + leg * 0.2 && dist(f, hips) < leg * 0.95 && (f.x - hips.x) * side > -b.hips,
+    (f) => f !== taken && f.y > hips.y + leg * 0.35 && dist(f, hips) < leg * 0.98 && (f.x - hips.x) * side > -b.hips,
   );
   if (candidates.length === 0) return ideal;
   return candidates.reduce((a, f) => (dist(f, ideal) < dist(a, ideal) ? f : a));
@@ -100,9 +103,9 @@ export function planMoves(hands: Pt[], feet: Pt[], height: number): { start: Con
 
   const moves: Move[] = [];
   const c: Contacts = { ...start0 };
-  const go = (limb: Limb, to: Pt) => {
-    if (dist(c[limb], to) < 1) return;
-    moves.push({ limb, from: c[limb], to });
+  const go = (limb: Limb, to: Pt, hold?: number) => {
+    if (dist(c[limb], to) < height * 0.005) return;
+    moves.push({ limb, from: c[limb], to, hold });
     c[limb] = to;
   };
 
@@ -122,7 +125,7 @@ export function planMoves(hands: Pt[], feet: Pt[], height: number): { start: Con
       go('lf', lf);
       go('rf', rf);
     }
-    go(hand, target);
+    go(hand, target, i);
     if (!far) {
       go('lf', lf);
       go('rf', rf);
@@ -133,79 +136,106 @@ export function planMoves(hands: Pt[], feet: Pt[], height: number): { start: Con
   if (hands.length > 1 && lastHand) {
     const top = hands[hands.length - 1];
     const other = lastHand === 'lh' ? 'rh' : 'lh';
-    go(other, add(top, { x: (other === 'lh' ? -1 : 1) * b.shoulders * 0.12, y: 0 }));
+    go(other, add(top, { x: (other === 'lh' ? -1 : 1) * b.shoulders * 0.12, y: 0 }), hands.length - 1);
   }
   return { start: start0, moves };
 }
 
-/** Pose des contacts au temps `t` (en nombre de mouvements, ex. 2.5 = milieu du 3e). */
-export function contactsAt(start: Contacts, moves: Move[], t: number, height: number): { c: Contacts; moving: Limb | null } {
+/** Contacts au temps `t` (en nombre de mouvements, ex. 2.5 = milieu du 3e) ; `lift` = décollement du mur (0 à 1). */
+export function contactsAt(
+  start: Contacts,
+  moves: Move[],
+  t: number,
+): { c: Contacts; moving: Limb | null; lift: number; index: number } {
   const c: Contacts = { ...start };
   const done = Math.min(moves.length, Math.max(0, Math.floor(t)));
   for (let i = 0; i < done; i++) c[moves[i].limb] = moves[i].to;
   const current = moves[done];
-  if (!current || t >= moves.length) return { c, moving: null };
-  const p = t - done;
+  if (!current || t >= moves.length) return { c, moving: null, lift: 0, index: moves.length };
+  const p = Math.max(0, t - done);
   const e = p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
-  // Trajectoire en arc : la main ou le pied s'écarte un peu du mur en se déplaçant.
-  const arc = Math.sin(Math.PI * e) * height * 0.04;
-  const dir = sub(current.to, current.from);
-  const side = current.limb === 'lh' || current.limb === 'lf' ? -1 : 1;
-  const normal = norm({ x: -dir.y * side, y: dir.x * side }, { x: side, y: 0 });
-  c[current.limb] = add(lerp(current.from, current.to, e), mul(normal, -Math.abs(arc)));
-  return { c, moving: current.limb };
+  c[current.limb] = lerp(current.from, current.to, e);
+  return { c, moving: current.limb, lift: Math.sin(Math.PI * e), index: done };
 }
 
-/** Articulation d'un membre à deux segments (coude ou genou) qui plie vers `bend`. */
-function joint(root: Pt, target: Pt, l1: number, l2: number, bend: Pt): { joint: Pt; end: Pt } {
-  const v = sub(target, root);
-  const d = Math.min(len(v), l1 + l2 - 1e-3);
-  const u = norm(v, { x: 0, y: 1 });
-  const end = add(root, mul(u, d));
-  const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d || 1)));
-  const a = Math.acos(cosA);
-  // Deux solutions possibles ; on garde celle du côté de `bend`.
-  const rot = (s: number) => ({
-    x: u.x * Math.cos(a * s) - u.y * Math.sin(a * s),
-    y: u.x * Math.sin(a * s) + u.y * Math.cos(a * s),
-  });
-  const j1 = add(root, mul(rot(1), l1));
-  const j2 = add(root, mul(rot(-1), l1));
-  const pick = dist(j1, add(root, bend)) < dist(j2, add(root, bend)) ? j1 : j2;
-  return { joint: pick, end };
-}
+/* ---------- Squelette en 3D ---------- */
 
-export type Pose = {
-  head: Pt;
-  neck: Pt;
-  pelvis: Pt;
-  arms: { shoulder: Pt; elbow: Pt; hand: Pt }[];
-  legs: { hip: Pt; knee: Pt; foot: Pt }[];
+export type P3 = { x: number; y: number; z: number };
+
+const v3 = (p: Pt, z: number): P3 => ({ x: p.x, y: p.y, z });
+const add3 = (a: P3, b: P3): P3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
+const sub3 = (a: P3, b: P3): P3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+const mul3 = (a: P3, k: number): P3 => ({ x: a.x * k, y: a.y * k, z: a.z * k });
+const dot3 = (a: P3, b: P3) => a.x * b.x + a.y * b.y + a.z * b.z;
+const len3 = (a: P3) => Math.sqrt(dot3(a, a));
+const norm3 = (a: P3, fallback: P3): P3 => {
+  const l = len3(a);
+  return l < 1e-6 ? fallback : mul3(a, 1 / l);
 };
 
-/** Squelette complet à partir des contacts. */
-export function poseFor(c: Contacts, height: number): Pose {
+/** Articulation (coude ou genou) d'un membre à deux segments, qui plie dans la direction `pole`. */
+function joint3(root: P3, target: P3, l1: number, l2: number, pole: P3): { joint: P3; end: P3 } {
+  const u = norm3(sub3(target, root), { x: 0, y: 1, z: 0 });
+  const d = Math.max(Math.abs(l1 - l2) + 1e-3, Math.min(len3(sub3(target, root)), l1 + l2 - 1e-3));
+  const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const side = norm3(sub3(pole, mul3(u, dot3(pole, u))), { x: 0, y: 0, z: 1 });
+  return { joint: add3(add3(root, mul3(u, a)), mul3(side, h)), end: add3(root, mul3(u, d)) };
+}
+
+export type Skeleton = {
+  head: P3;
+  neck: P3;
+  chest: P3;
+  pelvis: P3;
+  /** Gauche puis droite. */
+  arms: { shoulder: P3; elbow: P3; hand: P3 }[];
+  legs: { hip: P3; knee: P3; foot: P3 }[];
+};
+
+/**
+ * Squelette en 3D : x et y sur le mur (y vers le bas), z = distance au mur.
+ * Les mains et les pieds sont sur le mur, le corps s'en écarte d'autant que les membres le permettent.
+ */
+export function skeleton(c: Contacts, height: number, moving: Limb | null = null, lift = 0): Skeleton {
   const b = body(height);
+  const arm = b.upperArm + b.forearm;
+  const leg = b.thigh + b.shin;
   const { shoulders, hips } = hipCenter(c, height);
-  const up = norm(sub(shoulders, hips), { x: 0, y: -1 });
-  const across = { x: -up.y, y: up.x };
-  const sL = add(shoulders, mul(across, -b.shoulders / 2));
-  const sR = add(shoulders, mul(across, b.shoulders / 2));
-  const hL = add(hips, mul(across, -b.hips / 2));
-  const hR = add(hips, mul(across, b.hips / 2));
-  const arm = (s: Pt, h: Pt, side: number) => {
-    const r = joint(s, h, b.upperArm, b.forearm, { x: side * b.upperArm, y: b.upperArm * 0.6 });
-    return { shoulder: s, elbow: r.joint, hand: r.end };
+
+  const onWall = 0.03 * height;
+  const contact = (l: Limb) => v3(c[l], onWall + (moving === l ? lift * 0.14 * height : 0));
+  const reachZ = (from: Pt, limbs: Limb[], length: number, min: number, max: number) => {
+    const d = Math.max(...limbs.map((l) => dist(from, c[l])));
+    return Math.min(max, Math.max(min, Math.sqrt(Math.max(0, (length * 0.97) ** 2 - d * d))));
   };
-  const leg = (h: Pt, f: Pt, side: number) => {
-    const r = joint(h, f, b.thigh, b.shin, { x: side * b.thigh, y: -b.thigh * 0.2 });
-    return { hip: h, knee: r.joint, foot: r.end };
-  };
+  const zS = reachZ(shoulders, ['lh', 'rh'], arm, 0.07 * height, 0.17 * height);
+  const zH = reachZ(hips, ['lf', 'rf'], leg, 0.08 * height, 0.15 * height);
+  const S = v3(shoulders, zS);
+  const P = v3(hips, zH);
+
+  const up = norm3(sub3(S, P), { x: 0, y: -1, z: 0 });
+  // Axe des épaules : dans le plan du mur, perpendiculaire au buste.
+  const across = norm3({ x: -up.y, y: up.x, z: 0 }, { x: 1, y: 0, z: 0 });
+  const arms = ([['lh', -1], ['rh', 1]] as const).map(([l, side]) => {
+    const shoulder = add3(S, mul3(across, (side * b.shoulders) / 2));
+    // Coudes vers l'extérieur, vers le bas et décollés du mur.
+    const r = joint3(shoulder, contact(l), b.upperArm, b.forearm, { x: side * 0.7, y: 0.6, z: 0.5 });
+    return { shoulder, elbow: r.joint, hand: r.end };
+  });
+  const legs = ([['lf', -1], ['rf', 1]] as const).map(([l, side]) => {
+    const hip = add3(P, mul3(across, (side * b.hips) / 2));
+    // Genoux ouverts vers l'extérieur, comme en grenouille.
+    const r = joint3(hip, contact(l), b.thigh, b.shin, { x: side * 0.5, y: -0.1, z: 0.85 });
+    return { hip, knee: r.joint, foot: r.end };
+  });
+  const neck = add3(S, mul3(up, b.neck));
   return {
-    neck: shoulders,
-    head: add(shoulders, mul(up, b.neck + b.head)),
-    pelvis: hips,
-    arms: [arm(sL, c.lh, -1), arm(sR, c.rh, 1)],
-    legs: [leg(hL, c.lf, -1), leg(hR, c.rf, 1)],
+    neck,
+    head: add3(add3(neck, mul3(up, b.head)), { x: 0, y: 0, z: 0.02 * height }),
+    chest: S,
+    pelvis: P,
+    arms,
+    legs,
   };
 }
