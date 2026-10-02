@@ -279,6 +279,7 @@ const readHeight = () => {
 };
 
 function Player({ route, onSize }: { route: SimRoute; onSize: (size: number) => void }) {
+  const { height: windowHeight } = useWindowDimensions();
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [restartKey, setRestartKey] = useState(0);
@@ -305,8 +306,8 @@ function Player({ route, onSize }: { route: SimRoute; onSize: (size: number) => 
   };
 
   return (
-    <View style={s.player}>
-      <View style={s.glWrap}>
+    <ScrollView style={s.flex} contentContainerStyle={s.player}>
+      <View style={[s.glWrap, { height: Math.max(240, Math.min(420, windowHeight * 0.42)) }]}>
         <Climb3D
           route={route}
           plan={plan}
@@ -386,7 +387,7 @@ function Player({ route, onSize }: { route: SimRoute; onSize: (size: number) => 
         La hauteur du mur est estimée d’après l’écart entre les prises ; corrige-la si le grimpeur paraît trop grand
         ou trop petit. Un doigt fait tourner la caméra, deux doigts zooment.
       </Text>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -472,7 +473,7 @@ const s = StyleSheet.create({
   sheet: { backgroundColor: colors.background, padding: 20, paddingBottom: 32, gap: 14, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   sheetTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  glWrap: { flex: 1, minHeight: 220 },
+  glWrap: { borderRadius: 16, overflow: 'hidden' },
   stepCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, gap: 6 },
   stepHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   stepTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: colors.text },
@@ -489,7 +490,7 @@ const s = StyleSheet.create({
   emptyCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 24, gap: 14 },
   emptyTitle: { fontSize: 22, fontWeight: '800', color: colors.text },
   emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22, marginBottom: 6 },
-  player: { flex: 1, padding: 12, gap: 8 },
+  player: { padding: 12, gap: 8, paddingBottom: 32 },
   ctrl: {
     flex: 1,
     paddingVertical: 9,

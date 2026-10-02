@@ -31,7 +31,10 @@ PY
       echo "Touché « $1 » en $xy"
       return 0
     fi
-    sleep 3
+    # Pas visible : faire défiler la page vers le bas puis réessayer.
+    read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+    adb shell input swipe $((W / 2)) $((H * 75 / 100)) $((W / 2)) $((H * 45 / 100)) 300
+    sleep 2
   done
   echo "Introuvable : « $1 »"
   return 1

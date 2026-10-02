@@ -69,6 +69,8 @@ function orbitGestures(cam: Cam) {
   return PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
+    // La page défile autour : le geste reste à la 3D une fois commencé.
+    onPanResponderTerminationRequest: () => false,
     onPanResponderGrant: () => {
       start = { ...cam };
       pinch = null;
