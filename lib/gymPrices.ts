@@ -23,8 +23,6 @@ const BRANDS: Brand[] = [
       entry: 19,
       others: [
         { label: 'Entrée heures creuses', amount: 15 },
-        { label: '5 entrées', amount: 85 },
-        { label: 'Semaine illimitée', amount: 26 },
       ],
       taxes: BEFORE_TAXES,
       source: 'https://blocshop.com/tarifs/',
@@ -36,10 +34,6 @@ const BRANDS: Brand[] = [
     prices: {
       entry: 24.75,
       others: [
-        { label: 'Semaine illimitée', amount: 34 },
-        { label: '5 entrées', amount: 110 },
-        { label: '10 entrées', amount: 215 },
-        { label: '3 mois prépayés', amount: 330.85 },
       ],
       source: 'https://cafebloc.com/tarifs-escalade-bloc-montreal',
       checkedOn: CHECKED_ON,
@@ -50,8 +44,6 @@ const BRANDS: Brand[] = [
     prices: {
       entry: 23.75,
       others: [
-        { label: 'Semaine découverte', amount: 26 },
-        { label: '10 entrées', amount: 212.5 },
       ],
       source: 'https://allezup.com/en/',
       checkedOn: CHECKED_ON,
@@ -64,8 +56,6 @@ const BRANDS: Brand[] = [
       others: [
         { label: 'Entrée étudiant', amount: 22.5 },
         { label: 'Entrée heures creuses', amount: 19.75 },
-        { label: '10 entrées', amount: 217.4 },
-        { label: 'Annuel', amount: 989 },
       ],
       taxes: BEFORE_TAXES,
       source: 'https://zero-gravite.ca/en/pricing/',
@@ -79,10 +69,6 @@ const BRANDS: Brand[] = [
       others: [
         { label: 'Entrée étudiant', amount: 15 },
         { label: 'Entrée lève-tôt, semaine avant 14h', amount: 13.05 },
-        { label: '10 entrées', amount: 160 },
-        { label: '10 entrées étudiant', amount: 130 },
-        { label: 'Annuel', amount: 850 },
-        { label: 'Annuel étudiant', amount: 725 },
       ],
       source: 'https://shaktirockgym.com/rates',
       checkedOn: CHECKED_ON,
@@ -94,8 +80,6 @@ const BRANDS: Brand[] = [
       entry: 28,
       others: [
         { label: 'Entrée étudiant', amount: 25 },
-        { label: 'Semaine prépayée', amount: 42 },
-        { label: '10 entrées', amount: 240 },
       ],
       taxes: BEFORE_TAXES,
       source: 'https://www.rosebloc.com/tarifs-et-horaires',
@@ -108,11 +92,6 @@ const BRANDS: Brand[] = [
       entry: 24,
       others: [
         { label: 'Entrée lève-tôt, lun-jeu avant 15h', amount: 15 },
-        { label: 'Semaine illimitée', amount: 32 },
-        { label: '10 entrées', amount: 220 },
-        { label: '20 entrées', amount: 410 },
-        { label: '3 mois prépayés', amount: 310 },
-        { label: 'Annuel', amount: 949 },
       ],
       taxes: BEFORE_TAXES,
       source: 'https://www.betabloc.ca/escalade/',
@@ -126,9 +105,6 @@ const BRANDS: Brand[] = [
       others: [
         { label: 'Entrée étudiant', amount: 23 },
         { label: 'Entrée lève-tôt, semaine avant 15h', amount: 15 },
-        { label: '10 entrées', amount: 225 },
-        { label: '3 mois prépayés', amount: 309 },
-        { label: 'Annuel', amount: 949 },
       ],
       taxes: BEFORE_TAXES,
       source: 'https://www.lecrux.com/tarifs',
@@ -141,8 +117,6 @@ const BRANDS: Brand[] = [
       entry: 24,
       others: [
         { label: 'Soirée week-end, après 16h', amount: 10 },
-        { label: '10 entrées', amount: 199 },
-        { label: 'Annuel', amount: 899 },
       ],
       source: 'https://canyonescalade.com/abonnements-et-tarifs/',
       checkedOn: CHECKED_ON,
