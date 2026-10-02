@@ -4,7 +4,7 @@ import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 
 import { BlockRow } from '@/components/BlockRow';
 import { Chip, Empty } from '@/components/ui';
-import { GRADES, RESULT_LABELS, type BlockResult } from '@/lib/climbing';
+import { GRADES, isSent, placeKey, placeOf, RESULT_LABELS, type Discipline } from '@/lib/climbing';
 import { listBlocks, type Block } from '@/lib/db';
 import { colors } from '@/lib/theme';
 
@@ -12,45 +12,62 @@ type ResultFilter = 'all' | 'done' | 'project';
 
 export default function BlocksScreen() {
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [gym, setGym] = useState<string | null>(null);
+  const [discipline, setDiscipline] = useState<Discipline | null>(null);
+  const [outdoor, setOutdoor] = useState<boolean | null>(null);
+  const [place, setPlace] = useState<string | null>(null);
   const [grade, setGrade] = useState<string | null>(null);
   const [result, setResult] = useState<ResultFilter>('all');
 
   useFocusEffect(useCallback(() => setBlocks(listBlocks()), []));
 
-  const gyms = useMemo(() => {
+  const places = useMemo(() => {
     const m = new Map<string, string>();
-    blocks.forEach((b) => m.set(b.gymId, b.gymName));
+    blocks
+      .filter((b) => (!discipline || b.discipline === discipline) && (outdoor === null || b.outdoor === outdoor))
+      .forEach((b) => m.set(placeKey(b), placeOf(b)));
     return [...m.entries()];
-  }, [blocks]);
+  }, [blocks, discipline, outdoor]);
 
   const grades = useMemo(() => {
-    const used = new Set(blocks.map((b) => b.grade));
-    return [...GRADES.font, ...GRADES.v].filter((g) => used.has(g));
-  }, [blocks]);
+    const used = new Set(blocks.filter((b) => !discipline || b.discipline === discipline).map((b) => b.grade));
+    return [...new Set(Object.values(GRADES).flat())].filter((g) => used.has(g));
+  }, [blocks, discipline]);
 
-  const isDone = (r: BlockResult) => r !== 'project';
+  const hasVoies = blocks.some((b) => b.discipline === 'voie');
+  const hasOutdoor = blocks.some((b) => b.outdoor);
   const filtered = blocks.filter(
     (b) =>
-      (!gym || b.gymId === gym) &&
+      (!discipline || b.discipline === discipline) &&
+      (outdoor === null || b.outdoor === outdoor) &&
+      (!place || placeKey(b) === place) &&
       (!grade || b.grade === grade) &&
-      (result === 'all' || (result === 'done' ? isDone(b.result) : !isDone(b.result))),
+      (result === 'all' || (result === 'done' ? isSent(b.result) : !isSent(b.result))),
   );
 
   return (
     <View style={s.container}>
       {blocks.length > 0 && (
         <View style={s.filters}>
+          {(hasVoies || hasOutdoor) && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
+              <Chip label="Blocs et voies" selected={!discipline} onPress={() => setDiscipline(null)} />
+              <Chip label="Blocs" selected={discipline === 'bloc'} onPress={() => setDiscipline('bloc')} />
+              <Chip label="Voies" selected={discipline === 'voie'} onPress={() => setDiscipline('voie')} />
+              <Chip label="Partout" selected={outdoor === null} onPress={() => setOutdoor(null)} />
+              <Chip label="En salle" selected={outdoor === false} onPress={() => setOutdoor(false)} />
+              <Chip label="Extérieur" selected={outdoor === true} onPress={() => setOutdoor(true)} />
+            </ScrollView>
+          )}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
             <Chip label="Tous" selected={result === 'all'} onPress={() => setResult('all')} />
             <Chip label="Réussis" selected={result === 'done'} onPress={() => setResult('done')} />
             <Chip label={RESULT_LABELS.project} selected={result === 'project'} onPress={() => setResult('project')} />
           </ScrollView>
-          {gyms.length > 1 && (
+          {places.length > 1 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
-              <Chip label="Toutes les salles" selected={!gym} onPress={() => setGym(null)} />
-              {gyms.map(([id, name]) => (
-                <Chip key={id} label={name} selected={gym === id} onPress={() => setGym(id)} />
+              <Chip label="Tous les lieux" selected={!place} onPress={() => setPlace(null)} />
+              {places.map(([key, name]) => (
+                <Chip key={key} label={name} selected={place === key} onPress={() => setPlace(key)} />
               ))}
             </ScrollView>
           )}
@@ -73,8 +90,8 @@ export default function BlocksScreen() {
           <Empty
             text={
               blocks.length === 0
-                ? 'Aucun bloc pour l\'instant.\nAppuie sur + pour ajouter ton premier bloc.'
-                : 'Aucun bloc ne correspond à ces filtres.'
+                ? 'Ton carnet est vide.\nAppuie sur + pour ajouter un bloc ou une voie.'
+                : 'Aucune grimpe ne correspond à ces filtres.'
             }
           />
         }

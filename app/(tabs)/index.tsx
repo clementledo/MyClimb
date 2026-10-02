@@ -184,7 +184,7 @@ export default function GymsScreen() {
                   )}
                   <Text style={s.price}>
                     {entry !== undefined ? `Entrée ${formatPrice(entry)}` : 'Prix non disponible'}
-                    {n > 0 ? `  ·  ${n} bloc${n > 1 ? 's' : ''}` : ''}
+                    {n > 0 ? `  ·  ${n} grimpe${n > 1 ? 's' : ''}` : ''}
                   </Text>
                 </View>
                 <View style={s.time}>

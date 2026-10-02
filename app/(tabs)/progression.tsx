@@ -1,143 +1,242 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import { Legend, LineChart, RateBars, RESULT_COLORS, StackedBars, StackedColumns } from '@/components/charts';
 import { Empty, Section, Segmented } from '@/components/ui';
-import { GRADE_SYSTEM_LABELS, GRADES, STYLES, type GradeSystem } from '@/lib/climbing';
+import {
+  DISCIPLINE_LABELS,
+  DISCIPLINE_SYSTEMS,
+  FEEL_LABELS,
+  GRADE_SYSTEM_LABELS,
+  type Discipline,
+  type GradeSystem,
+} from '@/lib/climbing';
 import { listBlocks, type Block } from '@/lib/db';
+import { computeStats, periodStart, type Period } from '@/lib/stats';
 import { colors } from '@/lib/theme';
 
-type Period = '30' | 'all';
+type Where = 'all' | 'in' | 'out';
 
-const isSent = (b: Block) => b.result !== 'project';
-
-function daysAgoIso(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
-}
+const pct = (r: number) => `${Math.round(r * 100)} %`;
+const dec = (n: number) => n.toFixed(1).replace('.', ',').replace(',0', '');
 
 export default function ProgressionScreen() {
+  const { width } = useWindowDimensions();
+  const chartW = width - 32;
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [period, setPeriod] = useState<Period>('30');
+  const [discipline, setDiscipline] = useState<Discipline>('bloc');
+  const [where, setWhere] = useState<Where>('all');
+  const [period, setPeriod] = useState<Period>('90');
   const [systemChoice, setSystemChoice] = useState<GradeSystem | null>(null);
 
   useFocusEffect(useCallback(() => setBlocks(listBlocks()), []));
 
-  const inPeriod = useMemo(() => {
-    if (period === 'all') return blocks;
-    const from = daysAgoIso(30);
-    return blocks.filter((b) => b.date >= from);
-  }, [blocks, period]);
+  const disciplines = (['bloc', 'voie'] as Discipline[]).filter((d) => blocks.some((b) => b.discipline === d));
+  const current = disciplines.includes(discipline) ? discipline : (disciplines[0] ?? 'bloc');
+  const ofDiscipline = blocks.filter((b) => b.discipline === current);
+  const from = periodStart(period, ofDiscipline);
+  const list = ofDiscipline.filter((b) => b.date >= from && (where === 'all' || b.outdoor === (where === 'out')));
 
-  // Système de cotation : celui choisi, sinon le plus utilisé.
-  const systemsUsed = (Object.keys(GRADES) as GradeSystem[]).filter((sys) =>
-    blocks.some((b) => b.gradeSystem === sys),
-  );
-  const mostUsed =
-    systemsUsed.length > 1 &&
-    blocks.filter((b) => b.gradeSystem === 'v').length > blocks.filter((b) => b.gradeSystem === 'font').length
-      ? 'v'
-      : (systemsUsed[0] ?? 'font');
-  const system = systemChoice ?? mostUsed;
+  // Système de cotation : celui choisi, sinon le plus utilisé dans la discipline.
+  const systemsUsed = DISCIPLINE_SYSTEMS[current].filter((sys) => ofDiscipline.some((b) => b.gradeSystem === sys));
+  const count = (sys: GradeSystem) => ofDiscipline.filter((b) => b.gradeSystem === sys).length;
+  const mostUsed = [...systemsUsed].sort((a, b) => count(b) - count(a))[0] ?? DISCIPLINE_SYSTEMS[current][0];
+  const system = systemChoice && systemsUsed.includes(systemChoice) ? systemChoice : mostUsed;
 
-  const stats = useMemo(() => {
-    const ladder = GRADES[system];
-    const sent = inPeriod.filter(isSent);
-    const inSystem = sent.filter((b) => b.gradeSystem === system);
-    const best = inSystem.reduce<number>((m, b) => Math.max(m, ladder.indexOf(b.grade)), -1);
-    const counts = ladder.map((g) => inSystem.filter((b) => b.grade === g).length);
-    const first = counts.findIndex((n) => n > 0);
-    const last = counts.length - 1 - [...counts].reverse().findIndex((n) => n > 0);
-    const pyramid =
-      first === -1 ? [] : ladder.slice(first, last + 1).map((g, i) => ({ grade: g, n: counts[first + i] }));
-    const profiles = STYLES.map((st) => {
-      const all = inPeriod.filter((b) => b.styles.includes(st));
-      return { name: st, total: all.length, sent: all.filter(isSent).length };
-    }).filter((p) => p.total > 0);
-    return {
-      sent: sent.length,
-      flash: inPeriod.filter((b) => b.result === 'flash').length,
-      projects: inPeriod.filter((b) => b.result === 'project').length,
-      best: best >= 0 ? ladder.at(best)! : '–',
-      pyramid: [...pyramid].reverse(),
-      maxCount: Math.max(1, ...pyramid.map((p) => p.n)),
-      profiles,
-    };
-  }, [inPeriod, system]);
+  const st = computeStats(list, system, from);
 
   if (blocks.length === 0) {
     return (
       <View style={s.container}>
-        <Empty text={'Pas encore de progression à afficher.\nAjoute tes blocs dans l\'onglet Blocs.'} />
+        <Empty text={'Pas encore de progression à afficher.\nAjoute tes grimpes dans l\'onglet Carnet.'} />
       </View>
     );
   }
 
+  const kind = current === 'bloc' ? 'blocs' : 'voies';
+  const unit = st.bucketUnit === 'week' ? 'semaine' : 'mois';
+  const hasOutdoor = ofDiscipline.some((b) => b.outdoor);
+  const resultLegend = [
+    { label: current === 'bloc' ? 'Flash' : 'À vue ou flash', color: RESULT_COLORS[0] },
+    { label: 'Réussi après essais', color: RESULT_COLORS[1] },
+    { label: 'Pas encore', color: RESULT_COLORS[2] },
+  ];
+  const feelTotal = st.feel.reduce((a, b) => a + b, 0);
+  const ropeTotal = [...st.rope.lead, ...st.rope.toprope].reduce((a, b) => a + b, 0);
+
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
-      <Segmented
-        options={[
-          { value: '30', label: '30 derniers jours' },
-          { value: 'all', label: 'Depuis le début' },
-        ]}
-        value={period}
-        onChange={setPeriod}
-      />
-      {systemsUsed.length > 1 && (
+      <View style={s.filters}>
+        {disciplines.length > 1 && (
+          <Segmented
+            options={disciplines.map((d) => ({ value: d, label: `${DISCIPLINE_LABELS[d]}s` }))}
+            value={current}
+            onChange={setDiscipline}
+          />
+        )}
+        {hasOutdoor && (
+          <Segmented
+            options={[
+              { value: 'all', label: 'Partout' },
+              { value: 'in', label: 'En salle' },
+              { value: 'out', label: 'Extérieur' },
+            ]}
+            value={where}
+            onChange={setWhere}
+          />
+        )}
         <Segmented
-          options={systemsUsed.map((sys) => ({ value: sys, label: GRADE_SYSTEM_LABELS[sys] }))}
-          value={system}
-          onChange={setSystemChoice}
+          options={[
+            { value: '30', label: '1 mois' },
+            { value: '90', label: '3 mois' },
+            { value: '365', label: '1 an' },
+            { value: 'all', label: 'Tout' },
+          ]}
+          value={period}
+          onChange={setPeriod}
         />
-      )}
-
-      <View style={s.tiles}>
-        <Tile label="Meilleur bloc" value={stats.best} highlight />
-        <Tile label="Réussis" value={String(stats.sent)} />
-        <Tile label="Flashs" value={String(stats.flash)} />
-        <Tile label="En projet" value={String(stats.projects)} />
+        {systemsUsed.length > 1 && (
+          <Segmented
+            options={systemsUsed.map((sys) => ({ value: sys, label: GRADE_SYSTEM_LABELS[sys] }))}
+            value={system}
+            onChange={setSystemChoice}
+          />
+        )}
       </View>
 
-      <Section title="Blocs réussis par cotation">
-        {stats.pyramid.length === 0 ? (
-          <Text style={s.muted}>Aucun bloc réussi sur cette période.</Text>
-        ) : (
-          stats.pyramid.map((p) => (
-            <View key={p.grade} style={s.barRow}>
-              <Text style={s.barLabel}>{p.grade}</Text>
-              <View style={s.barTrack}>
-                {p.n > 0 && <View style={[s.bar, { width: `${(p.n / stats.maxCount) * 100}%` }]} />}
-              </View>
-              <Text style={s.barValue}>{p.n}</Text>
-            </View>
-          ))
-        )}
-      </Section>
+      {list.length === 0 ? (
+        <Empty text={`Aucune grimpe en ${kind} sur cette période.`} />
+      ) : (
+        <>
+          <View style={s.tiles}>
+            <Tile label="Meilleure réussite" value={st.best ?? '–'} highlight />
+            <Tile label="Niveau moyen réussi" value={st.avgGrade ?? '–'} />
+            <Tile label={`${kind[0].toUpperCase()}${kind.slice(1)} essayés`} value={String(st.total)} />
+            <Tile label="Réussis" value={`${st.sent} (${pct(st.successRate)})`} />
+            <Tile label={current === 'bloc' ? 'Flashs' : 'À vue ou flash'} value={`${st.firstTry} (${pct(st.firstTryRate)})`} />
+            <Tile label="Essais pour réussir" value={st.avgAttempts === null ? '–' : `${dec(st.avgAttempts)} en moy.`} />
+            <Tile label="Séances" value={String(st.sessions)} />
+            <Tile label="Grimpes par séance" value={dec(st.perSession)} />
+          </View>
 
-      {stats.profiles.length > 0 && (
-        <Section title="Réussite par profil">
-          {stats.profiles.map((p) => (
-            <View key={p.name} style={s.barRow}>
-              <Text style={[s.barLabel, { width: 72 }]}>{p.name}</Text>
-              <View style={s.barTrack}>
-                <View style={[s.bar, { width: `${(p.sent / p.total) * 100}%` }]} />
-              </View>
-              <Text style={[s.barValue, { width: 64 }]}>
-                {p.sent}/{p.total}
-              </Text>
-            </View>
-          ))}
-        </Section>
+          {st.level.some((l) => l.max !== null) && (
+            <Section title={`Évolution du niveau, par ${unit}`}>
+              <LineChart
+                width={chartW}
+                labels={st.bucketLabels}
+                series={[
+                  { values: st.level.map((l) => l.max), color: colors.primary },
+                  { values: st.level.map((l) => l.avg), color: '#F7A072' },
+                ]}
+                formatY={(v) => st.ladder[Math.round(v)] ?? ''}
+              />
+              <Legend
+                items={[
+                  { label: 'Meilleure réussite', color: colors.primary },
+                  { label: 'Moyenne des 5 meilleures', color: '#F7A072' },
+                ]}
+              />
+            </Section>
+          )}
+
+          <Section title={`Volume, par ${unit}`}>
+            <StackedColumns width={chartW} labels={st.bucketLabels} stacks={st.volume} />
+            <Legend items={resultLegend} />
+          </Section>
+
+          <Section title={`Séances, par ${unit}`}>
+            <StackedColumns
+              width={chartW}
+              height={120}
+              labels={st.bucketLabels}
+              stacks={st.sessionsPerBucket.map((n) => [n])}
+            />
+          </Section>
+
+          {st.pyramid.length > 0 && (
+            <Section title="Pyramide des cotations">
+              <StackedBars rows={st.pyramid} />
+              <Legend items={resultLegend} />
+            </Section>
+          )}
+
+          {st.attemptsByGrade.length > 0 && (
+            <Section title="Essais moyens pour réussir, par cotation">
+              <RateBars
+                labelWidth={44}
+                rows={(() => {
+                  const max = Math.max(...st.attemptsByGrade.map((r) => r.avg));
+                  return st.attemptsByGrade.map((r) => ({
+                    label: r.label,
+                    rate: r.avg / max,
+                    detail: `${dec(r.avg)} essai${r.avg >= 2 ? 's' : ''}`,
+                  }));
+                })()}
+              />
+            </Section>
+          )}
+
+          <RateSection title="Réussite par profil du mur" data={st.profiles} />
+          <RateSection title="Réussite par type de prises" data={st.holds} />
+          <RateSection title="Réussite par mouvement" data={st.moves} />
+
+          {feelTotal > 0 && (
+            <Section title="Cotation ressentie">
+              <StackedBars
+                labelWidth={56}
+                palette={['#2B8A3E']}
+                rows={(['soft', 'fair', 'hard'] as const).map((f, i) => ({ label: FEEL_LABELS[f], parts: [st.feel[i]] }))}
+              />
+            </Section>
+          )}
+
+          {current === 'voie' && ropeTotal > 0 && (
+            <Section title="En tête ou en moulinette">
+              <StackedBars
+                labelWidth={88}
+                rows={[
+                  { label: 'En tête', parts: st.rope.lead },
+                  { label: 'Moulinette', parts: st.rope.toprope },
+                ]}
+              />
+              <Legend items={resultLegend} />
+            </Section>
+          )}
+
+          {st.places.length > 1 && (
+            <Section title="Lieux les plus fréquentés">
+              <StackedBars labelWidth={120} rows={st.places} />
+            </Section>
+          )}
+        </>
       )}
     </ScrollView>
+  );
+}
+
+function RateSection({
+  title,
+  data,
+}: {
+  title: string;
+  data: { rows: { label: string; rate: number; detail: string }[]; weakest: string | null };
+}) {
+  if (data.rows.length === 0) return null;
+  return (
+    <Section title={title}>
+      <RateBars rows={data.rows} highlight={data.weakest} />
+      {data.weakest && <Text style={s.weak}>Point faible : {data.weakest.toLowerCase()}</Text>}
+    </Section>
   );
 }
 
 function Tile({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <View style={[s.tile, highlight && s.tileHighlight]}>
-      <Text style={[s.tileValue, highlight && { color: colors.primary }]}>{value}</Text>
+      <Text style={[s.tileValue, highlight && { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
       <Text style={s.tileLabel}>{label}</Text>
     </View>
   );
@@ -145,8 +244,8 @@ function Tile({ label, value, highlight }: { label: string; value: string; highl
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, gap: 20, paddingBottom: 40 },
-  muted: { color: colors.muted },
+  content: { padding: 16, gap: 24, paddingBottom: 40 },
+  filters: { gap: 8 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tile: {
     flexBasis: '47%',
@@ -157,11 +256,7 @@ const s = StyleSheet.create({
     gap: 2,
   },
   tileHighlight: { backgroundColor: colors.primarySoft },
-  tileValue: { fontSize: 26, fontWeight: '800', color: colors.text },
+  tileValue: { fontSize: 22, fontWeight: '800', color: colors.text },
   tileLabel: { color: colors.muted, fontSize: 13 },
-  barRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  barLabel: { width: 40, fontWeight: '700', color: colors.text },
-  barTrack: { flex: 1, height: 18, borderRadius: 9, backgroundColor: colors.surface, overflow: 'hidden' },
-  bar: { height: '100%', borderRadius: 9, backgroundColor: colors.primary },
-  barValue: { width: 28, textAlign: 'right', color: colors.muted, fontVariant: ['tabular-nums'] },
+  weak: { color: colors.danger, fontSize: 13, fontWeight: '600' },
 });

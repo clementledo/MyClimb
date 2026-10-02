@@ -176,9 +176,9 @@ export default function GymScreen() {
           )}
         </Section>
 
-        <Section title={`Mes blocs ici (${blocks.length})`}>
+        <Section title={`Mes grimpes ici (${blocks.length})`}>
           <Button
-            label="+ Ajouter un bloc ici"
+            label="+ Ajouter une grimpe ici"
             variant="secondary"
             onPress={() => router.push({ pathname: '/block/new', params: { gymId: gym.id } })}
           />

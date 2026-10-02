@@ -8,7 +8,7 @@ import { deletePhoto } from '@/lib/photos';
 export default function EditBlockScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const block = getBlock(Number(id));
-  if (!block) return <Empty text="Bloc introuvable." />;
+  if (!block) return <Empty text="Grimpe introuvable." />;
   const { id: _id, gymName: _gymName, ...initial } = block;
   return (
     <BlockForm

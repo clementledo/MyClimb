@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 
-import type { BlockResult, GradeSystem } from './climbing';
+import type { BlockResult, Discipline, Feel, GradeSystem, Rope } from './climbing';
 
 export const db = SQLite.openDatabaseSync('myclimb.db');
 
@@ -41,6 +41,42 @@ db.execSync(`
   );
 `);
 
+// Version 1 : voies, extérieur et caractéristiques détaillées. La salle devient facultative.
+if ((db.getFirstSync<{ user_version: number }>('PRAGMA user_version')?.user_version ?? 0) < 1) {
+  db.withTransactionSync(() => {
+    db.execSync(`
+      CREATE TABLE blocks_v1 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        discipline TEXT NOT NULL DEFAULT 'bloc',
+        outdoor INTEGER NOT NULL DEFAULT 0,
+        gym_id TEXT REFERENCES gyms(id),
+        site TEXT,
+        name TEXT,
+        photo_uri TEXT,
+        color TEXT,
+        grade TEXT NOT NULL,
+        grade_system TEXT NOT NULL,
+        styles TEXT NOT NULL DEFAULT '[]',
+        holds TEXT NOT NULL DEFAULT '[]',
+        moves TEXT NOT NULL DEFAULT '[]',
+        rope TEXT,
+        feel TEXT,
+        result TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 1,
+        date TEXT NOT NULL,
+        note TEXT,
+        created_at INTEGER NOT NULL
+      );
+      INSERT INTO blocks_v1 (id, gym_id, photo_uri, color, grade, grade_system, styles, result, attempts, date, note, created_at)
+        SELECT id, gym_id, photo_uri, color, grade, grade_system, styles, result, attempts, date, note, created_at FROM blocks;
+      DROP TABLE blocks;
+      ALTER TABLE blocks_v1 RENAME TO blocks;
+      CREATE INDEX IF NOT EXISTS blocks_gym ON blocks(gym_id);
+      PRAGMA user_version = 1;
+    `);
+  });
+}
+
 export type Gym = {
   id: string;
   name: string;
@@ -51,15 +87,27 @@ export type Gym = {
   photoName?: string | null;
 };
 
+/** Une grimpe du carnet : un bloc ou une voie, en salle ou dehors. */
 export type Block = {
   id: number;
-  gymId: string;
-  gymName: string;
+  discipline: Discipline;
+  outdoor: boolean;
+  /** Salle, en intérieur. */
+  gymId: string | null;
+  gymName: string | null;
+  /** Site ou secteur, en extérieur. */
+  site: string | null;
+  name: string | null;
   photoUri: string | null;
   color: string | null;
   grade: string;
   gradeSystem: GradeSystem;
+  /** Profil du mur. */
   styles: string[];
+  holds: string[];
+  moves: string[];
+  rope: Rope | null;
+  feel: Feel | null;
   result: BlockResult;
   attempts: number;
   date: string;
@@ -70,13 +118,21 @@ export type BlockInput = Omit<Block, 'id' | 'gymName'>;
 
 type BlockRow = {
   id: number;
-  gym_id: string;
-  gym_name: string;
+  discipline: Discipline;
+  outdoor: number;
+  gym_id: string | null;
+  gym_name: string | null;
+  site: string | null;
+  name: string | null;
   photo_uri: string | null;
   color: string | null;
   grade: string;
   grade_system: GradeSystem;
   styles: string;
+  holds: string;
+  moves: string;
+  rope: Rope | null;
+  feel: Feel | null;
   result: BlockResult;
   attempts: number;
   date: string;
@@ -86,13 +142,21 @@ type BlockRow = {
 function toBlock(r: BlockRow): Block {
   return {
     id: r.id,
+    discipline: r.discipline,
+    outdoor: r.outdoor === 1,
     gymId: r.gym_id,
     gymName: r.gym_name,
+    site: r.site,
+    name: r.name,
     photoUri: r.photo_uri,
     color: r.color,
     grade: r.grade,
     gradeSystem: r.grade_system,
     styles: JSON.parse(r.styles),
+    holds: JSON.parse(r.holds),
+    moves: JSON.parse(r.moves),
+    rope: r.rope,
+    feel: r.feel,
     result: r.result,
     attempts: r.attempts,
     date: r.date,
@@ -101,7 +165,7 @@ function toBlock(r: BlockRow): Block {
 }
 
 const BLOCK_SELECT = `
-  SELECT b.*, g.name AS gym_name FROM blocks b JOIN gyms g ON g.id = b.gym_id
+  SELECT b.*, g.name AS gym_name FROM blocks b LEFT JOIN gyms g ON g.id = b.gym_id
 `;
 
 export function saveGym(gym: Gym) {
@@ -138,28 +202,47 @@ export function getBlock(id: number): Block | null {
 
 export function countBlocksByGym(): Record<string, number> {
   const rows = db.getAllSync<{ gym_id: string; n: number }>(
-    'SELECT gym_id, COUNT(*) AS n FROM blocks GROUP BY gym_id',
+    'SELECT gym_id, COUNT(*) AS n FROM blocks WHERE gym_id IS NOT NULL GROUP BY gym_id',
   );
   return Object.fromEntries(rows.map((r) => [r.gym_id, r.n]));
 }
 
+const BLOCK_COLUMNS = [
+  'discipline', 'outdoor', 'gym_id', 'site', 'name', 'photo_uri', 'color', 'grade', 'grade_system',
+  'styles', 'holds', 'moves', 'rope', 'feel', 'result', 'attempts', 'date', 'note',
+];
+
+function blockValues(b: BlockInput) {
+  return [
+    b.discipline, b.outdoor ? 1 : 0, b.gymId, b.site, b.name, b.photoUri, b.color, b.grade, b.gradeSystem,
+    JSON.stringify(b.styles), JSON.stringify(b.holds), JSON.stringify(b.moves), b.rope, b.feel,
+    b.result, b.attempts, b.date, b.note,
+  ];
+}
+
 export function insertBlock(b: BlockInput): number {
   const res = db.runSync(
-    `INSERT INTO blocks (gym_id, photo_uri, color, grade, grade_system, styles, result, attempts, date, note, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    b.gymId, b.photoUri, b.color, b.grade, b.gradeSystem, JSON.stringify(b.styles),
-    b.result, b.attempts, b.date, b.note, Date.now(),
+    `INSERT INTO blocks (${BLOCK_COLUMNS.join(', ')}, created_at)
+     VALUES (${BLOCK_COLUMNS.map(() => '?').join(', ')}, ?)`,
+    ...blockValues(b), Date.now(),
   );
   return res.lastInsertRowId;
 }
 
 export function updateBlock(id: number, b: BlockInput) {
   db.runSync(
-    `UPDATE blocks SET gym_id = ?, photo_uri = ?, color = ?, grade = ?, grade_system = ?, styles = ?,
-       result = ?, attempts = ?, date = ?, note = ? WHERE id = ?`,
-    b.gymId, b.photoUri, b.color, b.grade, b.gradeSystem, JSON.stringify(b.styles),
-    b.result, b.attempts, b.date, b.note, id,
+    `UPDATE blocks SET ${BLOCK_COLUMNS.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
+    ...blockValues(b), id,
   );
+}
+
+/** Sites extérieurs déjà utilisés, du plus récent au plus ancien. */
+export function listSites(): string[] {
+  return db
+    .getAllSync<{ site: string }>(
+      'SELECT site FROM blocks WHERE site IS NOT NULL GROUP BY site ORDER BY MAX(date) DESC',
+    )
+    .map((r) => r.site);
 }
 
 export function deleteBlock(id: number) {
