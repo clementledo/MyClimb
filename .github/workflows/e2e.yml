@@ -7,6 +7,9 @@ on:
     branches: [wip]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: e2e
   cancel-in-progress: true
@@ -60,8 +63,13 @@ jobs:
           disable-animations: true
           script: bash e2e/run.sh
 
-      - uses: actions/upload-artifact@v4
+      # Résultats poussés sur la branche e2e-results (plus simple à lire que les artefacts).
+      - name: Publier les résultats
         if: always()
-        with:
-          name: e2e
-          path: e2e-out
+        run: |
+          cd e2e-out
+          git init -q
+          git checkout -q -b e2e-results
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "e2e ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" e2e-results
