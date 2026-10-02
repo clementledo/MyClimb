@@ -3,9 +3,21 @@ import { SymbolView } from 'expo-symbols';
 
 import { colors } from '@/lib/theme';
 
+// L'app s'ouvre sur les salles, même si l'onglet Jeux est à gauche.
+export const unstable_settings = { initialRouteName: 'index' };
+
 export default function TabLayout() {
   return (
     <Tabs screenOptions={{ tabBarActiveTintColor: colors.primary }}>
+      <Tabs.Screen
+        name="jeux"
+        options={{
+          title: 'Jeux',
+          tabBarIcon: ({ color }) => (
+            <SymbolView name={{ ios: 'dice', android: 'casino', web: 'casino' }} tintColor={color} size={26} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{
