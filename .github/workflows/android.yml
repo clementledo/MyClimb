@@ -25,14 +25,14 @@ jobs:
       MYCLIMB_KEY_ALIAS: myclimb
       MYCLIMB_KEY_PASSWORD: ${{ secrets.MYCLIMB_KEYSTORE_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -48,7 +48,8 @@ jobs:
       - name: Vérifier la clé Google Maps
         run: |
           if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
-            echo "::warning::Secret GOOGLE_MAPS_API_KEY absent : la carte et les temps de trajet ne marcheront pas."
+            echo "::error::Secret GOOGLE_MAPS_API_KEY absent : ajoute-le dans Settings > Secrets and variables > Actions, puis relance."
+            exit 1
           fi
 
       - name: Préparer la clé de signature
