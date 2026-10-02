@@ -36,6 +36,7 @@ import {
 import { searchGyms } from '@/lib/google';
 import { currentPosition, distanceM } from '@/lib/location';
 import { deletePhoto, pickPhoto } from '@/lib/photos';
+import type { Session } from '@/lib/session';
 import { colors } from '@/lib/theme';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -55,21 +56,26 @@ function toggle(list: string[], item: string) {
 
 export function BlockForm({
   initial,
-  gymId,
+  session,
   onSave,
 }: {
   initial?: BlockInput;
-  gymId?: string;
+  /** Grimpe ajoutée pendant une séance : le lieu et la date sont ceux de la séance. */
+  session?: Session;
   onSave: (b: BlockInput) => void;
 }) {
   const [discipline, setDiscipline] = useState<Discipline>(
     initial?.discipline ?? ((getSetting('discipline') as Discipline) || 'bloc'),
   );
-  const [outdoor, setOutdoor] = useState(initial?.outdoor ?? (gymId ? false : getSetting('outdoor') === '1'));
-  const [gyms, setGyms] = useState<Gym[]>(() => listSavedGyms());
-  const [selectedGym, setSelectedGym] = useState<string | null>(initial?.gymId ?? gymId ?? null);
+  const [outdoor, setOutdoor] = useState(initial?.outdoor ?? (session ? session.site !== null : false));
+  const [gyms, setGyms] = useState<Gym[]>(() => {
+    const saved = listSavedGyms();
+    const current = session?.gymId ? getGym(session.gymId) : null;
+    return current && !saved.some((g) => g.id === current.id) ? [current, ...saved] : saved;
+  });
+  const [selectedGym, setSelectedGym] = useState<string | null>(initial?.gymId ?? session?.gymId ?? null);
   const [sites] = useState<string[]>(() => listSites());
-  const [site, setSite] = useState(initial?.site ?? '');
+  const [site, setSite] = useState(initial?.site ?? session?.site ?? '');
   const [name, setName] = useState(initial?.name ?? '');
   const [photoUri, setPhotoUri] = useState<string | null>(initial?.photoUri ?? null);
   const [color, setColor] = useState<string | null>(initial?.color ?? null);
@@ -89,6 +95,7 @@ export function BlockForm({
 
   // Salles proches : la plus proche est présélectionnée si tu es dedans.
   useEffect(() => {
+    if (session) return;
     let cancelled = false;
     (async () => {
       try {
@@ -103,7 +110,7 @@ export function BlockForm({
         if (current) merged.set(current.id, current);
         setGyms([...merged.values()]);
         const closest = [...merged.values()].sort((a, b) => dist(a) - dist(b))[0];
-        if (!selectedGym && closest && dist(closest) < HERE_RADIUS_M) {
+        if (!session && !selectedGym && closest && dist(closest) < HERE_RADIUS_M) {
           setSelectedGym(closest.id);
           if (!initial) setOutdoor(false);
         }
@@ -155,7 +162,6 @@ export function BlockForm({
     if (gym) saveGym(gym);
     setSetting(systemSettingKey(discipline), gradeSystem);
     setSetting('discipline', discipline);
-    setSetting('outdoor', outdoor ? '1' : '0');
     onSave({
       discipline,
       outdoor,
@@ -193,14 +199,16 @@ export function BlockForm({
           value={discipline}
           onChange={changeDiscipline}
         />
-        <Segmented
-          options={[
-            { value: 'in', label: 'En salle' },
-            { value: 'out', label: 'Extérieur' },
-          ]}
-          value={outdoor ? 'out' : 'in'}
-          onChange={(v) => setOutdoor(v === 'out')}
-        />
+        {!session && (
+          <Segmented
+            options={[
+              { value: 'in', label: 'En salle' },
+              { value: 'out', label: 'Extérieur' },
+            ]}
+            value={outdoor ? 'out' : 'in'}
+            onChange={(v) => setOutdoor(v === 'out')}
+          />
+        )}
       </View>
 
       <Section title="Photo">
@@ -211,7 +219,7 @@ export function BlockForm({
         </View>
       </Section>
 
-      {outdoor ? (
+      {session ? null : outdoor ? (
         <Section title="Site ou secteur">
           <TextInput style={s.input} value={site} onChangeText={setSite} placeholder="Ex. Val-David, Dame Blanche" />
           {sites.length > 0 && (
@@ -316,9 +324,11 @@ export function BlockForm({
         </View>
       </Section>
 
-      <Section title="Date">
-        <TextInput style={s.input} value={date} onChangeText={setDate} placeholder="AAAA-MM-JJ" />
-      </Section>
+      {!session && (
+        <Section title="Date">
+          <TextInput style={s.input} value={date} onChangeText={setDate} placeholder="AAAA-MM-JJ" />
+        </Section>
+      )}
 
       <Section title="Note">
         <TextInput

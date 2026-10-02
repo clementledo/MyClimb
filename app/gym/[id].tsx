@@ -1,9 +1,10 @@
-import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { BlockRow } from '@/components/BlockRow';
+import { openSessionAt } from '@/components/startSession';
 import { Button, Empty, Section, Segmented } from '@/components/ui';
 import { formatPrice } from '@/lib/climbing';
 import { getGym, listBlocks, type Block } from '@/lib/db';
@@ -21,6 +22,7 @@ import {
 } from '@/lib/google';
 import { gymPrices } from '@/lib/gymPrices';
 import { currentPosition } from '@/lib/location';
+import { getSession } from '@/lib/session';
 import { colors } from '@/lib/theme';
 
 const MODES: TravelMode[] = ['WALK', 'TRANSIT', 'DRIVE'];
@@ -36,6 +38,7 @@ export default function GymScreen() {
   const route = routeLoading ? null : routeFor.route;
   const [details, setDetails] = useState<GymDetails | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [sessionHere, setSessionHere] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const map = useRef<MapView>(null);
 
@@ -67,6 +70,7 @@ export default function GymScreen() {
   useFocusEffect(
     useCallback(() => {
       setBlocks(listBlocks(params.id));
+      setSessionHere(getSession()?.gymId === params.id);
     }, [params.id]),
   );
 
@@ -125,6 +129,11 @@ export default function GymScreen() {
           />
         </View>
 
+        <Button
+          label={sessionHere ? 'Reprendre la séance en cours' : 'Démarrer une séance ici'}
+          onPress={() => openSessionAt({ gymId: gym.id })}
+        />
+
         <Section title="Tarifs">
           {prices ? (
             <>
@@ -176,13 +185,7 @@ export default function GymScreen() {
           )}
         </Section>
 
-        <Section title={`Mes grimpes ici (${blocks.length})`}>
-          <Button
-            label="+ Ajouter une grimpe ici"
-            variant="secondary"
-            onPress={() => router.push({ pathname: '/block/new', params: { gymId: gym.id } })}
-          />
-        </Section>
+        {blocks.length > 0 && <Text style={s.sectionTitle}>Mes grimpes ici ({blocks.length})</Text>}
       </View>
       {blocks.map((b) => (
         <BlockRow key={b.id} block={b} showGym={false} />
@@ -204,4 +207,5 @@ const s = StyleSheet.create({
   prices: { gap: 6, padding: 12, borderRadius: 10, backgroundColor: colors.surface },
   priceLine: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   error: { color: colors.danger },
+  sectionTitle: { fontWeight: '700', fontSize: 15, color: colors.text },
 });

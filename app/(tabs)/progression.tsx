@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import { ClimbList } from '@/components/ClimbList';
 import { Legend, LineChart, RateBars, RESULT_COLORS, StackedBars, StackedColumns } from '@/components/charts';
 import { Empty, Section, Segmented } from '@/components/ui';
 import {
@@ -21,7 +22,28 @@ type Where = 'all' | 'in' | 'out';
 const pct = (r: number) => `${Math.round(r * 100)} %`;
 const dec = (n: number) => n.toFixed(1).replace('.', ',').replace(',0', '');
 
+type Mode = 'stats' | 'list';
+
 export default function ProgressionScreen() {
+  const [view, setView] = useState<Mode>('stats');
+  return (
+    <View style={s.container}>
+      <View style={s.switcher}>
+        <Segmented
+          options={[
+            { value: 'stats', label: 'Statistiques' },
+            { value: 'list', label: 'Mes grimpes' },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      </View>
+      {view === 'stats' ? <StatsView /> : <ClimbList />}
+    </View>
+  );
+}
+
+function StatsView() {
   const { width } = useWindowDimensions();
   const chartW = width - 32;
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -49,7 +71,9 @@ export default function ProgressionScreen() {
   if (blocks.length === 0) {
     return (
       <View style={s.container}>
-        <Empty text={'Pas encore de progression à afficher.\nAjoute tes grimpes dans l\'onglet Carnet.'} />
+        <Empty
+          text={'Pas encore de progression à afficher.\nChoisis une salle dans l\'onglet Salles et démarre une séance.'}
+        />
       </View>
     );
   }
@@ -246,6 +270,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, gap: 24, paddingBottom: 40 },
   filters: { gap: 8 },
+  switcher: { paddingHorizontal: 16, paddingTop: 12 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tile: {
     flexBasis: '47%',

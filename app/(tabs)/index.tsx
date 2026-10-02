@@ -6,7 +6,7 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { Button, Empty, Segmented } from '@/components/ui';
 import { formatPrice } from '@/lib/climbing';
-import { countBlocksByGym, getSetting, saveGym, setSetting, type Gym } from '@/lib/db';
+import { countBlocksByGym, getGym, getSetting, saveGym, setSetting, type Gym } from '@/lib/db';
 import {
   ANDROID_HEADERS,
   formatDistance,
@@ -21,6 +21,7 @@ import {
 } from '@/lib/google';
 import { gymPrices } from '@/lib/gymPrices';
 import { currentPosition, distanceM } from '@/lib/location';
+import { getSession, type Session } from '@/lib/session';
 import { colors } from '@/lib/theme';
 
 const MODES: TravelMode[] = ['WALK', 'TRANSIT', 'DRIVE'];
@@ -39,6 +40,7 @@ export default function GymsScreen() {
   const [timesFor, setTimesFor] = useState<{ mode: TravelMode; data: Record<string, Travel> } | null>(null);
   const times = useMemo(() => (timesFor?.mode === mode ? timesFor.data : {}), [timesFor, mode]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [session, setSession] = useState<Session | null>(null);
   const [sortBy, setSortBy] = useState<'distance' | 'price'>(
     () => (getSetting('gymSort') as 'distance' | 'price') ?? 'distance',
   );
@@ -77,6 +79,7 @@ export default function GymsScreen() {
   useFocusEffect(
     useCallback(() => {
       setCounts(countBlocksByGym());
+      setSession(getSession());
     }, []),
   );
 
@@ -109,6 +112,15 @@ export default function GymsScreen() {
 
   return (
     <View style={s.container}>
+      {session && (
+        <Pressable style={s.session} onPress={() => router.push('/session')}>
+          <Text style={s.sessionText} numberOfLines={1}>
+            Séance en cours ·{' '}
+            {session.gymId ? (getGym(session.gymId)?.name ?? 'Salle') : (session.site ?? 'Extérieur')}
+          </Text>
+          <Text style={s.sessionAction}>Reprendre</Text>
+        </Pressable>
+      )}
       <View style={s.controls}>
         <Segmented
           options={MODES.map((m) => ({ value: m, label: TRAVEL_MODE_LABELS[m] }))}
@@ -228,6 +240,18 @@ export default function GymsScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   controls: { padding: 12, gap: 8 },
+  session: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 12,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+  },
+  sessionText: { flex: 1, color: '#fff', fontWeight: '600' },
+  sessionAction: { color: '#fff', fontWeight: '800' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,16 +1,17 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BlockRow } from '@/components/BlockRow';
-import { Chip, Empty } from '@/components/ui';
+import { Button, Chip, Empty } from '@/components/ui';
 import { GRADES, isSent, placeKey, placeOf, RESULT_LABELS, type Discipline } from '@/lib/climbing';
 import { listBlocks, type Block } from '@/lib/db';
 import { colors } from '@/lib/theme';
 
 type ResultFilter = 'all' | 'done' | 'project';
 
-export default function BlocksScreen() {
+/** Toutes les grimpes, avec des filtres. */
+export function ClimbList() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [discipline, setDiscipline] = useState<Discipline | null>(null);
   const [outdoor, setOutdoor] = useState<boolean | null>(null);
@@ -90,17 +91,22 @@ export default function BlocksScreen() {
           <Empty
             text={
               blocks.length === 0
-                ? 'Ton carnet est vide.\nAppuie sur + pour ajouter un bloc ou une voie.'
+                ? 'Aucune grimpe pour l\'instant.\nChoisis une salle dans l\'onglet Salles et démarre une séance.'
                 : 'Aucune grimpe ne correspond à ces filtres.'
             }
           />
         }
-        contentContainerStyle={{ paddingBottom: 96 }}
+        ListFooterComponent={
+          <View style={s.footer}>
+            <Button
+              label="Démarrer une séance en extérieur"
+              variant="secondary"
+              onPress={() => router.push('/session/outdoor')}
+            />
+          </View>
+        }
+        contentContainerStyle={{ paddingBottom: 32 }}
       />
-
-      <Pressable style={s.fab} onPress={() => router.push('/block/new')}>
-        <Text style={s.fabText}>+</Text>
-      </Pressable>
     </View>
   );
 }
@@ -109,17 +115,5 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   filters: { paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   chips: { gap: 8, paddingHorizontal: 12 },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-  },
-  fabText: { color: '#fff', fontSize: 32, lineHeight: 34, fontWeight: '600' },
+  footer: { padding: 16 },
 });

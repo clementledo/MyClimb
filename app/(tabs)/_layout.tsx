@@ -28,19 +28,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="blocs"
-        options={{
-          title: 'Carnet',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'figure.climbing', android: 'landscape', web: 'landscape' }}
-              tintColor={color}
-              size={26}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="progression"
         options={{
           title: 'Progression',

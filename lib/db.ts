@@ -195,6 +195,13 @@ export function listBlocks(gymId?: string): Block[] {
   return rows.map(toBlock);
 }
 
+/** Grimpes ajoutées depuis `since` (horodatage en ms), les plus récentes d'abord. */
+export function listBlocksAddedSince(since: number): Block[] {
+  return db
+    .getAllSync<BlockRow>(`${BLOCK_SELECT} WHERE b.created_at >= ? ORDER BY b.created_at DESC`, since)
+    .map(toBlock);
+}
+
 export function getBlock(id: number): Block | null {
   const row = db.getFirstSync<BlockRow>(`${BLOCK_SELECT} WHERE b.id = ?`, id);
   return row ? toBlock(row) : null;

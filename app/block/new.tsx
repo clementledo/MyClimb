@@ -1,16 +1,21 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
+import { useState } from 'react';
 
 import { BlockForm } from '@/components/BlockForm';
+import { Empty } from '@/components/ui';
 import { insertBlock } from '@/lib/db';
+import { getSession } from '@/lib/session';
 
+/** Ajout d'une grimpe, toujours pendant une séance. */
 export default function NewBlockScreen() {
-  const { gymId } = useLocalSearchParams<{ gymId?: string }>();
+  const [session] = useState(() => getSession());
+  if (!session) return <Empty text="Démarre une séance depuis une salle pour ajouter des grimpes." />;
   return (
     <BlockForm
-      gymId={gymId}
+      session={session}
       onSave={(b) => {
-        const id = insertBlock(b);
-        router.replace({ pathname: '/block/[id]', params: { id: String(id) } });
+        insertBlock(b);
+        router.back();
       }}
     />
   );
