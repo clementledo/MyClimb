@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Clé Google Maps : secret du dépôt (Settings > Secrets and variables > Actions).
-      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY || vars.GOOGLE_MAPS_API_KEY }}
       # Signature de l'APK : secrets optionnels. Sans eux, l'APK est signé avec la clé de
       # débogage du modèle Expo, identique d'une fabrication à l'autre mais publique.
       MYCLIMB_KEYSTORE_BASE64: ${{ secrets.MYCLIMB_KEYSTORE_BASE64 }}
