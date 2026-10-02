@@ -57,6 +57,8 @@ module.exports = {
         },
       ],
       ['react-native-maps', { androidGoogleMapsApiKey: googleMapsApiKey }],
+      // Barre des boutons Android transparente : elle prend la couleur de l'app au lieu d'un gris.
+      ['expo-navigation-bar', { enforceContrast: false, style: 'dark' }],
       './plugins/withReleaseSigning',
     ],
     experiments: {
