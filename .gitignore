@@ -39,3 +39,15 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Generated native projects (Continuous Native Generation)
+/android
+/ios
+
+# Local secrets
+.env
+.env.local
+
+# Signing keys
+/signing
+*.keystore

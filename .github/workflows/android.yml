@@ -1,0 +1,77 @@
+name: APK Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      # Clé Google Maps : secret du dépôt (Settings > Secrets and variables > Actions).
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+      # Signature de l'APK : secrets optionnels. Sans eux, l'APK est signé avec la clé de
+      # débogage du modèle Expo, identique d'une fabrication à l'autre mais publique.
+      MYCLIMB_KEYSTORE_BASE64: ${{ secrets.MYCLIMB_KEYSTORE_BASE64 }}
+      MYCLIMB_KEYSTORE_PASSWORD: ${{ secrets.MYCLIMB_KEYSTORE_PASSWORD }}
+      MYCLIMB_KEY_ALIAS: myclimb
+      MYCLIMB_KEY_PASSWORD: ${{ secrets.MYCLIMB_KEYSTORE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Vérifier le code
+        run: |
+          npx tsc --noEmit
+          npx eslint .
+
+      - name: Vérifier la clé Google Maps
+        run: |
+          if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
+            echo "::warning::Secret GOOGLE_MAPS_API_KEY absent : la carte et les temps de trajet ne marcheront pas."
+          fi
+
+      - name: Préparer la clé de signature
+        if: env.MYCLIMB_KEYSTORE_BASE64 != ''
+        run: |
+          echo "$MYCLIMB_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/myclimb.keystore"
+          echo "MYCLIMB_KEYSTORE=$RUNNER_TEMP/myclimb.keystore" >> "$GITHUB_ENV"
+
+      - name: Générer le projet Android
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: 1
+
+      - name: Fabriquer l'APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Publier l'APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v1.0.${{ github.run_number }}"
+          cp android/app/build/outputs/apk/release/app-release.apk "MyClimb-$VERSION.apk"
+          gh release create "$VERSION" "MyClimb-$VERSION.apk" \
+            --title "MyClimb $VERSION" \
+            --notes "Version fabriquée depuis ${GITHUB_SHA::7}. Télécharge l'APK ci-dessous sur ton téléphone Android et installe-le."
