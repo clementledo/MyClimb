@@ -51,7 +51,11 @@ tap "Simulation" ; sleep 4 ; shot 2-simulation
 tap "Essayer avec une voie d’exemple" ; sleep 6 ; shot 3-exemple
 tap "Méthode 3D" ; sleep 8 ; shot 4-3d-debut
 tap "Étape ⏭" ; sleep 3 ; tap "Étape ⏭" ; sleep 3 ; shot 5-3d-etapes
-tap "▶ Tout jouer" ; sleep 15 ; shot 6-3d-fin
+tap "⏮" ; sleep 3 ; shot 6-etape-crux
+tap "↔ Prendre avec la main gauche" ; sleep 4 ; shot 7-correction
+tap "Annuler mes corrections" ; sleep 3
+tap "× 1" ; sleep 1 ; tap "× 2" ; sleep 1
+tap "▶ Tout jouer" ; sleep 8 ; shot 8-3d-fin
 echo "Application en vie : $(adb shell pidof $APP || echo NON)"
 adb logcat -d > "$OUT/logcat.txt"
 adb logcat -d -b crash > "$OUT/crash.txt" || true

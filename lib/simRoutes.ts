@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { getSetting, setSetting } from './db';
 import { DEMO_WALL_JPEG } from './demoWall';
 import { deletePhoto, photoDir } from './photos';
+import type { Fixes } from './planner';
 import type { Hold, Pt } from './simulation';
 
 /** Une voie à simuler : une photo et les prises touchées dessus (coordonnées de 0 à 1). */
@@ -17,6 +18,8 @@ export type SimRoute = {
   feet: Pt[];
   /** Taille du grimpeur, en multiple de la taille calculée. */
   size: number;
+  /** Corrections de la méthode (main ou pied imposé). */
+  fix?: Fixes;
 };
 
 const KEY = 'simulation';

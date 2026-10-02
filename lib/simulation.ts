@@ -13,7 +13,12 @@ export type Contacts = Record<Limb, Pt>;
 /** Types de prises de main (facultatifs). `lat_g` : latérale qu'on tire vers la gauche. */
 export type HoldType = 'bac' | 'reglette' | 'plat' | 'pince' | 'inversee' | 'lat_g' | 'lat_d';
 export type Hold = Pt & { type?: HoldType };
-export type HandTypes = { lh?: HoldType; rh?: HoldType };
+/** Crochet de pied : talon ou pointe posés sur une prise haute, sur le côté. */
+export type FootStyle = 'talon' | 'pointe';
+/** Type de prise tenu par chaque main, et crochet éventuel de chaque pied. */
+export type HandTypes = { lh?: HoldType; rh?: HoldType; lf?: FootStyle; rf?: FootStyle };
+/** Difficulté d'une étape : 1 facile, 2 moyen, 3 dur. */
+export type Level = 1 | 2 | 3;
 
 /** Un mouvement de la méthode, avec ce qu'il faut afficher pour aider. */
 export type Move = {
@@ -22,7 +27,18 @@ export type Move = {
   to: Pt;
   /** Type de la prise de main visée. */
   type?: HoldType;
+  /** Crochet de pied (talon ou pointe). */
+  hook?: FootStyle;
+  /** Jeté : le corps se charge puis part d'un coup. */
+  dyno?: boolean;
   title: string;
+  level: Level;
+  /** Étape la plus dure de la voie. */
+  crux?: boolean;
+  /** Ce que l'utilisateur peut corriger sur cette étape. */
+  fix?: { kind: 'hand'; hold: number } | { kind: 'foot'; label: string };
+  /** L'étape suit une correction de l'utilisateur. */
+  corrected?: boolean;
   tips: string[];
   alerts: string[];
 };
@@ -57,7 +73,7 @@ function clampTo(p: Pt, target: Pt, max: number): Pt {
 }
 
 /** Pose d'équilibre : épaules sous les mains, bassin vers les pieds, membres à portée. */
-function hipCenter(c: Contacts, height: number, types: HandTypes = {}) {
+function hipCenter(c: Contacts, height: number, types: HandTypes = {}, crouch = 0) {
   const b = body(height);
   // Latérale : le corps se décale du côté où l'on tire. Inversée ou plat : le corps descend.
   const pull = (t?: HoldType) => (t === 'lat_g' ? -1 : t === 'lat_d' ? 1 : 0);
@@ -67,14 +83,20 @@ function hipCenter(c: Contacts, height: number, types: HandTypes = {}) {
   const arm = b.upperArm + b.forearm;
   const leg = b.thigh + b.shin;
   const hands = mid(c.lh, c.rh);
-  const feet = mid(c.lf, c.rf);
-  let shoulders = add(hands, { x: sideShift, y: arm * (0.8 + drop) });
+  // Un pied en crochet retient le corps sans le porter : l'équilibre se fait sur l'autre pied.
+  const standing = (['lf', 'rf'] as const).filter((l) => !types[l]);
+  const hooks = (['lf', 'rf'] as const).filter((l) => types[l]);
+  const feet = standing.length === 1 ? c[standing[0]] : mid(c.lf, c.rf);
+  const lowest = standing.length ? Math.min(...standing.map((l) => c[l].y)) : Math.min(c.lf.y, c.rf.y);
+  // Jeté : le corps descend pour se charger (crouch > 0) puis monte (crouch < 0).
+  let shoulders = add(hands, { x: sideShift, y: arm * (0.8 + drop + crouch * 0.18) });
   let hips = add(shoulders, { x: 0, y: b.torso });
   for (let i = 0; i < 4; i++) {
     // Le bassin reste à portée des pieds, les épaules à portée des mains.
     hips = clampTo(hips, add(feet, { x: sideShift, y: -leg * 0.15 }), leg * 0.9);
-    // Le bassin reste au-dessus du pied le plus haut, sinon les jambes se replient à l'horizontale.
-    hips = { x: hips.x, y: Math.min(hips.y, Math.min(c.lf.y, c.rf.y) - leg * 0.3) };
+    for (const l of hooks) hips = clampTo(hips, c[l], leg * 0.92);
+    // Le bassin reste au-dessus du pied d'appui le plus haut, sinon les jambes se replient à l'horizontale.
+    hips = { x: hips.x, y: Math.min(hips.y, lowest - leg * 0.3) };
     shoulders = add(hips, mul(norm(sub(hands, hips), { x: 0, y: -1 }), b.torso));
     shoulders = clampTo(shoulders, c.lh, arm * 0.98);
     shoulders = clampTo(shoulders, c.rh, arm * 0.98);
@@ -94,7 +116,7 @@ export function contactsAt(
   startTypes: HandTypes,
   moves: Move[],
   t: number,
-): { c: Contacts; types: HandTypes; moving: Limb | null; lift: number; index: number } {
+): { c: Contacts; types: HandTypes; moving: Limb | null; lift: number; crouch: number; index: number } {
   const c: Contacts = { ...start };
   const types: HandTypes = { ...startTypes };
   const done = Math.min(moves.length, Math.max(0, Math.floor(t)));
@@ -102,13 +124,24 @@ export function contactsAt(
     const m = moves[i];
     c[m.limb] = m.to;
     if (m.limb === 'lh' || m.limb === 'rh') types[m.limb] = m.type;
+    else types[m.limb] = m.hook;
   }
   const current = moves[done];
-  if (!current || t >= moves.length) return { c, types, moving: null, lift: 0, index: moves.length };
+  if (!current || t >= moves.length) return { c, types, moving: null, lift: 0, crouch: 0, index: moves.length };
   const p = Math.max(0, t - done);
+  if (current.dyno) {
+    // Jeté : le corps se charge (main encore sur sa prise), puis la main part vite et le corps monte.
+    const load = 0.4;
+    if (p < load) return { c, types, moving: null, lift: 0, crouch: Math.sin((p / load) * (Math.PI / 2)), index: done };
+    const q = (p - load) / (1 - load);
+    const e = 1 - (1 - q) ** 3;
+    c[current.limb] = lerp(current.from, current.to, e);
+    return { c, types, moving: current.limb, lift: Math.sin(Math.PI * e) * 0.6, crouch: 1 - 2.2 * Math.sin(Math.PI * q) - q, index: done };
+  }
   const e = p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
   c[current.limb] = lerp(current.from, current.to, e);
-  return { c, types, moving: current.limb, lift: Math.sin(Math.PI * e), index: done };
+  if (current.limb === 'lf' || current.limb === 'rf') types[current.limb] = e > 0.5 ? current.hook : types[current.limb];
+  return { c, types, moving: current.limb, lift: Math.sin(Math.PI * e), crouch: 0, index: done };
 }
 
 /* ---------- Squelette en 3D ---------- */
@@ -156,11 +189,12 @@ export function skeleton(
   moving: Limb | null = null,
   lift = 0,
   types: HandTypes = {},
+  crouch = 0,
 ): Skeleton {
   const b = body(height);
   const arm = b.upperArm + b.forearm;
   const leg = b.thigh + b.shin;
-  const { shoulders, hips } = hipCenter(c, height, types);
+  const { shoulders, hips } = hipCenter(c, height, types, crouch);
 
   const onWall = 0.03 * height;
   const contact = (l: Limb) => v3(c[l], onWall + (moving === l ? lift * 0.14 * height : 0));
@@ -184,8 +218,15 @@ export function skeleton(
   });
   const legs = ([['lf', -1], ['rf', 1]] as const).map(([l, side]) => {
     const hip = add3(P, mul3(across, (side * b.hips) / 2));
-    // Genoux ouverts vers l'extérieur, comme en grenouille.
-    const r = joint3(hip, contact(l), b.thigh, b.shin, { x: side * 0.5, y: -0.1, z: 0.85 });
+    // Genoux ouverts vers l'extérieur, comme en grenouille ; talon : genou vers le haut et dehors ;
+    // pointe : jambe presque tendue, genou vers le haut.
+    const pole =
+      types[l] === 'talon'
+        ? { x: side * 0.6, y: -0.7, z: 0.4 }
+        : types[l] === 'pointe'
+          ? { x: 0, y: -1, z: 0.3 }
+          : { x: side * 0.5, y: -0.1, z: 0.85 };
+    const r = joint3(hip, contact(l), b.thigh, b.shin, pole);
     return { hip, knee: r.joint, foot: r.end };
   });
   const neck = add3(S, mul3(up, b.neck));

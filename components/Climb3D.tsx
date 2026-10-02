@@ -272,8 +272,8 @@ export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek
     const pose = (t: number) => {
       const p = live.current.plan;
       const hgt = p.height;
-      const { c, types, moving, lift } = contactsAt(p.start, p.startTypes, p.moves, t);
-      const s = skeleton(c, hgt, moving, lift, types);
+      const { c, types, moving, lift, crouch } = contactsAt(p.start, p.startTypes, p.moves, t);
+      const s = skeleton(c, hgt, moving, lift, types, crouch);
       const chest = toWorld(s.chest);
       const pelvis = toWorld(s.pelvis);
       const neckP = toWorld(s.neck);

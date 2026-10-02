@@ -5,7 +5,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensi
 import { Climb3D, type Progress } from '@/components/Climb3D';
 import { Button, Chip, Segmented } from '@/components/ui';
 import { getSetting, setSetting } from '@/lib/db';
-import { HOLD_TYPES, planRoute } from '@/lib/planner';
+import { HOLD_TYPES, LEVELS, planRoute } from '@/lib/planner';
 import { demoRoute, listSimRoutes, pickRoutePhotos, removeSimRoute, saveSimRoutes, type SimRoute } from '@/lib/simRoutes';
 import type { HoldType, Pt } from '@/lib/simulation';
 import { colors } from '@/lib/theme';
@@ -26,7 +26,13 @@ export default function SimulationScreen() {
     saveSimRoutes(next);
   };
   const patch = (changes: Partial<SimRoute>) => {
-    if (route) update(routes.map((r) => (r.id === route.id ? { ...r, ...changes } : r)));
+    if (!route) return;
+    // Ajouter ou retirer une prise décale les numéros : les corrections ne s'appliquent plus.
+    const renumbered =
+      (changes.hands && changes.hands.length !== route.hands.length) ||
+      (changes.feet && changes.feet.length !== route.feet.length);
+    const next = renumbered ? { ...changes, fix: undefined } : changes;
+    update(routes.map((r) => (r.id === route.id ? { ...r, ...next } : r)));
   };
 
   const add = async (source: 'camera' | 'library') => {
@@ -125,7 +131,7 @@ export default function SimulationScreen() {
         />
       </View>
       {mode === '3d' && ready ? (
-        <Player key={route.id} route={route} onSize={(size) => patch({ size })} />
+        <Player key={route.id} route={route} onChange={patch} />
       ) : (
         <HoldsEditor
           route={route}
@@ -278,7 +284,7 @@ const readHeight = () => {
   return v >= 1.2 && v <= 2.2 ? v : 1.75;
 };
 
-function Player({ route, onSize }: { route: SimRoute; onSize: (size: number) => void }) {
+function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<SimRoute>) => void }) {
   const { height: windowHeight } = useWindowDimensions();
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
@@ -304,6 +310,25 @@ function Player({ route, onSize }: { route: SimRoute; onSize: (size: number) => 
     setPlaying(false);
     setSeek((x) => ({ t: Math.max(0, Math.min(total, i)), n: x.n + 1 }));
   };
+  const fixes = route.fix ?? {};
+  const hasFixes = Object.keys(fixes.hands ?? {}).length + Object.keys(fixes.feet ?? {}).length > 0;
+  /** Corrige l'étape affichée : l'autre main (ou l'autre pied) prend la prise, et la suite se recalcule. */
+  const correct = () => {
+    if (!move?.fix) return;
+    const f = move.fix;
+    if (f.kind === 'hand') {
+      const other = move.limb === 'lh' ? 'rh' : 'lh';
+      onChange({ fix: { ...fixes, hands: { ...fixes.hands, [f.hold]: other } } });
+    } else {
+      const other = move.limb === 'lf' ? 'rf' : 'lf';
+      onChange({ fix: { ...fixes, feet: { ...fixes.feet, [f.label]: other } } });
+    }
+    goTo(index);
+  };
+  const resetFixes = () => {
+    onChange({ fix: undefined });
+    goTo(0);
+  };
 
   return (
     <ScrollView style={s.flex} contentContainerStyle={s.player}>
@@ -322,6 +347,22 @@ function Player({ route, onSize }: { route: SimRoute; onSize: (size: number) => 
         />
       </View>
 
+      <View style={s.strip}>
+        {plan.moves.map((m, i) => (
+          <Pressable
+            key={i}
+            onPress={() => goTo(i)}
+            hitSlop={{ top: 8, bottom: 8 }}
+            style={[
+              s.seg,
+              { backgroundColor: LEVELS[m.level].color, opacity: i < index ? 0.35 : 1 },
+              i === index && !finished && s.segActive,
+            ]}>
+            {m.crux && <View style={s.cruxDot} />}
+          </Pressable>
+        ))}
+      </View>
+
       <View style={s.stepCard}>
         <View style={s.stepHead}>
           <Text style={s.stepTitle} numberOfLines={2}>
@@ -331,6 +372,19 @@ function Player({ route, onSize }: { route: SimRoute; onSize: (size: number) => 
             {Math.min(index + 1, total)}/{total}
           </Text>
         </View>
+        {!finished && move && (
+          <View style={s.badges}>
+            <View style={[s.badge, { backgroundColor: LEVELS[move.level].color }]}>
+              <Text style={s.badgeText}>{LEVELS[move.level].label}</Text>
+            </View>
+            {move.crux && (
+              <View style={[s.badge, { backgroundColor: '#1A1A1A' }]}>
+                <Text style={s.badgeText}>Crux</Text>
+              </View>
+            )}
+            {move.corrected && <Text style={s.corrected}>✎ corrigé par toi</Text>}
+          </View>
+        )}
         {index === 0 && <Text style={s.stepStart}>{plan.startText}</Text>}
         {!finished &&
           move?.alerts.map((a) => (
@@ -344,6 +398,20 @@ function Player({ route, onSize }: { route: SimRoute; onSize: (size: number) => 
               • {t}
             </Text>
           ))}
+        {!finished && move?.fix && (
+          <Pressable onPress={correct} style={({ pressed }) => [s.fixBtn, pressed && { opacity: 0.5 }]}>
+            <Text style={s.fixText}>
+              {move.fix.kind === 'hand'
+                ? `↔ Prendre avec la main ${move.limb === 'lh' ? 'droite' : 'gauche'}`
+                : `↔ Mettre le pied ${move.limb === 'lf' ? 'droit' : 'gauche'} ici`}
+            </Text>
+          </Pressable>
+        )}
+        {hasFixes && (
+          <Pressable onPress={resetFixes} hitSlop={6}>
+            <Text style={s.resetFix}>Annuler mes corrections</Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={s.row}>
@@ -380,12 +448,14 @@ function Player({ route, onSize }: { route: SimRoute; onSize: (size: number) => 
       </View>
       <View style={s.row}>
         <Text style={s.sizeLabel}>Mur : {plan.H.toFixed(1).replace('.', ',')} m</Text>
-        <Ctrl label="−" onPress={() => onSize(Math.min(2, route.size * 1.1))} />
-        <Ctrl label="+" onPress={() => onSize(Math.max(0.5, route.size / 1.1))} />
+        <Ctrl label="−" onPress={() => onChange({ size: Math.min(2, route.size * 1.1) })} />
+        <Ctrl label="+" onPress={() => onChange({ size: Math.max(0.5, route.size / 1.1) })} />
       </View>
       <Text style={s.hint}>
         La hauteur du mur est estimée d’après l’écart entre les prises ; corrige-la si le grimpeur paraît trop grand
-        ou trop petit. Un doigt fait tourner la caméra, deux doigts zooment.
+        ou trop petit. La barre de couleur montre la difficulté de chaque étape (touche-la pour y aller). Si une étape
+        ne te convient pas, change la main ou le pied : la suite se recalcule. Un doigt fait tourner la caméra, deux
+        doigts zooment.
       </Text>
     </ScrollView>
   );
@@ -480,6 +550,25 @@ const s = StyleSheet.create({
   stepCount: { color: colors.muted, fontWeight: '600' },
   stepStart: { color: colors.text, fontSize: 13, lineHeight: 18 },
   tip: { color: colors.text, fontSize: 13, lineHeight: 18 },
+  strip: { flexDirection: 'row', gap: 2, paddingVertical: 4 },
+  seg: { flex: 1, height: 8, borderRadius: 3, alignItems: 'center' },
+  segActive: { height: 14, marginTop: -3, borderWidth: 2, borderColor: colors.text },
+  cruxDot: { position: 'absolute', top: -9, width: 6, height: 6, borderRadius: 3, backgroundColor: '#1A1A1A' },
+  badges: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  badgeText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  corrected: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  fixBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  fixText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  resetFix: { color: colors.muted, fontSize: 13, textDecorationLine: 'underline', paddingTop: 2 },
   alert: { alignSelf: 'flex-start', backgroundColor: '#FFF3BF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   alertText: { color: '#8A5A00', fontWeight: '700', fontSize: 13 },
   row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
