@@ -14,19 +14,11 @@ export default function TabLayout() {
   return (
     <Tabs screenOptions={{ tabBarActiveTintColor: colors.primary }}>
       <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Accueil',
-          headerShown: false,
-          tabBarIcon: ({ color }) => <TabIcon ios="house.fill" android="home" color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="jeux"
         options={{ title: 'Jeux', tabBarIcon: ({ color }) => <TabIcon ios="dice" android="casino" color={color} /> }}
       />
       <Tabs.Screen
-        name="grimper"
+        name="index"
         options={{ title: 'Grimper', tabBarIcon: ({ color }) => <TabIcon ios="map" android="map" color={color} /> }}
       />
       <Tabs.Screen
@@ -34,6 +26,14 @@ export default function TabLayout() {
         options={{
           title: 'Progression',
           tabBarIcon: ({ color }) => <TabIcon ios="chart.bar.fill" android="bar_chart" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="simulation"
+        options={{
+          title: 'Simulation',
+          headerTitle: 'Simulation (bêta)',
+          tabBarIcon: ({ color }) => <TabIcon ios="figure.climbing" android="sports_gymnastics" color={color} />,
         }}
       />
     </Tabs>
