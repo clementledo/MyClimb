@@ -1,0 +1,39 @@
+Touché « Commencer »
+Touché « Voir la carte »
+Touché « Voir la liste »
+Touché « Filtres »
+Touché « Reprendre »
+Touché « Ajouter une grimpe »
+Introuvable : « Annuler »
+Touché « Extérieur »
+Touché « En salle »
+Touché « Progression »
+Touché « Tout »
+Touché « Mes grimpes »
+Touché « re:^7A »
+Touché « Jeux »
+Touché « Un jeu au hasard »
+Touché « Simulation »
+Touché « Essayer avec une voie d’exemple »
+Touché « Méthode 3D »
+Touché « ▶ Tout jouer »
+Touché « ⏮ »
+Touché « Étape ⏭ »
+Touché « Étape ⏭ »
+Touché « Dévers »
+Touché « ▶ Tout jouer »
+Touché « Paramètres »
+Touché « Nuit »
+Touché « Océan »
+Touché « Forêt »
+Touché « Terminal rétro »
+Touché « Classique »
+Introuvable : « Nuit »
+Touché « Progression »
+Touché « Grimper »
+Touché « Paramètres »
+Touché « Terminal rétro »
+Touché « Progression »
+Touché « Grimper »
+Touché « Paramètres »
+Touché « Classique »
