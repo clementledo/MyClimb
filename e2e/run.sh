@@ -45,6 +45,9 @@ PY
 }
 
 adb install -r app.apk
+# Barre de navigation à 3 boutons (rond, carré, triangle), comme sur le téléphone de Clement.
+adb shell cmd overlay enable com.android.internal.systemui.navbar.threebutton || true
+sleep 3
 adb shell pm grant $APP android.permission.ACCESS_FINE_LOCATION || true
 adb shell pm grant $APP android.permission.ACCESS_COARSE_LOCATION || true
 adb logcat -c
