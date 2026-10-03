@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 
 import { autoBackup } from '@/lib/backup';
 import { getSetting } from '@/lib/db';
+import { seedDemo } from '@/lib/demo';
 import {
   applyFont,
   applyTheme,
@@ -23,6 +24,8 @@ export { ErrorBoundary } from 'expo-router';
 export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
+
+seedDemo();
 
 export default function RootLayout() {
   const router = useRouter();
