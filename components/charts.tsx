@@ -1,12 +1,41 @@
-import { Text, View } from 'react-native';
-import Svg, { Circle, G, Line, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import { Text, View } from "react-native";
+import Svg, {
+  Circle,
+  G,
+  Line,
+  Polyline,
+  Rect,
+  Text as SvgText,
+} from "react-native-svg";
 
-import { colors, themedStyles } from '@/lib/theme';
+import { colors, font, themedStyles } from "@/lib/theme";
 
-/** Couleurs des résultats : du premier coup, réussi après essais, pas encore. */
-export const RESULT_COLORS = [colors.primary, '#F7A072', '#D9D9D9'];
+/** Mélange deux couleurs #RRGGBB (t = 0 : a, t = 1 : b). */
+export function mix(a: string, b: string, t: number) {
+  const p = (h: string) =>
+    [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return `#${x
+    .map((v, i) =>
+      Math.round(v + (y[i] - v) * t)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
 
-export function Legend({ items }: { items: { label: string; color: string }[] }) {
+/** Couleurs des résultats (du premier coup, réussi après essais, pas encore), d'après le thème. */
+export const resultColors = () => [
+  colors.primary,
+  mix(colors.primary, colors.card, 0.45),
+  colors.border,
+];
+
+export function Legend({
+  items,
+}: {
+  items: { label: string; color: string }[];
+}) {
   return (
     <View style={s.legend}>
       {items.map((it) => (
@@ -44,13 +73,17 @@ export function LineChart({
   series: { values: (number | null)[]; color: string }[];
   formatY: (v: number) => string;
 }) {
-  const all = series.flatMap((sr) => sr.values).filter((v): v is number => v !== null);
+  const all = series
+    .flatMap((sr) => sr.values)
+    .filter((v): v is number => v !== null);
   if (all.length === 0) return null;
   const min = Math.max(0, Math.min(...all) - 1);
   const max = Math.max(...all) + 1;
   const plotW = width - PAD.left - PAD.right;
   const plotH = height - PAD.top - PAD.bottom;
-  const x = (i: number) => PAD.left + (labels.length === 1 ? plotW / 2 : (i / (labels.length - 1)) * plotW);
+  const x = (i: number) =>
+    PAD.left +
+    (labels.length === 1 ? plotW / 2 : (i / (labels.length - 1)) * plotW);
   const y = (v: number) => PAD.top + plotH - ((v - min) / (max - min)) * plotH;
   const yStep = Math.max(1, Math.ceil((max - min) / 5));
   const ticks: number[] = [];
@@ -60,16 +93,40 @@ export function LineChart({
   return (
     <Svg width={width} height={height}>
       {ticks.map((v) => (
-        <Line key={`g${v}`} x1={PAD.left} x2={width - PAD.right} y1={y(v)} y2={y(v)} stroke={colors.border} strokeWidth={1} />
+        <Line
+          key={`g${v}`}
+          x1={PAD.left}
+          x2={width - PAD.right}
+          y1={y(v)}
+          y2={y(v)}
+          stroke={colors.border}
+          strokeWidth={1}
+        />
       ))}
       {ticks.map((v) => (
-        <SvgText key={`t${v}`} x={PAD.left - 6} y={y(v) + 4} fontSize={11} fill={colors.muted} textAnchor="end">
+        <SvgText
+          fontFamily={font.family}
+          key={`t${v}`}
+          x={PAD.left - 6}
+          y={y(v) + 4}
+          fontSize={11}
+          fill={colors.muted}
+          textAnchor="end"
+        >
           {formatY(v)}
         </SvgText>
       ))}
       {labels.map((l, i) =>
         showX(i) ? (
-          <SvgText key={`x${i}`} x={x(i)} y={height - 6} fontSize={10} fill={colors.muted} textAnchor="middle">
+          <SvgText
+            fontFamily={font.family}
+            key={`x${i}`}
+            x={x(i)}
+            y={height - 6}
+            fontSize={10}
+            fill={colors.muted}
+            textAnchor="middle"
+          >
             {l}
           </SvgText>
         ) : null,
@@ -82,7 +139,7 @@ export function LineChart({
           <G key={k}>
             {pts.length > 1 && (
               <Polyline
-                points={pts.map((p) => `${p.cx},${p.cy}`).join(' ')}
+                points={pts.map((p) => `${p.cx},${p.cy}`).join(" ")}
                 fill="none"
                 stroke={sr.color}
                 strokeWidth={2.5}
@@ -105,7 +162,7 @@ export function StackedColumns({
   height = 160,
   labels,
   stacks,
-  palette = RESULT_COLORS,
+  palette = resultColors(),
 }: {
   width: number;
   height?: number;
@@ -121,15 +178,33 @@ export function StackedColumns({
   const barW = Math.max(3, Math.min(28, slot * 0.7));
   const y = (v: number) => PAD.top + plotH - (v / max) * plotH;
   const showX = sparse(labels, 6);
-  const ticks = [0, Math.ceil(max / 2), max].filter((v, i, a) => a.indexOf(v) === i);
+  const ticks = [0, Math.ceil(max / 2), max].filter(
+    (v, i, a) => a.indexOf(v) === i,
+  );
 
   return (
     <Svg width={width} height={height}>
       {ticks.map((v) => (
-        <Line key={`g${v}`} x1={PAD.left} x2={width - PAD.right} y1={y(v)} y2={y(v)} stroke={colors.border} strokeWidth={1} />
+        <Line
+          key={`g${v}`}
+          x1={PAD.left}
+          x2={width - PAD.right}
+          y1={y(v)}
+          y2={y(v)}
+          stroke={colors.border}
+          strokeWidth={1}
+        />
       ))}
       {ticks.map((v) => (
-        <SvgText key={`t${v}`} x={PAD.left - 6} y={y(v) + 4} fontSize={11} fill={colors.muted} textAnchor="end">
+        <SvgText
+          fontFamily={font.family}
+          key={`t${v}`}
+          x={PAD.left - 6}
+          y={y(v) + 4}
+          fontSize={11}
+          fill={colors.muted}
+          textAnchor="end"
+        >
           {String(v)}
         </SvgText>
       ))}
@@ -142,19 +217,28 @@ export function StackedColumns({
           const bottom = y(acc);
           acc += v;
           return (
-            <Rect key={`${i}-${k}`} x={cx - barW / 2} y={top} width={barW} height={bottom - top} fill={palette[k]} />
+            <Rect
+              key={`${i}-${k}`}
+              x={cx - barW / 2}
+              y={top}
+              width={barW}
+              height={bottom - top}
+              fill={palette[k]}
+            />
           );
         });
       })}
       {labels.map((l, i) =>
         showX(i) ? (
           <SvgText
+            fontFamily={font.family}
             key={`x${i}`}
             x={PAD.left + slot * i + slot / 2}
             y={height - 6}
             fontSize={10}
             fill={colors.muted}
-            textAnchor="middle">
+            textAnchor="middle"
+          >
             {l}
           </SvgText>
         ) : null,
@@ -166,14 +250,17 @@ export function StackedColumns({
 /** Barres horizontales empilées : une ligne par catégorie. */
 export function StackedBars({
   rows,
-  palette = RESULT_COLORS,
+  palette = resultColors(),
   labelWidth = 44,
 }: {
   rows: { label: string; parts: number[] }[];
   palette?: string[];
   labelWidth?: number;
 }) {
-  const max = Math.max(1, ...rows.map((r) => r.parts.reduce((a, b) => a + b, 0)));
+  const max = Math.max(
+    1,
+    ...rows.map((r) => r.parts.reduce((a, b) => a + b, 0)),
+  );
   return (
     <View style={{ gap: 6 }}>
       {rows.map((r) => {
@@ -185,7 +272,15 @@ export function StackedBars({
             </Text>
             <View style={s.barTrack}>
               {r.parts.map((v, k) =>
-                v > 0 ? <View key={k} style={{ width: `${(v / max) * 100}%`, backgroundColor: palette[k] }} /> : null,
+                v > 0 ? (
+                  <View
+                    key={k}
+                    style={{
+                      width: `${(v / max) * 100}%`,
+                      backgroundColor: palette[k],
+                    }}
+                  />
+                ) : null,
               )}
             </View>
             <Text style={s.barValue}>{total}</Text>
@@ -217,7 +312,8 @@ export function RateBars({
             <View
               style={{
                 width: `${Math.round(r.rate * 100)}%`,
-                backgroundColor: r.label === highlight ? colors.danger : colors.primary,
+                backgroundColor:
+                  r.label === highlight ? colors.danger : colors.primary,
               }}
             />
           </View>
@@ -229,19 +325,25 @@ export function RateBars({
 }
 
 const s = themedStyles({
-  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legend: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { color: colors.muted, fontSize: 12 },
-  barRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  barLabel: { fontWeight: '600', color: colors.text, fontSize: 13 },
+  legendText: { color: colors.muted, fontSize: 12, fontWeight: "500" },
+  barRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  barLabel: { fontWeight: "600", color: colors.text, fontSize: 13 },
   barTrack: {
     flex: 1,
-    height: 16,
-    borderRadius: 8,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: colors.surface,
-    overflow: 'hidden',
-    flexDirection: 'row',
+    overflow: "hidden",
+    flexDirection: "row",
   },
-  barValue: { width: 28, textAlign: 'right', color: colors.muted, fontVariant: ['tabular-nums'], fontSize: 13 },
+  barValue: {
+    width: 28,
+    textAlign: "right",
+    color: colors.muted,
+    fontVariant: ["tabular-nums"],
+    fontSize: 13,
+  },
 });
