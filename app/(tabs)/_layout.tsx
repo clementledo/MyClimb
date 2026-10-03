@@ -1,6 +1,7 @@
 import { Tabs, useRouter } from 'expo-router';
 import type { AndroidSymbol } from 'expo-symbols';
 import type { ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, IconButton } from '@/components/ui';
 import { colors, font } from '@/lib/theme';
@@ -18,6 +19,8 @@ function SettingsButton() {
 }
 
 export default function TabLayout() {
+  // Place sous les onglets pour la barre système d'Android (boutons ou geste).
+  const { bottom } = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
@@ -26,8 +29,9 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: colors.card,
           borderTopColor: colors.border,
-          height: 68,
+          height: 64 + bottom,
           paddingTop: 6,
+          paddingBottom: bottom + 6,
         },
         tabBarLabelStyle: { fontFamily: font.family, fontSize: 11, fontWeight: '600' },
         headerTitleAlign: 'left',
