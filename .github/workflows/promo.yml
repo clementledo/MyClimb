@@ -70,10 +70,14 @@ jobs:
       - name: Publier les résultats
         if: always()
         run: |
+          echo "::notice::$(du -sh promo-out 2>&1) — $(ls promo-out 2>&1 | tr '\n' ' ' | cut -c1-900)"
           cd promo-out
           git init -q
           git checkout -q -b promo-results
           git add -A
-          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "promo ${GITHUB_SHA::7}"
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "promo ${GITHUB_SHA::7}" > /tmp/commit.txt 2>&1 || echo "::error::commit $(tail -3 /tmp/commit.txt | tr '\n' ' ')"
           git config http.postBuffer 524288000
-          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" e2e-results
+          if ! git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" promo-results > /tmp/push.txt 2>&1; then
+            echo "::error::push $(tail -6 /tmp/push.txt | tr '\n' ' ' | cut -c1-900)"
+            exit 1
+          fi
