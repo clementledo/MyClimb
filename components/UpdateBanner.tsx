@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { Icon } from '@/components/ui';
+
 import { checkForUpdate, installUpdate, type Update } from '@/lib/update';
-import { colors, themedStyles } from '@/lib/theme';
+import { colors, radius, space, themedStyles } from '@/lib/theme';
 
 // Une seule vérification par lancement de l'app.
 let pending: Promise<Update | null> | null = null;
@@ -28,6 +30,7 @@ export function UpdateBanner() {
 
   return (
     <View style={s.banner}>
+      <Icon name="system_update" size={24} color={colors.success} />
       <View style={s.text}>
         <Text style={s.title}>Nouvelle version {update.version}</Text>
         <Text style={s.sub}>
@@ -54,17 +57,17 @@ const s = themedStyles({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginHorizontal: 12,
-    marginTop: 12,
+    gap: space.md,
+    marginHorizontal: space.lg,
+    marginBottom: space.md,
     padding: 14,
-    borderRadius: 14,
-    backgroundColor: '#E7F5EC',
+    borderRadius: radius.lg,
+    backgroundColor: colors.successSoft,
   },
   text: { flex: 1, gap: 2 },
-  title: { fontWeight: '700', color: colors.success, fontSize: 15 },
-  sub: { color: colors.muted, fontSize: 13 },
-  later: { color: colors.muted, fontWeight: '600' },
-  button: { backgroundColor: colors.success, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10 },
-  buttonText: { color: '#fff', fontWeight: '700' },
+  title: { fontSize: 15, fontWeight: '700', color: colors.success },
+  sub: { fontSize: 13, fontWeight: '400', color: colors.muted },
+  later: { fontSize: 14, fontWeight: '600', color: colors.muted },
+  button: { backgroundColor: colors.success, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.sm },
+  buttonText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
 });

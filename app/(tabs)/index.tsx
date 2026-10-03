@@ -6,7 +6,7 @@ import { OutdoorView } from '@/components/OutdoorView';
 import { SessionBanner } from '@/components/SessionBanner';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { Segmented } from '@/components/ui';
-import { colors, themedStyles } from '@/lib/theme';
+import { colors, space, themedStyles } from '@/lib/theme';
 
 type Where = 'gym' | 'outdoor';
 
@@ -20,8 +20,8 @@ export default function ClimbScreen() {
       <View style={s.switcher}>
         <Segmented
           options={[
-            { value: 'gym', label: 'En salle' },
-            { value: 'outdoor', label: 'Extérieur' },
+            { value: 'gym', label: 'En salle', icon: 'fitness_center' },
+            { value: 'outdoor', label: 'Extérieur', icon: 'park' },
           ]}
           value={where}
           onChange={setWhere}
@@ -34,5 +34,5 @@ export default function ClimbScreen() {
 
 const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
-  switcher: { paddingHorizontal: 12, paddingTop: 12 },
+  switcher: { paddingHorizontal: space.lg, paddingTop: space.xs, paddingBottom: space.md },
 });

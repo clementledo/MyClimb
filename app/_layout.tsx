@@ -1,10 +1,21 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { autoBackup } from '@/lib/backup';
-import { applyTheme, colors, currentTheme, isDark, ThemeSwitch, type ThemeId } from '@/lib/theme';
+import {
+  applyFont,
+  applyTheme,
+  colors,
+  currentFont,
+  currentTheme,
+  font,
+  isDark,
+  ThemeSwitch,
+  type FontId,
+  type ThemeId,
+} from '@/lib/theme';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -17,10 +28,21 @@ export default function RootLayout() {
   // Compteur de redessins : changer de thème (ou restaurer une sauvegarde) redessine toute l'app.
   const [version, setVersion] = useState(0);
   const reopen = useRef(false);
-  const switchTheme = useCallback((id: ThemeId) => {
-    applyTheme(id);
-    reopen.current = true;
-    setVersion((v) => v + 1);
+  const switcher = useMemo(() => {
+    const redraw = () => {
+      reopen.current = true;
+      setVersion((v) => v + 1);
+    };
+    return {
+      theme: (id: ThemeId) => {
+        applyTheme(id);
+        redraw();
+      },
+      font: (id: FontId) => {
+        applyFont(id);
+        redraw();
+      },
+    };
   }, []);
   useEffect(() => {
     if (!reopen.current) return;
@@ -50,13 +72,26 @@ export default function RootLayout() {
       text: colors.text,
       border: colors.border,
     },
+    fonts: {
+      regular: { fontFamily: font.family, fontWeight: '400' as const },
+      medium: { fontFamily: font.family, fontWeight: '500' as const },
+      bold: { fontFamily: font.family, fontWeight: '700' as const },
+      heavy: { fontFamily: font.family, fontWeight: '800' as const },
+    },
   };
 
   return (
-    <ThemeSwitch.Provider value={switchTheme}>
-      <ThemeProvider value={theme} key={`${currentTheme()}-${version}`}>
+    <ThemeSwitch.Provider value={switcher}>
+      <ThemeProvider value={theme} key={`${currentTheme()}-${currentFont()}-${version}`}>
         <StatusBar style={isDark() ? 'light' : 'dark'} />
-        <Stack screenOptions={{ headerTintColor: colors.text }}>
+        <Stack
+          screenOptions={{
+            headerTintColor: colors.text,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: colors.background },
+            headerTitleStyle: { fontFamily: font.family, fontWeight: '700', fontSize: 18 },
+            contentStyle: { backgroundColor: colors.background },
+          }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="settings" options={{ title: 'Paramètres' }} />
           <Stack.Screen name="gym/[id]" options={{ title: 'Salle' }} />

@@ -1,10 +1,11 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
+import { Icon } from '@/components/ui';
 import { getGym } from '@/lib/db';
 import { getSession, type Session } from '@/lib/session';
-import { colors, themedStyles } from '@/lib/theme';
+import { colors, radius, space, themedStyles } from '@/lib/theme';
 
 export function sessionPlace(session: Session) {
   return session.gymId ? (getGym(session.gymId)?.name ?? 'Salle') : (session.site ?? 'Extérieur');
@@ -16,11 +17,18 @@ export function SessionBanner() {
   useFocusEffect(useCallback(() => setSession(getSession()), []));
   if (!session) return null;
   return (
-    <Pressable style={s.banner} onPress={() => router.push('/session')}>
-      <Text style={s.text} numberOfLines={1}>
-        Séance en cours · {sessionPlace(session)}
-      </Text>
+    <Pressable style={({ pressed }) => [s.banner, pressed && { opacity: 0.85 }]} onPress={() => router.push('/session')}>
+      <View style={s.pulse}>
+        <Icon name="timer" size={20} color={colors.primary} />
+      </View>
+      <View style={s.body}>
+        <Text style={s.label}>Séance en cours</Text>
+        <Text style={s.place} numberOfLines={1}>
+          {sessionPlace(session)}
+        </Text>
+      </View>
       <Text style={s.action}>Reprendre</Text>
+      <Icon name="chevron_right" size={20} color={colors.onPrimary} />
     </Pressable>
   );
 }
@@ -29,13 +37,23 @@ const s = themedStyles({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 12,
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 10,
+    gap: space.md,
+    marginHorizontal: space.lg,
+    marginBottom: space.md,
+    padding: 14,
+    borderRadius: radius.lg,
     backgroundColor: colors.primary,
   },
-  text: { flex: 1, color: colors.onPrimary, fontWeight: '600' },
-  action: { color: colors.onPrimary, fontWeight: '800' },
+  pulse: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.onPrimary,
+  },
+  body: { flex: 1, gap: 1 },
+  label: { fontSize: 12, fontWeight: '600', color: colors.onPrimary, opacity: 0.85 },
+  place: { fontSize: 16, fontWeight: '700', color: colors.onPrimary },
+  action: { fontSize: 14, fontWeight: '800', color: colors.onPrimary },
 });

@@ -6,6 +6,16 @@ const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY ?? '';
 // Numéro de version donné par la fabrication GitHub (v1.0.N) : sert à détecter les mises à jour.
 const build = Number(process.env.MYCLIMB_BUILD ?? 0);
 
+// Une famille de police avec ses graisses (fichiers assets/fonts/<Nom>_<graisse>.ttf).
+const WEIGHTS = { 400: 'Regular', 500: 'Medium', 600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold' };
+const family = (fontFamily, file) => ({
+  fontFamily,
+  fontDefinitions: Object.entries(WEIGHTS).map(([weight, name]) => ({
+    path: `./assets/fonts/${file}_${weight}${name}.ttf`,
+    weight: Number(weight),
+  })),
+});
+
 module.exports = {
   expo: {
     name: 'MyClimb',
@@ -66,6 +76,19 @@ module.exports = {
       // Barre des boutons Android transparente : elle prend la couleur de l'app au lieu d'un gris.
       ['expo-navigation-bar', { enforceContrast: false, style: 'dark' }],
       './plugins/withReleaseSigning',
+      // Polices de l'app (fontWeight choisit la bonne graisse sur Android).
+      [
+        'expo-font',
+        {
+          android: {
+            fonts: [
+              family('Inter', 'Inter'),
+              family('Manrope', 'Manrope'),
+              { fontFamily: 'SpaceMono', fontDefinitions: [{ path: './assets/fonts/SpaceMono-Regular.ttf', weight: 400 }] },
+            ],
+          },
+        },
+      ],
     ],
     experiments: {
       typedRoutes: true,
