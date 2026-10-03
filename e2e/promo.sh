@@ -10,6 +10,7 @@ shot() { adb exec-out screencap -p > "$OUT/$1.png"; echo "capture $1"; }
 # Touche l'élément dont le texte (ou la description) correspond ; « re:motif » pour une expression régulière.
 tap() {
   for i in 1 2 3 4 5 6; do
+    front
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
     adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
     xy=$(python3 - "$1" "$OUT/ui.xml" <<'PY'
@@ -33,6 +34,14 @@ PY
   echo "Introuvable : « $1 »" | tee -a "$OUT/taps.txt"; return 1
 }
 
+# Ramène l'app au premier plan si on l'a quittée par erreur.
+front() {
+  if ! adb shell dumpsys window | grep -E "mCurrentFocus" | grep -q "$APP"; then
+    echo "App ramenée au premier plan" | tee -a "$OUT/taps.txt"
+    adb shell monkey -p $APP -c android.intent.category.LAUNCHER 1 > /dev/null; sleep 4
+  fi
+}
+
 read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
 swipe() { adb shell input swipe $((W / 2)) $((H * $1 / 100)) $((W / 2)) $((H * $2 / 100)) ${3:-500}; }
 rec_start() { adb shell screenrecord --bit-rate 6000000 --time-limit "${2:-20}" "/sdcard/$1.mp4" & REC=$!; sleep 1; }
@@ -41,6 +50,7 @@ rec_stop() { adb shell pkill -INT screenrecord || true; wait $REC 2>/dev/null; s
 # Barre d'état propre (mode démo d'Android) : 9:41, batterie pleine, pas de notifications.
 adb shell settings put global sysui_demo_allowed 1
 demo() { adb shell am broadcast -a com.android.systemui.demo -e command "$@" > /dev/null; }
+adb shell settings put global sysui_tuner_demo_on 1
 demo enter
 demo clock -e hhmm 0941
 demo battery -e level 100 -e plugged false

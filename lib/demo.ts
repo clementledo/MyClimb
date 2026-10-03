@@ -14,14 +14,25 @@ const pick = <T,>(a: readonly T[]) => a[Math.floor(rnd() * a.length)];
 const some = <T,>(a: readonly T[], n: number) => [...a].sort(() => rnd() - 0.5).slice(0, n);
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+const FALLBACK: Gym[] = [
+  { id: 'demo-blocshop', name: 'Bloc Shop Chabanel', address: '555 Rue Chabanel O, Montréal', lat: 45.5376, lng: -73.6539 },
+  { id: 'demo-cafebloc', name: 'Café Bloc', address: '6420 Rue Saint-Hubert, Montréal', lat: 45.5357, lng: -73.6043 },
+  { id: 'demo-allezup', name: 'Allez Up', address: '1555 Rue Saint-Patrick, Montréal', lat: 45.4859, lng: -73.5713 },
+];
+
 const NAMES = ['Le toit jaune', 'Tension', 'Petit pan', 'La vague', 'Crimpfest', 'Origami', 'Funambule', 'Le dièdre'];
 
 export function seedDemo() {
   if (getSetting('demo')) return;
+  const launch = Number(getSetting('demoLaunch') || 0) + 1;
+  setSetting('demoLaunch', String(launch));
   const row = db.getFirstSync<{ value: string }>("SELECT value FROM cache WHERE key LIKE 'gyms-v2:%' ORDER BY ts DESC");
-  if (!row) return;
-  const gyms = (JSON.parse(row.value) as Gym[]).slice(0, 4);
-  if (gyms.length < 2) return;
+  let gyms = row ? (JSON.parse(row.value) as Gym[]).slice(0, 4) : [];
+  // Sans salles trouvées (pas de réseau) : quelques salles de Montréal, au 2e lancement.
+  if (gyms.length < 2) {
+    if (launch < 2) return;
+    gyms = FALLBACK;
+  }
   gyms.forEach(saveGym);
 
   const font = GRADES.font;

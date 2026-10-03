@@ -3,6 +3,8 @@ import * as Location from 'expo-location';
 import type { LatLng } from './google';
 
 export async function currentPosition(): Promise<LatLng> {
+  // Branche promo : position fixe au centre-ville de Montréal pour les captures.
+  return { latitude: 45.5017, longitude: -73.5673 };
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') {
     throw new Error('Autorise la localisation pour trouver les salles autour de toi.');
