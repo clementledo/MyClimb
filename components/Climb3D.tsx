@@ -6,7 +6,7 @@ import { ActivityIndicator, PanResponder, Platform, StyleSheet, Text, View } fro
 import * as THREE from 'three';
 
 import type { SimRoute } from '@/lib/simRoutes';
-import type { Plan } from '@/lib/planner';
+import { WALL_ANGLES, type Plan } from '@/lib/planner';
 import { contactsAt, skeleton, type P3 } from '@/lib/simulation';
 import { colors } from '@/lib/theme';
 
@@ -194,7 +194,10 @@ export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek
     );
     pad.position.set(0, 0.125, 0.75);
     pad.receiveShadow = true;
-    scene.add(wall, floor, pad);
+    // Mur incliné (dévers ou dalle) : le mur, les prises et le grimpeur tournent autour du pied du mur.
+    const tilt = new THREE.Group();
+    scene.add(tilt, floor, pad);
+    tilt.add(wall);
     const toWorld = (p: P3) => {
       const { W, H } = live.current.plan;
       return new THREE.Vector3(p.x - W / 2, H - p.y, p.z);
@@ -235,11 +238,11 @@ export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek
       shin: part(cyl, pants),
       foot: part(sphere, shoe),
     }));
-    scene.add(climber);
+    tilt.add(climber);
 
     // Repères sur les prises touchées.
     const holds = new THREE.Group();
-    scene.add(holds);
+    tilt.add(holds);
     const ringGeo = new THREE.TorusGeometry(1, 0.16, 10, 28);
     const buildHolds = () => {
       holds.clear();
@@ -348,6 +351,8 @@ export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek
         const { W, H } = L.plan;
         wall.scale.set(W, H, 1);
         wall.position.set(0, H / 2, 0);
+        tilt.rotation.x = (WALL_ANGLES[L.plan.angle].deg * Math.PI) / 180;
+        tilt.updateMatrixWorld(true);
         pad.scale.set(Math.max(2, W * 0.9), 1, 1);
         const span = Math.max(W, H) * 0.8;
         sun.position.set(span * 0.6, H + span * 0.7, span * 1.2);
@@ -374,7 +379,7 @@ export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek
       }
       if (L.t < total) ended = false;
 
-      const pelvis = pose(Math.max(0, t));
+      const pelvis = tilt.localToWorld(pose(Math.max(0, t)).clone());
       const follow = new THREE.Vector3(pelvis.x * 0.6, pelvis.y + L.plan.height * 0.15, 0);
       if (first) target.copy(follow);
       else target.lerp(follow, 0.06);

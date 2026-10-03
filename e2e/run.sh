@@ -56,6 +56,7 @@ tap "↔ Prendre avec la main gauche" ; sleep 4 ; shot 7-correction
 tap "Annuler mes corrections" ; sleep 3
 tap "× 1" ; sleep 1 ; tap "× 2" ; sleep 1
 tap "▶ Tout jouer" ; sleep 8 ; shot 8-3d-fin
+tap "Dévers" ; sleep 6 ; tap "⟲" ; sleep 2 ; tap "▶ Tout jouer" ; sleep 3 ; shot 9-devers
 echo "Application en vie : $(adb shell pidof $APP || echo NON)"
 adb logcat -d > "$OUT/logcat.txt"
 adb logcat -d -b crash > "$OUT/crash.txt" || true

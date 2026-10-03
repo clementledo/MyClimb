@@ -1,11 +1,21 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Climb3D, type Progress } from '@/components/Climb3D';
 import { Button, Chip, Segmented } from '@/components/ui';
 import { getSetting, setSetting } from '@/lib/db';
-import { DEFAULT_WALL, HOLD_TYPES, LEVELS, planRoute } from '@/lib/planner';
+import {
+  DEFAULT_WALL,
+  HOLD_TYPES,
+  LEVELS,
+  learnFrom,
+  planRoute,
+  WALL_ANGLES,
+  type Plan,
+  type WallAngle,
+  type Weights,
+} from '@/lib/planner';
 import { demoRoute, listSimRoutes, pickRoutePhotos, removeSimRoute, saveSimRoutes, type SimRoute } from '@/lib/simRoutes';
 import type { HoldType, Pt } from '@/lib/simulation';
 import { colors } from '@/lib/theme';
@@ -285,13 +295,101 @@ const readWall = () => {
   const v = Number(getSetting(WALL_KEY));
   return v >= 1.5 && v <= 20 ? v : DEFAULT_WALL;
 };
+const ANGLE_KEY = 'wallAngle';
+const readAngle = (): WallAngle => {
+  const v = getSetting(ANGLE_KEY);
+  return v && v in WALL_ANGLES ? (v as WallAngle) : 'vertical';
+};
+const WEIGHTS_KEY = 'plannerWeights';
+const LEARNED_KEY = 'plannerLearned';
+const readWeights = (): Weights => {
+  try {
+    return JSON.parse(getSetting(WEIGHTS_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+};
 const readHeight = () => {
   const v = Number(getSetting(HEIGHT_KEY));
   // 1,75 était l'ancienne valeur par défaut : Clement mesure 1,80 m.
   return v >= 1.2 && v <= 2.2 && v !== 1.75 ? v : 1.8;
 };
 
-function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<SimRoute>) => void }) {
+type PlayerProps = { route: SimRoute; onChange: (c: Partial<SimRoute>) => void };
+
+/** Calcule la méthode hors du rendu (quelques dixièmes de seconde) puis affiche le lecteur. */
+function Player({ route, onChange }: PlayerProps) {
+  const [height, setHeight] = useState(readHeight);
+  const [learned, setLearned] = useState(readWeights);
+  const [learnedCount, setLearnedCount] = useState(() => Number(getSetting(LEARNED_KEY) ?? 0) || 0);
+  const input = useMemo(
+    () => ({ ...route, wallHeight: route.wallHeight ?? readWall(), angle: route.angle ?? readAngle() }),
+    [route],
+  );
+  const key = JSON.stringify([input, height, learned]);
+  const [result, setResult] = useState<{ key: string; plan: Plan } | null>(null);
+  useEffect(() => {
+    const id = setTimeout(() => setResult({ key, plan: planRoute(input, height, learned) }), 30);
+    return () => clearTimeout(id);
+  }, [key, input, height, learned]);
+
+  if (!result) {
+    return (
+      <View style={[s.flex, s.computing]}>
+        <ActivityIndicator color={colors.primary} />
+        <Text style={s.hint}>Calcul de la méthode…</Text>
+      </View>
+    );
+  }
+  const learn = (fix: SimRoute['fix']) => {
+    // Apprentissage : la méthode corrigée devient moins coûteuse pour le moteur.
+    const after = planRoute({ ...input, fix }, height, learned);
+    const next = learnFrom(result.plan.features, after.features, learned);
+    setLearned(next);
+    setSetting(WEIGHTS_KEY, JSON.stringify(next));
+    setLearnedCount(learnedCount + 1);
+    setSetting(LEARNED_KEY, String(learnedCount + 1));
+  };
+  const forget = () => {
+    setLearned({});
+    setSetting(WEIGHTS_KEY, '{}');
+    setLearnedCount(0);
+    setSetting(LEARNED_KEY, '0');
+  };
+  return (
+    <PlayerView
+      route={route}
+      onChange={onChange}
+      plan={result.plan}
+      computing={result.key !== key}
+      height={height}
+      setHeight={setHeight}
+      learnedCount={learnedCount}
+      onLearn={learn}
+      onForget={forget}
+    />
+  );
+}
+
+function PlayerView({
+  route,
+  onChange,
+  plan,
+  computing,
+  height,
+  setHeight,
+  learnedCount,
+  onLearn,
+  onForget,
+}: PlayerProps & {
+  plan: Plan;
+  computing: boolean;
+  height: number;
+  setHeight: (h: number) => void;
+  learnedCount: number;
+  onLearn: (fix: SimRoute['fix']) => void;
+  onForget: () => void;
+}) {
   const { height: windowHeight } = useWindowDimensions();
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
@@ -299,10 +397,8 @@ function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<Si
   const [viewKey, setViewKey] = useState(0);
   const [seek, setSeek] = useState({ t: -0.6, n: 0 });
   const [step, setStep] = useState(0);
-  const [height, setHeight] = useState(readHeight);
   const [progress, setProgress] = useState<Progress>({ index: 0, total: 0 });
 
-  const plan = planRoute({ ...route, wallHeight: route.wallHeight ?? readWall() }, height);
   const total = plan.moves.length;
   const index = Math.min(progress.index, total);
   const finished = index >= total;
@@ -312,6 +408,10 @@ function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<Si
     const v = Math.round(Math.min(2.2, Math.max(1.2, height + d)) * 100) / 100;
     setHeight(v);
     setSetting(HEIGHT_KEY, String(v));
+  };
+  const changeAngle = (angle: WallAngle) => {
+    onChange({ angle });
+    setSetting(ANGLE_KEY, angle);
   };
   const changeWall = (d: number) => {
     const v = Math.min(20, Math.max(1.5, plan.H + d));
@@ -328,13 +428,12 @@ function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<Si
   const correct = () => {
     if (!move?.fix) return;
     const f = move.fix;
-    if (f.kind === 'hand') {
-      const other = move.limb === 'lh' ? 'rh' : 'lh';
-      onChange({ fix: { ...fixes, hands: { ...fixes.hands, [f.hold]: other } } });
-    } else {
-      const other = move.limb === 'lf' ? 'rf' : 'lf';
-      onChange({ fix: { ...fixes, feet: { ...fixes.feet, [f.label]: other } } });
-    }
+    const fix =
+      f.kind === 'hand'
+        ? { ...fixes, hands: { ...fixes.hands, [f.hold]: move.limb === 'lh' ? ('rh' as const) : ('lh' as const) } }
+        : { ...fixes, feet: { ...fixes.feet, [f.label]: move.limb === 'lf' ? ('rf' as const) : ('lf' as const) } };
+    onLearn(fix);
+    onChange({ fix });
     goTo(index);
   };
   const resetFixes = () => {
@@ -359,6 +458,7 @@ function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<Si
         />
       </View>
 
+      {computing && <Text style={s.recompute}>Recalcul de la méthode…</Text>}
       <View style={s.strip}>
         {plan.moves.map((m, i) => (
           <Pressable
@@ -463,9 +563,24 @@ function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<Si
         <Ctrl label="−" onPress={() => changeWall(-0.5)} />
         <Ctrl label="+" onPress={() => changeWall(0.5)} />
       </View>
+      <View style={s.chips}>
+        {(Object.keys(WALL_ANGLES) as WallAngle[]).map((a) => (
+          <Chip key={a} label={WALL_ANGLES[a].label} selected={plan.angle === a} onPress={() => changeAngle(a)} />
+        ))}
+      </View>
+      {learnedCount > 0 && (
+        <View style={s.learnRow}>
+          <Text style={s.learnText}>
+            Le moteur a appris de {learnedCount === 1 ? 'ta correction' : `tes ${learnedCount} corrections`}.
+          </Text>
+          <Pressable onPress={onForget} hitSlop={6}>
+            <Text style={s.resetFix}>Oublier</Text>
+          </Pressable>
+        </View>
+      )}
       <Text style={s.hint}>
         « Mur » est la hauteur du mur visible sur la photo, du sol au sommet (6 m par défaut) ; « Ta taille » est
-        la tienne. La barre de couleur montre la difficulté de chaque étape (touche-la pour y aller). Si une étape
+        la tienne, et choisis l’inclinaison du mur (dalle, vertical, dévers). La barre de couleur montre la difficulté de chaque étape (touche-la pour y aller). Si une étape
         ne te convient pas, change la main ou le pied : la suite se recalcule. Un doigt fait tourner la caméra, deux
         doigts zooment.
       </Text>
@@ -562,6 +677,10 @@ const s = StyleSheet.create({
   stepCount: { color: colors.muted, fontWeight: '600' },
   stepStart: { color: colors.text, fontSize: 13, lineHeight: 18 },
   tip: { color: colors.text, fontSize: 13, lineHeight: 18 },
+  computing: { alignItems: 'center', justifyContent: 'center', gap: 10 },
+  recompute: { color: colors.muted, fontSize: 12, textAlign: 'center' },
+  learnRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  learnText: { flex: 1, color: colors.text, fontSize: 13 },
   strip: { flexDirection: 'row', gap: 2, paddingVertical: 4 },
   seg: { flex: 1, height: 8, borderRadius: 3, alignItems: 'center' },
   segActive: { height: 14, marginTop: -3, borderWidth: 2, borderColor: colors.text },
