@@ -9,7 +9,7 @@ import { getSession } from '@/lib/session';
 /** Ajout d'une grimpe, toujours pendant une séance. */
 export default function NewBlockScreen() {
   const [session] = useState(() => getSession());
-  if (!session) return <Empty text="Démarre une séance depuis une salle pour ajouter des grimpes." />;
+  if (!session) return <Empty icon="timer" text="Démarre une séance depuis une salle pour ajouter des grimpes." />;
   return (
     <BlockForm
       session={session}

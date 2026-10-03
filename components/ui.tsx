@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
+  ScrollView,
   Text,
   View,
   type ColorValue,
@@ -391,7 +392,9 @@ export function Sheet({
           <Text style={styles.sheetTitle}>{title}</Text>
           <IconButton icon="close" label="Fermer" onPress={onClose} />
         </View>
-        {children}
+        <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetContent} bounces={false}>
+          {children}
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -507,6 +510,18 @@ export const styles = themedStyles({
   stat: { flex: 1, minWidth: '45%', gap: 2 },
   statValue: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: colors.text },
   statLabel: { fontSize: 13, fontWeight: '500', color: colors.muted },
+  input: {
+    minHeight: 50,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    fontSize: 16,
+    fontWeight: '400',
+    color: colors.text,
+  },
   backdrop: { flex: 1, backgroundColor: '#00000066' },
   sheet: {
     backgroundColor: colors.card,
@@ -515,7 +530,10 @@ export const styles = themedStyles({
     paddingHorizontal: space.lg,
     paddingTop: space.sm,
     gap: space.lg,
+    maxHeight: '88%',
   },
+  sheetScroll: { flexGrow: 0 },
+  sheetContent: { gap: space.lg, paddingBottom: space.xs },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetTitle: { ...type.title },

@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { openSessionAt } from '@/components/startSession';
-import { Button, Chip, Section } from '@/components/ui';
+import { Banner, Button, Chip, Icon, Section, styles as ui } from '@/components/ui';
 import { listSpots, saveSpot } from '@/lib/db';
 import type { LatLng } from '@/lib/google';
 import { currentPosition, distanceM, placeName } from '@/lib/location';
-import { colors, themedStyles } from '@/lib/theme';
+import { friendlyError } from '@/lib/errors';
+import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 
 // Un spot connu à moins de 500 m est considéré comme celui où tu te trouves.
 const SAME_SPOT_M = 500;
@@ -36,7 +37,7 @@ export default function OutdoorSessionScreen() {
         setPos(r.pos);
         if (r.name) setSite((cur) => cur || r.name!);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => setError(friendlyError(e)))
       .finally(() => setLocating(false));
   }, []);
 
@@ -46,44 +47,60 @@ export default function OutdoorSessionScreen() {
   };
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={s.content}>
-      <Section title="Où es-tu ?">
-        {locating ? (
-          <View style={s.locating}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={s.muted}>Recherche de ta position…</Text>
-          </View>
-        ) : error ? (
-          <Text style={s.error}>{error} Tu peux quand même taper le nom du spot.</Text>
-        ) : null}
-        <TextInput style={s.input} value={site} onChangeText={setSite} placeholder="Nom du spot ou du secteur" />
-        {spots.length > 0 && (
+    <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+      <View style={s.intro}>
+        <View style={s.icon}>
+          <Icon name="my_location" size={26} color={colors.primary} />
+        </View>
+        <Text style={s.title}>Où grimpes-tu ?</Text>
+        <Text style={s.text}>Le nom du spot est proposé à partir de ta position. Tu peux le modifier.</Text>
+      </View>
+      {locating ? (
+        <View style={s.locating}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={s.muted}>Recherche de ta position…</Text>
+        </View>
+      ) : error ? (
+        <Banner tone="danger" title="Position introuvable" text={`${error} Tu peux quand même taper le nom du spot.`} />
+      ) : null}
+      <TextInput
+        style={ui.input}
+        value={site}
+        onChangeText={setSite}
+        placeholder="Nom du spot ou du secteur"
+        placeholderTextColor={colors.muted}
+      />
+      {spots.length > 0 && (
+        <Section title="Mes spots">
           <View style={s.wrap}>
             {spots.map((sp) => (
               <Chip key={sp.name} label={sp.name} selected={name === sp.name} onPress={() => setSite(sp.name)} />
             ))}
           </View>
-        )}
-      </Section>
-      <Button label="Démarrer la séance" disabled={!name} onPress={start} />
-      <Text style={s.muted}>Tu pourras ajouter des blocs et des voies pendant la séance.</Text>
+        </Section>
+      )}
+      <Button label="Démarrer la séance" icon="play_arrow" disabled={!name} onPress={start} />
+      <Text style={[s.muted, { textAlign: 'center' }]}>Tu ajouteras tes blocs et tes voies pendant la séance.</Text>
     </ScrollView>
   );
 }
 
 const s = themedStyles({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, gap: 20 },
-  locating: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  muted: { color: colors.muted, fontSize: 13 },
-  error: { color: colors.danger, fontSize: 13 },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    color: colors.text,
+  container: { flex: 1 },
+  content: { padding: space.lg, gap: space.lg },
+  intro: { gap: 6, marginBottom: space.xs },
+  icon: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+    marginBottom: space.xs,
   },
+  title: { ...type.title },
+  text: { ...type.body, color: colors.muted },
+  locating: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  muted: { fontSize: 13, fontWeight: '400', color: colors.muted },
 });

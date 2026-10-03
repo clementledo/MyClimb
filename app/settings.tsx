@@ -1,6 +1,8 @@
 import { useContext, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { Button, Card, Icon, ListRow, Section } from '@/components/ui';
+
 import {
   autoBackup,
   autoBackupError,
@@ -14,12 +16,30 @@ import {
   restoreBackup,
 } from '@/lib/backup';
 import { getSetting, setSetting } from '@/lib/db';
-import { colors, currentTheme, ThemeSwitch, THEMES, themedStyles, type ThemeId } from '@/lib/theme';
+import {
+  colors,
+  currentFont,
+  currentTheme,
+  FONTS,
+  radius,
+  space,
+  ThemeSwitch,
+  THEMES,
+  themedStyles,
+  type,
+  type FontId,
+  type ThemeId,
+} from '@/lib/theme';
 import { checkForUpdate, currentVersion, installUpdate } from '@/lib/update';
 
 const savedTheme = (): ThemeId => {
   const v = getSetting('theme');
   return v && v in THEMES ? (v as ThemeId) : 'classique';
+};
+
+const savedFont = (): FontId => {
+  const v = getSetting('font');
+  return v && v in FONTS ? (v as FontId) : 'inter';
 };
 
 const HEIGHT_KEY = 'climberHeight';
@@ -29,7 +49,7 @@ const readHeight = () => {
 };
 
 export default function SettingsScreen() {
-  const switchTheme = useContext(ThemeSwitch);
+  const switcher = useContext(ThemeSwitch);
   const selected = currentTheme();
   const [height, setHeight] = useState(readHeight);
   const [checking, setChecking] = useState(false);
@@ -90,7 +110,8 @@ export default function SettingsScreen() {
           onPress: () => {
             try {
               restoreBackup(backup);
-              switchTheme(savedTheme());
+              switcher.font(savedFont());
+              switcher.theme(savedTheme());
             } catch (e) {
               Alert.alert('Restauration impossible', e instanceof Error ? e.message : String(e));
             }
@@ -144,164 +165,242 @@ export default function SettingsScreen() {
     ? last.toLocaleString('fr-CA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
     : 'pas encore';
 
-  const themeList = (fun: boolean) =>
-    ids
-      .filter((id) => THEMES[id].fun === fun)
-      .map((id) => {
-        const t = THEMES[id];
-        const active = id === selected;
-        return (
-          <Pressable
-            key={id}
-            onPress={() => !active && switchTheme(id)}
-            style={({ pressed }) => [
-              s.theme,
-              { backgroundColor: t.colors.background, borderColor: active ? colors.primary : t.colors.border },
-              active && s.themeActive,
-              pressed && { opacity: 0.7 },
-            ]}>
-            <View style={s.swatches}>
-              {[t.colors.primary, t.colors.primarySoft, t.colors.surface, t.colors.text].map((c, i) => (
-                <View key={i} style={[s.swatch, { backgroundColor: c, borderColor: t.colors.border }]} />
-              ))}
-            </View>
-            <View style={s.themeBody}>
-              <Text style={[s.themeName, { color: t.colors.text }]}>
+  const fontId = currentFont();
+
+  const themeGrid = (fun: boolean) => (
+    <View style={s.grid}>
+      {ids
+        .filter((id) => THEMES[id].fun === fun)
+        .map((id) => {
+          const t = THEMES[id];
+          const active = id === selected;
+          return (
+            <Pressable
+              key={id}
+              onPress={() => !active && switcher.theme(id)}
+              accessibilityState={{ selected: active }}
+              style={({ pressed }) => [s.theme, active && s.themeActive, pressed && { opacity: 0.7 }]}>
+              {/* Aperçu miniature du thème */}
+              <View style={[s.preview, { backgroundColor: t.colors.background, borderColor: t.colors.border }]}>
+                <View style={[s.previewCard, { backgroundColor: t.colors.card, borderColor: t.colors.border }]}>
+                  <View style={[s.previewLine, { backgroundColor: t.colors.text, width: '70%' }]} />
+                  <View style={[s.previewLine, { backgroundColor: t.colors.muted, width: '45%' }]} />
+                </View>
+                <View style={[s.previewButton, { backgroundColor: t.colors.primary }]} />
+                {active && (
+                  <View style={s.check}>
+                    <Icon name="check" size={14} color={colors.onPrimary} />
+                  </View>
+                )}
+              </View>
+              <Text style={s.themeName} numberOfLines={1}>
                 {t.name}
-                {active ? '  ✓' : ''}
               </Text>
-              <Text style={[s.themeBlurb, { color: t.colors.muted }]}>{t.blurb}</Text>
-            </View>
-          </Pressable>
-        );
-      });
+              <Text style={s.themeBlurb} numberOfLines={2}>
+                {t.blurb}
+              </Text>
+            </Pressable>
+          );
+        })}
+    </View>
+  );
 
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
-      <Text style={s.title}>Thème</Text>
-      <Text style={s.subtitle}>Classiques</Text>
-      <View style={s.list}>{themeList(false)}</View>
-      <Text style={s.subtitle}>Loufoques</Text>
-      <View style={s.list}>{themeList(true)}</View>
+      <Section title="Thème">
+        <Text style={s.groupTitle}>Classiques</Text>
+        {themeGrid(false)}
+        <Text style={s.groupTitle}>Loufoques</Text>
+        {themeGrid(true)}
+      </Section>
 
-      <Text style={s.title}>Simulation</Text>
-      <View style={s.card}>
-        <Text style={s.rowLabel}>Ta taille : {height.toFixed(2).replace('.', ',')} m</Text>
-        <Pressable style={s.step} onPress={() => changeHeight(-0.05)}>
-          <Text style={s.stepText}>−</Text>
-        </Pressable>
-        <Pressable style={s.step} onPress={() => changeHeight(0.05)}>
-          <Text style={s.stepText}>+</Text>
-        </Pressable>
-      </View>
+      <Section title="Police">
+        <View style={s.listCard}>
+          {(Object.keys(FONTS) as FontId[]).map((id, i, all) => {
+            const f = FONTS[id];
+            const active = id === fontId;
+            return (
+              <ListRow
+                key={id}
+                left={
+                  <View style={s.fontSample}>
+                    <Text style={[s.fontSampleText, { fontFamily: f.family }]}>Aa</Text>
+                  </View>
+                }
+                title={f.name}
+                subtitle={f.blurb}
+                right={active ? <Icon name="check_circle" size={22} color={colors.primary} /> : undefined}
+                chevron={false}
+                onPress={() => !active && switcher.font(id)}
+                last={i === all.length - 1}
+              />
+            );
+          })}
+        </View>
+      </Section>
 
-      <Text style={s.title}>Mes données</Text>
-      <View style={s.dataCard}>
-        <Text style={s.dataText}>
-          Tes séances, grimpes, réglages et photos restent sur ce téléphone. Garde une copie pour les retrouver si tu
-          changes de téléphone : dans un fichier, ou automatiquement sur ton Google Drive.
-        </Text>
-        <Pressable style={s.action} onPress={save} disabled={busy !== null}>
-          <Text style={s.actionText}>{busy === 'save' ? 'Sauvegarde…' : 'Sauvegarder dans un fichier'}</Text>
-        </Pressable>
-        <Pressable style={s.actionSoft} onPress={() => restoreFrom('restore')} disabled={busy !== null}>
-          <Text style={s.actionSoftText}>{busy === 'restore' ? 'Lecture…' : 'Restaurer depuis un fichier'}</Text>
-        </Pressable>
-        <View style={s.autoBox}>
-          <Text style={s.autoTitle}>Sauvegarde automatique sur Google Drive</Text>
-          <Text style={s.autoText}>
+      <Section title="Simulation">
+        <Card style={s.heightCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.rowTitle}>Ta taille</Text>
+            <Text style={s.rowSub}>Sert à placer le grimpeur à la bonne échelle.</Text>
+          </View>
+          <View style={s.stepper}>
+            <Pressable style={s.step} onPress={() => changeHeight(-0.05)} accessibilityLabel="Diminuer la taille">
+              <Icon name="remove" size={18} color={colors.text} />
+            </Pressable>
+            <Text style={s.stepValue}>{height.toFixed(2).replace('.', ',')} m</Text>
+            <Pressable style={s.step} onPress={() => changeHeight(0.05)} accessibilityLabel="Augmenter la taille">
+              <Icon name="add" size={18} color={colors.text} />
+            </Pressable>
+          </View>
+        </Card>
+      </Section>
+
+      <Section title="Mes données">
+        <Card style={s.driveCard}>
+          <View style={s.driveHead}>
+            <View style={s.driveIcon}>
+              <Icon name={account ? 'cloud_done' : 'cloud_upload'} size={24} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={s.rowTitle}>Sauvegarde automatique sur Google Drive</Text>
+              <Text style={s.rowSub}>{account ? `Activée sur ${account}` : 'Désactivée'}</Text>
+            </View>
+          </View>
+          <Text style={s.driveText}>
             {account
-              ? `Activée sur ${account}. L’app envoie tes données sur ton Drive toutes les 6 heures au plus, à l’ouverture ou quand tu quittes l’app. Dernière : ${lastText}.`
-              : 'Connecte ton compte Google une seule fois : l’app enverra une copie de tes données dans un dossier caché de ton Drive, gratuitement.'}
+              ? `Tes données partent sur ton Drive toutes les 6 heures au plus, à l’ouverture ou quand tu quittes l’app. Dernière sauvegarde : ${lastText}.`
+              : 'Connecte ton compte Google une seule fois : l’app enverra une copie de tes séances, grimpes et photos dans un dossier caché de ton Drive, gratuitement.'}
           </Text>
           {account && autoError ? <Text style={s.autoErrorText}>Dernier essai raté : {autoError}</Text> : null}
           {account ? (
             <>
-              <Pressable style={s.action} onPress={saveNow} disabled={busy !== null}>
-                <Text style={s.actionText}>{busy === 'auto' ? 'Envoi…' : 'Sauvegarder maintenant'}</Text>
-              </Pressable>
+              <Button label="Sauvegarder maintenant" icon="cloud_upload" loading={busy === 'auto'} onPress={saveNow} disabled={busy !== null} />
               <View style={s.row}>
-                <Pressable style={[s.actionSoft, s.grow]} onPress={() => restoreFrom('driveRestore')} disabled={busy !== null}>
-                  <Text style={s.actionSoftText}>{busy === 'driveRestore' ? 'Lecture…' : 'Restaurer du Drive'}</Text>
-                </Pressable>
-                <Pressable style={[s.actionSoft, s.grow]} onPress={disconnectDrive} disabled={busy !== null}>
-                  <Text style={s.actionSoftText}>Désactiver</Text>
-                </Pressable>
+                <Button
+                  label="Restaurer du Drive"
+                  variant="secondary"
+                  size="sm"
+                  style={s.grow}
+                  loading={busy === 'driveRestore'}
+                  disabled={busy !== null}
+                  onPress={() => restoreFrom('driveRestore')}
+                />
+                <Button label="Désactiver" variant="secondary" size="sm" style={s.grow} disabled={busy !== null} onPress={disconnectDrive} />
               </View>
             </>
           ) : (
             <>
-              <Pressable style={s.action} onPress={connectDrive} disabled={busy !== null}>
-                <Text style={s.actionText}>{busy === 'auto' ? 'Connexion…' : 'Connecter Google Drive'}</Text>
-              </Pressable>
-              <Pressable style={s.actionSoft} onPress={() => restoreFrom('driveRestore')} disabled={busy !== null}>
-                <Text style={s.actionSoftText}>
-                  {busy === 'driveRestore' ? 'Lecture…' : 'Récupérer une sauvegarde du Drive'}
-                </Text>
-              </Pressable>
+              <Button label="Connecter Google Drive" icon="add_to_drive" loading={busy === 'auto'} onPress={connectDrive} disabled={busy !== null} />
+              <Button
+                label="Récupérer une sauvegarde du Drive"
+                variant="ghost"
+                size="sm"
+                loading={busy === 'driveRestore'}
+                disabled={busy !== null}
+                onPress={() => restoreFrom('driveRestore')}
+              />
             </>
           )}
+        </Card>
+        <View style={s.listCard}>
+          <ListRow icon="save" title="Sauvegarder dans un fichier" subtitle="Un fichier à garder où tu veux" onPress={save} />
+          <ListRow
+            icon="folder_open"
+            title="Restaurer depuis un fichier"
+            subtitle="Remplace les données de l’app"
+            onPress={() => restoreFrom('restore')}
+            last
+          />
         </View>
-      </View>
+        <Text style={s.footnote}>
+          Tes séances, grimpes, réglages et photos sont enregistrés sur ce téléphone. Garde une copie pour les retrouver si tu
+          changes de téléphone.
+        </Text>
+      </Section>
 
-      <Text style={s.title}>Application</Text>
-      <View style={s.card}>
-        <Text style={s.rowLabel}>MyClimb v{currentVersion()}</Text>
-        <Pressable style={s.action} onPress={check} disabled={checking}>
-          <Text style={s.actionText}>{checking ? 'Recherche…' : 'Chercher une mise à jour'}</Text>
-        </Pressable>
-      </View>
+      <Section title="Application">
+        <View style={s.listCard}>
+          <ListRow icon="info" title="Version" value={currentVersion()} />
+          <ListRow
+            icon="system_update"
+            title={checking ? 'Recherche…' : 'Chercher une mise à jour'}
+            onPress={check}
+            last
+          />
+        </View>
+      </Section>
     </ScrollView>
   );
 }
 
 const s = themedStyles({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, gap: 10, paddingBottom: 40 },
-  title: { fontSize: 20, fontWeight: '800', color: colors.text, marginTop: 10 },
-  subtitle: { fontSize: 14, fontWeight: '700', color: colors.muted, marginTop: 4 },
-  list: { gap: 10 },
-  theme: {
-    flexDirection: 'row',
+  container: { flex: 1 },
+  content: { padding: space.lg, gap: space.xl, paddingBottom: 48 },
+  groupTitle: { ...type.callout, marginTop: space.xs },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
+  theme: { width: '47%', flexGrow: 1, gap: 4, padding: space.sm, borderRadius: radius.lg, borderWidth: 2, borderColor: 'transparent' },
+  themeActive: { borderColor: colors.primary, backgroundColor: colors.card },
+  preview: { height: 92, borderRadius: radius.md, borderWidth: 1, padding: 10, gap: 8, justifyContent: 'space-between' },
+  previewCard: { borderRadius: 8, borderWidth: 1, padding: 8, gap: 5 },
+  previewLine: { height: 5, borderRadius: 3 },
+  previewButton: { height: 14, borderRadius: 7, width: '55%' },
+  check: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
-    gap: 14,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
   },
-  themeActive: { borderWidth: 3 },
-  swatches: { flexDirection: 'row', gap: 4 },
-  swatch: { width: 16, height: 36, borderRadius: 6, borderWidth: 1 },
-  themeBody: { flex: 1, gap: 3 },
-  themeName: { fontSize: 16, fontWeight: '800' },
-  themeBlurb: { fontSize: 13, lineHeight: 18 },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 14,
+  themeName: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 4 },
+  themeBlurb: { fontSize: 12, fontWeight: '400', lineHeight: 16, color: colors.muted },
+  listCard: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
   },
-  rowLabel: { flex: 1, color: colors.text, fontWeight: '600', fontSize: 15 },
-  step: {
-    width: 44,
-    paddingVertical: 8,
+  fontSample: {
+    width: 36,
+    height: 36,
     borderRadius: 10,
-    backgroundColor: colors.primarySoft,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
   },
-  stepText: { color: colors.primary, fontWeight: '800', fontSize: 18 },
-  action: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.primary },
-  actionText: { color: colors.onPrimary, fontWeight: '700', textAlign: 'center' },
-  actionSoft: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.primarySoft },
-  actionSoftText: { color: colors.primary, fontWeight: '700', textAlign: 'center' },
-  dataCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 10 },
-  dataText: { color: colors.text, fontSize: 14, lineHeight: 20 },
-  autoBox: { gap: 8, marginTop: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
-  autoTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
-  autoText: { color: colors.muted, fontSize: 13, lineHeight: 19 },
-  autoErrorText: { color: colors.danger, fontSize: 13, lineHeight: 19 },
-  row: { flexDirection: 'row', gap: 10 },
+  fontSampleText: { fontSize: 16, color: colors.text, fontWeight: '700' },
+  heightCard: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  rowTitle: { fontSize: 16, fontWeight: '600', letterSpacing: -0.2, color: colors.text },
+  rowSub: { fontSize: 13, fontWeight: '400', lineHeight: 18, color: colors.muted },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  step: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  stepValue: { fontSize: 16, fontWeight: '700', color: colors.text, minWidth: 64, textAlign: 'center' },
+  driveCard: { gap: space.md },
+  driveHead: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  driveIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  driveText: { fontSize: 14, fontWeight: '400', lineHeight: 20, color: colors.muted },
+  autoErrorText: { fontSize: 13, fontWeight: '500', lineHeight: 18, color: colors.danger },
+  row: { flexDirection: 'row', gap: space.sm },
   grow: { flex: 1 },
+  footnote: { fontSize: 12, fontWeight: '400', lineHeight: 17, color: colors.muted, paddingHorizontal: 4 },
 });

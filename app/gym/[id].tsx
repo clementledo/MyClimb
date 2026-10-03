@@ -5,7 +5,7 @@ import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { BlockRow } from '@/components/BlockRow';
 import { openSessionAt } from '@/components/startSession';
-import { Button, Empty, Section, Segmented } from '@/components/ui';
+import { Badge, Button, Card, Empty, Icon, Section, Segmented } from '@/components/ui';
 import { formatPrice } from '@/lib/climbing';
 import { getGym, listBlocks, type Block } from '@/lib/db';
 import {
@@ -23,9 +23,11 @@ import {
 import { gymPrices } from '@/lib/gymPrices';
 import { currentPosition } from '@/lib/location';
 import { getSession } from '@/lib/session';
-import { colors, themedStyles } from '@/lib/theme';
+import { friendlyError } from '@/lib/errors';
+import { colors, space, themedStyles, type } from '@/lib/theme';
 
 const MODES: TravelMode[] = ['WALK', 'TRANSIT', 'DRIVE'];
+const MODE_ICONS = { WALK: 'directions_walk', TRANSIT: 'directions_transit', DRIVE: 'directions_car' } as const;
 
 export default function GymScreen() {
   const params = useLocalSearchParams<{ id: string; mode?: TravelMode }>();
@@ -43,7 +45,9 @@ export default function GymScreen() {
   const map = useRef<MapView>(null);
 
   useEffect(() => {
-    currentPosition().then(setPosition).catch((e) => setError(e.message));
+    currentPosition()
+      .then(setPosition)
+      .catch((e) => setError(friendlyError(e)));
     if (gym) gymDetails(gym.id).then(setDetails).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
@@ -61,7 +65,7 @@ export default function GymScreen() {
         }
       })
       .catch((e) => {
-        setError(e.message);
+        setError(friendlyError(e, 'Impossible de calculer le trajet.'));
         setRouteFor({ mode, route: null });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,12 +78,12 @@ export default function GymScreen() {
     }, [params.id]),
   );
 
-  if (!gym) return <Empty text="Salle introuvable." />;
+  if (!gym) return <Empty icon="search_off" text="Salle introuvable." />;
   const prices = gymPrices(gym);
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 32 }}>
-      <Stack.Screen options={{ title: gym.name }} />
+    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: space.xxl }}>
+      <Stack.Screen options={{ title: '' }} />
       <MapView
         ref={map}
         style={s.map}
@@ -93,54 +97,74 @@ export default function GymScreen() {
       </MapView>
 
       <View style={s.body}>
-        <Segmented
-          options={MODES.map((m) => ({ value: m, label: TRAVEL_MODE_LABELS[m] }))}
-          value={mode}
-          onChange={setMode}
-        />
-
-        <View style={s.travel}>
-          {routeLoading ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : route ? (
-            <Text style={s.travelText}>
-              <Text style={s.duration}>{formatDuration(route.durationSec)}</Text>
-              {'  ·  '}
-              {formatDistance(route.distanceM)}
-            </Text>
-          ) : (
-            <Text style={s.muted}>Pas de trajet trouvé dans ce mode.</Text>
+        <View style={s.titleBlock}>
+          <Text style={s.title}>{gym.name}</Text>
+          {gym.address && <Text style={s.address}>{gym.address}</Text>}
+          {details && (details.openNow !== null || details.rating !== null) && (
+            <View style={s.badges}>
+              {details.openNow !== null && (
+                <Badge label={details.openNow ? 'Ouvert maintenant' : 'Fermé maintenant'} tone={details.openNow ? 'success' : 'danger'} />
+              )}
+              {details.rating !== null && (
+                <Badge
+                  tone="neutral"
+                  label={`★ ${details.rating.toFixed(1).replace('.', ',')}${details.ratingCount ? ` · ${details.ratingCount} avis` : ''}`}
+                />
+              )}
+            </View>
           )}
         </View>
-        {error && <Text style={s.error}>{error}</Text>}
 
-        <View style={s.actions}>
-          <Button
-            label="Y aller"
-            style={{ flex: 1 }}
-            onPress={() => Linking.openURL(navigationUrl(gym, mode))}
+        <Card style={s.travelCard}>
+          <Segmented
+            options={MODES.map((m) => ({ value: m, label: TRAVEL_MODE_LABELS[m], icon: MODE_ICONS[m] }))}
+            value={mode}
+            onChange={setMode}
           />
-          <Button
-            label={details && !details.website ? 'Pas de site web' : 'Site web'}
-            variant="secondary"
-            style={{ flex: 1 }}
-            disabled={!details?.website}
-            onPress={() => details?.website && Linking.openURL(details.website)}
-          />
-        </View>
+          <View style={s.travel}>
+            {routeLoading ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : route ? (
+              <>
+                <Text style={s.duration}>{formatDuration(route.durationSec)}</Text>
+                <Text style={s.distance}>{formatDistance(route.distanceM)}</Text>
+              </>
+            ) : (
+              <Text style={s.muted}>Pas de trajet trouvé dans ce mode.</Text>
+            )}
+          </View>
+          {error && <Text style={s.error}>{error}</Text>}
+          <View style={s.actions}>
+            <Button
+              label="Y aller"
+              icon="navigation"
+              style={{ flex: 1 }}
+              onPress={() => Linking.openURL(navigationUrl(gym, mode))}
+            />
+            <Button
+              label={details && !details.website ? 'Pas de site' : 'Site web'}
+              icon="language"
+              variant="secondary"
+              style={{ flex: 1 }}
+              disabled={!details?.website}
+              onPress={() => details?.website && Linking.openURL(details.website)}
+            />
+          </View>
+        </Card>
 
         <Button
           label={sessionHere ? 'Reprendre la séance en cours' : 'Démarrer une séance ici'}
+          icon="play_arrow"
           onPress={() => openSessionAt({ gymId: gym.id })}
         />
 
         <Section title="Tarifs">
-          {prices ? (
-            <>
-              <View style={s.prices}>
+          <Card style={s.listCard}>
+            {prices ? (
+              <>
                 <View style={s.priceLine}>
-                  <Text style={[s.text, { fontWeight: '700' }]}>Entrée</Text>
-                  <Text style={[s.text, { fontWeight: '700' }]}>{formatPrice(prices.entry)}</Text>
+                  <Text style={s.priceMain}>Entrée</Text>
+                  <Text style={s.priceMainValue}>{formatPrice(prices.entry)}</Text>
                 </View>
                 {prices.others.map((p) => (
                   <View key={p.label} style={s.priceLine}>
@@ -148,64 +172,85 @@ export default function GymScreen() {
                     <Text style={s.text}>{formatPrice(p.amount)}</Text>
                   </View>
                 ))}
-              </View>
-              <Text style={s.muted} onPress={() => Linking.openURL(prices.source)}>
-                {prices.taxes ? `${prices.taxes}. ` : ''}Relevé sur le site de la salle en {prices.checkedOn}.{' '}
-                <Text style={{ color: colors.primary }}>Voir les tarifs à jour</Text>
-              </Text>
-            </>
-          ) : (
-            <Text style={s.muted}>Tarifs non disponibles pour cette salle.</Text>
-          )}
+                <Text style={s.note} onPress={() => Linking.openURL(prices.source)}>
+                  {prices.taxes ? `${prices.taxes}. ` : ''}Relevé sur le site de la salle en {prices.checkedOn}.{' '}
+                  <Text style={s.noteLink}>Voir les tarifs à jour</Text>
+                </Text>
+              </>
+            ) : (
+              <Text style={s.muted}>Tarifs non disponibles pour cette salle.</Text>
+            )}
+          </Card>
         </Section>
 
-        <Section title="Infos">
-          {gym.address && <Text style={s.text}>{gym.address}</Text>}
-          {details ? (
-            <>
-              {details.openNow !== null && (
-                <Text style={[s.text, { color: details.openNow ? colors.success : colors.danger, fontWeight: '600' }]}>
-                  {details.openNow ? 'Ouvert maintenant' : 'Fermé maintenant'}
-                </Text>
-              )}
-              {details.rating !== null && (
-                <Text style={s.text}>
-                  ★ {details.rating.toFixed(1).replace('.', ',')}
-                  {details.ratingCount ? ` (${details.ratingCount} avis)` : ''}
-                </Text>
-              )}
-              {details.hours.map((h) => (
-                <Text key={h} style={s.muted}>
-                  {h}
-                </Text>
+        <Section title="Horaires">
+          <Card style={s.listCard}>
+            {details ? (
+              details.hours.length > 0 ? (
+                details.hours.map((h) => {
+                  const [day, ...rest] = h.split(': ');
+                  return (
+                    <View key={h} style={s.hourLine}>
+                      <Text style={s.hourDay}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
+                      <Text style={s.hourValue}>{rest.join(': ')}</Text>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={s.muted}>Horaires non disponibles.</Text>
+              )
+            ) : (
+              <ActivityIndicator color={colors.muted} style={{ alignSelf: 'flex-start' }} />
+            )}
+          </Card>
+        </Section>
+
+        {blocks.length > 0 && (
+          <Section title={`Mes grimpes ici · ${blocks.length}`}>
+            <View style={s.blocks}>
+              {blocks.map((b) => (
+                <BlockRow key={b.id} block={b} showGym={false} />
               ))}
-            </>
-          ) : (
-            <ActivityIndicator color={colors.muted} style={{ alignSelf: 'flex-start' }} />
-          )}
-        </Section>
-
-        {blocks.length > 0 && <Text style={s.sectionTitle}>Mes grimpes ici ({blocks.length})</Text>}
+            </View>
+          </Section>
+        )}
+        {blocks.length === 0 && (
+          <View style={s.hint}>
+            <Icon name="info" size={18} color={colors.muted} />
+            <Text style={s.hintText}>Tes grimpes dans cette salle apparaîtront ici.</Text>
+          </View>
+        )}
       </View>
-      {blocks.map((b) => (
-        <BlockRow key={b.id} block={b} showGym={false} />
-      ))}
     </ScrollView>
   );
 }
 
 const s = themedStyles({
-  container: { flex: 1, backgroundColor: colors.background },
-  map: { height: 260 },
-  body: { padding: 16, gap: 16 },
-  travel: { alignItems: 'center', minHeight: 28, justifyContent: 'center' },
-  travelText: { fontSize: 16, color: colors.text },
-  duration: { fontSize: 22, fontWeight: '800' },
-  text: { color: colors.text, fontSize: 15 },
-  muted: { color: colors.muted, fontSize: 13 },
-  actions: { flexDirection: 'row', gap: 8 },
-  prices: { gap: 6, padding: 12, borderRadius: 10, backgroundColor: colors.surface },
-  priceLine: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  error: { color: colors.danger },
-  sectionTitle: { fontWeight: '700', fontSize: 15, color: colors.text },
+  container: { flex: 1 },
+  map: { height: 220 },
+  body: { padding: space.lg, gap: space.xl },
+  titleBlock: { gap: 4 },
+  title: { ...type.display },
+  address: { ...type.subhead },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+  travelCard: { gap: space.lg },
+  travel: { alignItems: 'center', minHeight: 56, justifyContent: 'center', gap: 2 },
+  duration: { fontSize: 34, fontWeight: '800', letterSpacing: -1, color: colors.text },
+  distance: { ...type.subhead },
+  text: { fontSize: 15, fontWeight: '400', color: colors.text },
+  muted: { fontSize: 14, fontWeight: '400', color: colors.muted },
+  actions: { flexDirection: 'row', gap: space.sm },
+  listCard: { gap: 10 },
+  priceLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: space.md },
+  priceMain: { fontSize: 16, fontWeight: '700', color: colors.text },
+  priceMainValue: { fontSize: 20, fontWeight: '800', color: colors.primary },
+  note: { fontSize: 12, fontWeight: '400', lineHeight: 17, color: colors.muted, marginTop: 4 },
+  noteLink: { color: colors.primary, fontWeight: '700' },
+  hourLine: { flexDirection: 'row', justifyContent: 'space-between', gap: space.md },
+  hourDay: { fontSize: 14, fontWeight: '600', color: colors.text },
+  hourValue: { flex: 1, textAlign: 'right', fontSize: 14, fontWeight: '400', color: colors.muted },
+  error: { fontSize: 13, fontWeight: '500', color: colors.danger, textAlign: 'center' },
+  blocks: { gap: 10 },
+  hint: { flexDirection: 'row', alignItems: 'center', gap: space.sm, justifyContent: 'center' },
+  hintText: { fontSize: 13, fontWeight: '400', color: colors.muted },
 });

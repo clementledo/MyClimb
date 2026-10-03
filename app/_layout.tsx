@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
@@ -25,6 +25,11 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const router = useRouter();
+  const path = usePathname();
+  const pathname = useRef(path);
+  useEffect(() => {
+    pathname.current = path;
+  }, [path]);
   // Compteur de redessins : changer de thème (ou restaurer une sauvegarde) redessine toute l'app.
   const [version, setVersion] = useState(0);
   const reopen = useRef(false);
@@ -47,7 +52,8 @@ export default function RootLayout() {
   useEffect(() => {
     if (!reopen.current) return;
     reopen.current = false;
-    const t = setTimeout(() => router.push('/settings'), 50);
+    // Le redessin garde parfois la page Paramètres ouverte : on ne la rouvre que si elle a disparu.
+    const t = setTimeout(() => pathname.current !== '/settings' && router.push('/settings'), 50);
     return () => clearTimeout(t);
   }, [version, router]);
 
