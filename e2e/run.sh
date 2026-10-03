@@ -61,7 +61,11 @@ tap "Paramètres" ; sleep 4 ; shot 10-parametres
 tap "Terminal rétro" ; sleep 6 ; shot 11-theme
 adb shell input keyevent 4 ; sleep 4 ; shot 12-retour
 tap "Paramètres" ; sleep 4
-tap "Connecter Google Drive" ; sleep 8 ; shot 13-drive
+read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+for _ in 1 2 3 4 5 6; do adb shell input swipe $((W / 2)) $((H * 80 / 100)) $((W / 2)) $((H * 30 / 100)) 300; sleep 1; done
+sleep 3
+tap "Connecter Google Drive" | tee "$OUT/drive.txt" ; sleep 8 ; shot 13-drive
+adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" >> "$OUT/drive.txt" || true
 adb shell input keyevent 4 ; sleep 3 ; shot 14-drive-retour
 echo "Application en vie : $(adb shell pidof $APP || echo NON)"
 adb logcat -d > "$OUT/logcat.txt"
