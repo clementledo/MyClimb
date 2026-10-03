@@ -2,8 +2,11 @@ import { useContext, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import {
-  autoBackupEnabled,
+  autoBackup,
+  autoBackupError,
   disableAutoBackup,
+  driveAccount,
+  driveBackup,
   enableAutoBackup,
   exportBackup,
   lastAutoBackup,
@@ -68,31 +71,39 @@ export default function SettingsScreen() {
       setBusy(null);
     }
   };
-  const restore = async () => {
-    setBusy('restore');
-    try {
-      const backup = await pickBackup();
-      if (!backup) return;
-      const when = new Date(backup.date).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' });
-      Alert.alert(
-        'Restaurer cette sauvegarde ?',
-        `Sauvegarde du ${when}. Toutes les données actuelles de l’app seront remplacées.`,
-        [
-          { text: 'Annuler', style: 'cancel' },
-          {
-            text: 'Restaurer',
-            style: 'destructive',
-            onPress: () => {
-              try {
-                restoreBackup(backup);
-                switchTheme(savedTheme());
-              } catch (e) {
-                Alert.alert('Restauration impossible', e instanceof Error ? e.message : String(e));
-              }
-            },
+  const confirmRestore = (backup: NonNullable<Awaited<ReturnType<typeof pickBackup>>>) => {
+    const when = new Date(backup.date).toLocaleString('fr-CA', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    Alert.alert(
+      'Restaurer cette sauvegarde ?',
+      `Sauvegarde du ${when}. Toutes les données actuelles de l’app seront remplacées.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Restaurer',
+          style: 'destructive',
+          onPress: () => {
+            try {
+              restoreBackup(backup);
+              switchTheme(savedTheme());
+            } catch (e) {
+              Alert.alert('Restauration impossible', e instanceof Error ? e.message : String(e));
+            }
           },
-        ],
-      );
+        },
+      ],
+    );
+  };
+  const restoreFrom = async (kind: 'restore' | 'driveRestore') => {
+    setBusy(kind);
+    try {
+      const backup = kind === 'restore' ? await pickBackup() : await driveBackup();
+      if (backup) confirmRestore(backup);
     } catch (e) {
       Alert.alert('Restauration impossible', e instanceof Error ? e.message : String(e));
     } finally {
@@ -100,25 +111,34 @@ export default function SettingsScreen() {
     }
   };
 
-  const [auto, setAuto] = useState(autoBackupEnabled);
+  const [account, setAccount] = useState(driveAccount);
   const [last, setLast] = useState(lastAutoBackup);
-  const toggleAuto = async () => {
-    if (auto) {
-      disableAutoBackup();
-      setAuto(false);
-      return;
-    }
+  const [autoError, setAutoError] = useState(autoBackupError);
+  const refreshAuto = () => {
+    setAccount(driveAccount());
+    setLast(lastAutoBackup());
+    setAutoError(autoBackupError());
+  };
+  const connectDrive = async () => {
     setBusy('auto');
     try {
-      if (await enableAutoBackup()) {
-        setAuto(true);
-        setLast(lastAutoBackup());
-      }
+      await enableAutoBackup();
     } catch (e) {
-      Alert.alert('Sauvegarde automatique impossible', e instanceof Error ? e.message : String(e));
+      Alert.alert('Google Drive', e instanceof Error ? e.message : String(e));
     } finally {
+      refreshAuto();
       setBusy(null);
     }
+  };
+  const saveNow = async () => {
+    setBusy('auto');
+    await autoBackup(true);
+    refreshAuto();
+    setBusy(null);
+  };
+  const disconnectDrive = async () => {
+    await disableAutoBackup();
+    refreshAuto();
   };
   const lastText = last
     ? last.toLocaleString('fr-CA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
@@ -178,27 +198,49 @@ export default function SettingsScreen() {
       <Text style={s.title}>Mes données</Text>
       <View style={s.dataCard}>
         <Text style={s.dataText}>
-          Tes séances, grimpes, réglages et photos restent sur ce téléphone. Sauvegarde-les dans un fichier (par
-          exemple dans Téléchargements, puis sur ton Drive) pour les retrouver si tu changes de téléphone.
+          Tes séances, grimpes, réglages et photos restent sur ce téléphone. Garde une copie pour les retrouver si tu
+          changes de téléphone : dans un fichier, ou automatiquement sur ton Google Drive.
         </Text>
         <Pressable style={s.action} onPress={save} disabled={busy !== null}>
-          <Text style={s.actionText}>{busy === 'save' ? 'Sauvegarde…' : 'Sauvegarder mes données'}</Text>
+          <Text style={s.actionText}>{busy === 'save' ? 'Sauvegarde…' : 'Sauvegarder dans un fichier'}</Text>
         </Pressable>
-        <Pressable style={s.actionSoft} onPress={restore} disabled={busy !== null}>
-          <Text style={s.actionSoftText}>{busy === 'restore' ? 'Lecture…' : 'Restaurer une sauvegarde'}</Text>
+        <Pressable style={s.actionSoft} onPress={() => restoreFrom('restore')} disabled={busy !== null}>
+          <Text style={s.actionSoftText}>{busy === 'restore' ? 'Lecture…' : 'Restaurer depuis un fichier'}</Text>
         </Pressable>
         <View style={s.autoBox}>
-          <Text style={s.autoTitle}>Sauvegarde automatique : {auto ? 'activée' : 'désactivée'}</Text>
+          <Text style={s.autoTitle}>Sauvegarde automatique sur Google Drive</Text>
           <Text style={s.autoText}>
-            {auto
-              ? `L’app met à jour le fichier « MyClimb-sauvegarde-auto.json » toutes les 6 heures au plus, à l’ouverture ou quand tu quittes l’app. Dernière : ${lastText}.`
-              : 'Choisis un dossier une seule fois, l’app y tiendra une sauvegarde à jour toute seule.'}
+            {account
+              ? `Activée sur ${account}. L’app envoie tes données sur ton Drive toutes les 6 heures au plus, à l’ouverture ou quand tu quittes l’app. Dernière : ${lastText}.`
+              : 'Connecte ton compte Google une seule fois : l’app enverra une copie de tes données dans un dossier caché de ton Drive, gratuitement.'}
           </Text>
-          <Pressable style={auto ? s.actionSoft : s.action} onPress={toggleAuto} disabled={busy !== null}>
-            <Text style={auto ? s.actionSoftText : s.actionText}>
-              {busy === 'auto' ? 'Sauvegarde…' : auto ? 'Désactiver' : 'Activer la sauvegarde automatique'}
-            </Text>
-          </Pressable>
+          {account && autoError ? <Text style={s.autoErrorText}>Dernier essai raté : {autoError}</Text> : null}
+          {account ? (
+            <>
+              <Pressable style={s.action} onPress={saveNow} disabled={busy !== null}>
+                <Text style={s.actionText}>{busy === 'auto' ? 'Envoi…' : 'Sauvegarder maintenant'}</Text>
+              </Pressable>
+              <View style={s.row}>
+                <Pressable style={[s.actionSoft, s.grow]} onPress={() => restoreFrom('driveRestore')} disabled={busy !== null}>
+                  <Text style={s.actionSoftText}>{busy === 'driveRestore' ? 'Lecture…' : 'Restaurer du Drive'}</Text>
+                </Pressable>
+                <Pressable style={[s.actionSoft, s.grow]} onPress={disconnectDrive} disabled={busy !== null}>
+                  <Text style={s.actionSoftText}>Désactiver</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <>
+              <Pressable style={s.action} onPress={connectDrive} disabled={busy !== null}>
+                <Text style={s.actionText}>{busy === 'auto' ? 'Connexion…' : 'Connecter Google Drive'}</Text>
+              </Pressable>
+              <Pressable style={s.actionSoft} onPress={() => restoreFrom('driveRestore')} disabled={busy !== null}>
+                <Text style={s.actionSoftText}>
+                  {busy === 'driveRestore' ? 'Lecture…' : 'Récupérer une sauvegarde du Drive'}
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
       </View>
 
@@ -259,4 +301,7 @@ const s = themedStyles({
   autoBox: { gap: 8, marginTop: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
   autoTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   autoText: { color: colors.muted, fontSize: 13, lineHeight: 19 },
+  autoErrorText: { color: colors.danger, fontSize: 13, lineHeight: 19 },
+  row: { flexDirection: 'row', gap: 10 },
+  grow: { flex: 1 },
 });

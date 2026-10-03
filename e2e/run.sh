@@ -60,6 +60,9 @@ tap "Dévers" ; sleep 6 ; tap "⟲" ; sleep 2 ; tap "▶ Tout jouer" ; sleep 3 ;
 tap "Paramètres" ; sleep 4 ; shot 10-parametres
 tap "Terminal rétro" ; sleep 6 ; shot 11-theme
 adb shell input keyevent 4 ; sleep 4 ; shot 12-retour
+tap "Paramètres" ; sleep 4
+tap "Connecter Google Drive" ; sleep 8 ; shot 13-drive
+adb shell input keyevent 4 ; sleep 3 ; shot 14-drive-retour
 echo "Application en vie : $(adb shell pidof $APP || echo NON)"
 adb logcat -d > "$OUT/logcat.txt"
 adb logcat -d -b crash > "$OUT/crash.txt" || true
