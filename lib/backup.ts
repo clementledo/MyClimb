@@ -5,7 +5,7 @@
  */
 import { Directory, File } from 'expo-file-system';
 
-import { db } from './db';
+import { db, getSetting, setSetting } from './db';
 import { photoDir } from './photos';
 
 const FORMAT = 1;
@@ -38,7 +38,11 @@ export async function exportBackup(): Promise<{ name: string; photos: number } |
     return null;
   }
   const name = `MyClimb-sauvegarde-${stamp()}.json`;
-  const out = dir.createFile(name, 'application/json');
+  return { name, photos: writeBackup(dir.createFile(name, 'application/json')) };
+}
+
+/** Écrit toute la sauvegarde dans `out` (remplace son contenu). Renvoie le nombre de photos. */
+function writeBackup(out: File): number {
   const data: Record<string, unknown[]> = {};
   for (const t of tables()) data[t] = db.getAllSync(`SELECT * FROM "${t}"`);
   const head = {
@@ -56,7 +60,58 @@ export async function exportBackup(): Promise<{ name: string; photos: number } |
     out.write(`${i ? ',' : ''}${JSON.stringify(f.name)}:"${f.base64Sync()}"`, { append: true });
   });
   out.write('}}', { append: true });
-  return { name, photos: photos.length };
+  return photos.length;
+}
+
+/* ---------- Sauvegarde automatique ---------- */
+
+const AUTO_DIR = 'autoBackupDir';
+const AUTO_LAST = 'autoBackupLast';
+const AUTO_NAME = 'MyClimb-sauvegarde-auto.json';
+/** Au plus une sauvegarde automatique toutes les 6 heures. */
+const AUTO_EVERY = 6 * 3600 * 1000;
+
+export const autoBackupEnabled = () => !!getSetting(AUTO_DIR);
+export const lastAutoBackup = () => {
+  const v = Number(getSetting(AUTO_LAST));
+  return v > 0 ? new Date(v) : null;
+};
+
+/** Active la sauvegarde automatique : l'utilisateur choisit une fois le dossier. Faux si annulé. */
+export async function enableAutoBackup(): Promise<boolean> {
+  let dir: Directory;
+  try {
+    dir = await Directory.pickDirectoryAsync();
+  } catch {
+    return false;
+  }
+  setSetting(AUTO_DIR, dir.uri);
+  autoBackup(true);
+  return true;
+}
+
+export function disableAutoBackup() {
+  setSetting(AUTO_DIR, '');
+}
+
+/**
+ * Sauvegarde automatique dans le dossier choisi, toujours dans le même fichier.
+ * Ne fait rien si elle est désactivée ou trop récente (sauf `force`). Ne lève jamais d'erreur.
+ */
+export function autoBackup(force = false): boolean {
+  try {
+    const uri = getSetting(AUTO_DIR);
+    if (!uri) return false;
+    const last = Number(getSetting(AUTO_LAST)) || 0;
+    if (!force && Date.now() - last < AUTO_EVERY) return false;
+    const dir = new Directory(uri);
+    const existing = dir.list().find((f): f is File => f instanceof File && f.name === AUTO_NAME);
+    writeBackup(existing ?? dir.createFile(AUTO_NAME, 'application/json'));
+    setSetting(AUTO_LAST, String(Date.now()));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 type Backup = {

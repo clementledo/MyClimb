@@ -1,7 +1,15 @@
 import { useContext, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
-import { exportBackup, pickBackup, restoreBackup } from '@/lib/backup';
+import {
+  autoBackupEnabled,
+  disableAutoBackup,
+  enableAutoBackup,
+  exportBackup,
+  lastAutoBackup,
+  pickBackup,
+  restoreBackup,
+} from '@/lib/backup';
 import { getSetting, setSetting } from '@/lib/db';
 import { colors, currentTheme, ThemeSwitch, THEMES, themedStyles, type ThemeId } from '@/lib/theme';
 import { checkForUpdate, currentVersion, installUpdate } from '@/lib/update';
@@ -92,6 +100,30 @@ export default function SettingsScreen() {
     }
   };
 
+  const [auto, setAuto] = useState(autoBackupEnabled);
+  const [last, setLast] = useState(lastAutoBackup);
+  const toggleAuto = async () => {
+    if (auto) {
+      disableAutoBackup();
+      setAuto(false);
+      return;
+    }
+    setBusy('auto');
+    try {
+      if (await enableAutoBackup()) {
+        setAuto(true);
+        setLast(lastAutoBackup());
+      }
+    } catch (e) {
+      Alert.alert('Sauvegarde automatique impossible', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const lastText = last
+    ? last.toLocaleString('fr-CA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+    : 'pas encore';
+
   const themeList = (fun: boolean) =>
     ids
       .filter((id) => THEMES[id].fun === fun)
@@ -155,6 +187,19 @@ export default function SettingsScreen() {
         <Pressable style={s.actionSoft} onPress={restore} disabled={busy !== null}>
           <Text style={s.actionSoftText}>{busy === 'restore' ? 'Lecture…' : 'Restaurer une sauvegarde'}</Text>
         </Pressable>
+        <View style={s.autoBox}>
+          <Text style={s.autoTitle}>Sauvegarde automatique : {auto ? 'activée' : 'désactivée'}</Text>
+          <Text style={s.autoText}>
+            {auto
+              ? `L’app met à jour le fichier « MyClimb-sauvegarde-auto.json » toutes les 6 heures au plus, à l’ouverture ou quand tu quittes l’app. Dernière : ${lastText}.`
+              : 'Choisis un dossier une seule fois, l’app y tiendra une sauvegarde à jour toute seule.'}
+          </Text>
+          <Pressable style={auto ? s.actionSoft : s.action} onPress={toggleAuto} disabled={busy !== null}>
+            <Text style={auto ? s.actionSoftText : s.actionText}>
+              {busy === 'auto' ? 'Sauvegarde…' : auto ? 'Désactiver' : 'Activer la sauvegarde automatique'}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <Text style={s.title}>Application</Text>
@@ -211,4 +256,7 @@ const s = themedStyles({
   actionSoftText: { color: colors.primary, fontWeight: '700', textAlign: 'center' },
   dataCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 10 },
   dataText: { color: colors.text, fontSize: 14, lineHeight: 20 },
+  autoBox: { gap: 8, marginTop: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  autoTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
+  autoText: { color: colors.muted, fontSize: 13, lineHeight: 19 },
 });

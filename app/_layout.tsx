@@ -1,7 +1,9 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
+import { autoBackup } from '@/lib/backup';
 import { applyTheme, colors, currentTheme, isDark, ThemeSwitch, type ThemeId } from '@/lib/theme';
 
 export { ErrorBoundary } from 'expo-router';
@@ -26,6 +28,16 @@ export default function RootLayout() {
     const t = setTimeout(() => router.push('/settings'), 50);
     return () => clearTimeout(t);
   }, [version, router]);
+
+  // Sauvegarde automatique (si activée) : peu après l'ouverture et quand on quitte l'app, 6 h au plus souvent.
+  useEffect(() => {
+    const t = setTimeout(() => autoBackup(), 5000);
+    const sub = AppState.addEventListener('change', (s) => s === 'background' && autoBackup());
+    return () => {
+      clearTimeout(t);
+      sub.remove();
+    };
+  }, []);
 
   const base = isDark() ? DarkTheme : DefaultTheme;
   const theme = {
