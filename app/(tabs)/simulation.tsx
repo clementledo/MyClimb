@@ -5,7 +5,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensi
 import { Climb3D, type Progress } from '@/components/Climb3D';
 import { Button, Chip, Segmented } from '@/components/ui';
 import { getSetting, setSetting } from '@/lib/db';
-import { HOLD_TYPES, LEVELS, planRoute } from '@/lib/planner';
+import { DEFAULT_WALL, HOLD_TYPES, LEVELS, planRoute } from '@/lib/planner';
 import { demoRoute, listSimRoutes, pickRoutePhotos, removeSimRoute, saveSimRoutes, type SimRoute } from '@/lib/simRoutes';
 import type { HoldType, Pt } from '@/lib/simulation';
 import { colors } from '@/lib/theme';
@@ -279,9 +279,16 @@ function HoldsEditor({
 /* ---------- Méthode en 3D ---------- */
 
 const HEIGHT_KEY = 'climberHeight';
+const WALL_KEY = 'wallHeight';
+/** Hauteur de mur des nouvelles voies : la dernière réglée, sinon 6 m. */
+const readWall = () => {
+  const v = Number(getSetting(WALL_KEY));
+  return v >= 1.5 && v <= 20 ? v : DEFAULT_WALL;
+};
 const readHeight = () => {
   const v = Number(getSetting(HEIGHT_KEY));
-  return v >= 1.2 && v <= 2.2 ? v : 1.75;
+  // 1,75 était l'ancienne valeur par défaut : Clement mesure 1,80 m.
+  return v >= 1.2 && v <= 2.2 && v !== 1.75 ? v : 1.8;
 };
 
 function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<SimRoute>) => void }) {
@@ -295,7 +302,7 @@ function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<Si
   const [height, setHeight] = useState(readHeight);
   const [progress, setProgress] = useState<Progress>({ index: 0, total: 0 });
 
-  const plan = planRoute(route, height);
+  const plan = planRoute({ ...route, wallHeight: route.wallHeight ?? readWall() }, height);
   const total = plan.moves.length;
   const index = Math.min(progress.index, total);
   const finished = index >= total;
@@ -305,6 +312,11 @@ function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<Si
     const v = Math.round(Math.min(2.2, Math.max(1.2, height + d)) * 100) / 100;
     setHeight(v);
     setSetting(HEIGHT_KEY, String(v));
+  };
+  const changeWall = (d: number) => {
+    const v = Math.min(20, Math.max(1.5, plan.H + d));
+    onChange({ wallHeight: v });
+    setSetting(WALL_KEY, String(v));
   };
   const goTo = (i: number) => {
     setPlaying(false);
@@ -448,12 +460,12 @@ function Player({ route, onChange }: { route: SimRoute; onChange: (c: Partial<Si
       </View>
       <View style={s.row}>
         <Text style={s.sizeLabel}>Mur : {plan.H.toFixed(1).replace('.', ',')} m</Text>
-        <Ctrl label="−" onPress={() => onChange({ size: Math.min(2, route.size * 1.1) })} />
-        <Ctrl label="+" onPress={() => onChange({ size: Math.max(0.5, route.size / 1.1) })} />
+        <Ctrl label="−" onPress={() => changeWall(-0.5)} />
+        <Ctrl label="+" onPress={() => changeWall(0.5)} />
       </View>
       <Text style={s.hint}>
-        La hauteur du mur est estimée d’après l’écart entre les prises ; corrige-la si le grimpeur paraît trop grand
-        ou trop petit. La barre de couleur montre la difficulté de chaque étape (touche-la pour y aller). Si une étape
+        « Mur » est la hauteur du mur visible sur la photo, du sol au sommet (6 m par défaut) ; « Ta taille » est
+        la tienne. La barre de couleur montre la difficulté de chaque étape (touche-la pour y aller). Si une étape
         ne te convient pas, change la main ou le pied : la suite se recalcule. Un doigt fait tourner la caméra, deux
         doigts zooment.
       </Text>

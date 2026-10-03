@@ -49,7 +49,15 @@ const LIMB_NAMES: Record<Limb, string> = {
 export type Fixes = { hands?: Record<number, 'lh' | 'rh'>; feet?: Record<string, 'lf' | 'rf'> };
 
 /** Voie en coordonnées de 0 à 1 sur la photo. */
-export type RouteInput = { width: number; height: number; hands: Hold[]; feet: Pt[]; size: number; fix?: Fixes };
+export type RouteInput = {
+  width: number;
+  height: number;
+  hands: Hold[];
+  feet: Pt[];
+  /** Hauteur du mur visible sur la photo, en mètres. */
+  wallHeight?: number;
+  fix?: Fixes;
+};
 
 export const LEVELS: Record<Level, { label: string; color: string }> = {
   1: { label: 'Facile', color: '#2F9E44' },
@@ -81,17 +89,12 @@ export type Plan = {
   moves: Move[];
 };
 
-/** Hauteur de la photo en mètres : un mouvement de bloc courant fait environ 0,42 fois la taille du grimpeur. */
-export function photoHeight(route: RouteInput, climber: number) {
-  const ratio = route.width / route.height;
-  const pts = route.hands.map((p) => ({ x: p.x * ratio, y: p.y }));
-  const gaps = pts
-    .slice(1)
-    .map((p, i) => dist(p, pts[i]))
-    .sort((a, b) => a - b);
-  const median = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0.2;
-  const H = (0.42 * climber) / Math.max(median, 0.03);
-  return Math.min(10, Math.max(1.5, H)) / route.size;
+/** Hauteur de mur par défaut (salle de bloc ou de voie courante), en mètres. */
+export const DEFAULT_WALL = 6;
+
+/** Hauteur de mur visible sur la photo, en mètres : celle que l'utilisateur a réglée, sinon 6 m. */
+export function photoHeight(route: RouteInput) {
+  return route.wallHeight && route.wallHeight > 0 ? route.wallHeight : DEFAULT_WALL;
 }
 
 /** Coût d'un crochet : plus sûr qu'une adhérence, moins qu'une vraie prise de pied. */
@@ -101,7 +104,7 @@ type Foot = { pt: Pt; label: string | null; hook?: FootStyle };
 type Feet = { lf: Foot; rf: Foot };
 
 export function planRoute(route: RouteInput, climber: number): Plan {
-  const H = photoHeight(route, climber);
+  const H = photoHeight(route);
   const W = (H * route.width) / route.height;
   const h = climber;
   const hands: Hold[] = route.hands.map((p) => ({ x: p.x * W, y: p.y * H, type: p.type }));

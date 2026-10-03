@@ -16,8 +16,10 @@ export type SimRoute = {
   height: number;
   hands: Hold[];
   feet: Pt[];
-  /** Taille du grimpeur, en multiple de la taille calculée. */
-  size: number;
+  /** Ancien réglage d'échelle, plus utilisé. */
+  size?: number;
+  /** Hauteur du mur visible sur la photo, en mètres (6 m par défaut). */
+  wallHeight?: number;
   /** Corrections de la méthode (main ou pied imposé). */
   fix?: Fixes;
 };
@@ -79,7 +81,6 @@ export async function pickRoutePhotos(source: 'camera' | 'library'): Promise<Sim
       height: saved.height,
       hands: [],
       feet: [],
-      size: 1,
     });
   }
   return routes;
@@ -98,7 +99,7 @@ export async function demoRoute(): Promise<SimRoute> {
     photo: dest.uri,
     width: 900,
     height: 1200,
-    size: 1,
+    wallHeight: 4,
     hands: [
       { x: 0.45, y: 0.62 },
       { x: 0.62, y: 0.48 },
