@@ -12,20 +12,20 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const router = useRouter();
-  const [themeId, setThemeId] = useState<ThemeId>(currentTheme);
+  // Compteur de redessins : changer de thème (ou restaurer une sauvegarde) redessine toute l'app.
+  const [version, setVersion] = useState(0);
   const reopen = useRef(false);
-  // Changer de thème redessine toute l'app, puis rouvre les paramètres.
   const switchTheme = useCallback((id: ThemeId) => {
     applyTheme(id);
     reopen.current = true;
-    setThemeId(id);
+    setVersion((v) => v + 1);
   }, []);
   useEffect(() => {
     if (!reopen.current) return;
     reopen.current = false;
     const t = setTimeout(() => router.push('/settings'), 50);
     return () => clearTimeout(t);
-  }, [themeId, router]);
+  }, [version, router]);
 
   const base = isDark() ? DarkTheme : DefaultTheme;
   const theme = {
@@ -42,7 +42,7 @@ export default function RootLayout() {
 
   return (
     <ThemeSwitch.Provider value={switchTheme}>
-      <ThemeProvider value={theme} key={themeId}>
+      <ThemeProvider value={theme} key={`${currentTheme()}-${version}`}>
         <StatusBar style={isDark() ? 'light' : 'dark'} />
         <Stack screenOptions={{ headerTintColor: colors.text }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

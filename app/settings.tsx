@@ -1,9 +1,15 @@
 import { useContext, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { exportBackup, pickBackup, restoreBackup } from '@/lib/backup';
 import { getSetting, setSetting } from '@/lib/db';
 import { colors, currentTheme, ThemeSwitch, THEMES, themedStyles, type ThemeId } from '@/lib/theme';
 import { checkForUpdate, currentVersion, installUpdate } from '@/lib/update';
+
+const savedTheme = (): ThemeId => {
+  const v = getSetting('theme');
+  return v && v in THEMES ? (v as ThemeId) : 'classique';
+};
 
 const HEIGHT_KEY = 'climberHeight';
 const readHeight = () => {
@@ -35,6 +41,55 @@ export default function SettingsScreen() {
       { text: 'Plus tard', style: 'cancel' },
       { text: 'Installer', onPress: () => installUpdate(update, () => {}) },
     ]);
+  };
+
+  const [busy, setBusy] = useState<string | null>(null);
+  const save = async () => {
+    setBusy('save');
+    try {
+      const done = await exportBackup();
+      if (done) {
+        Alert.alert(
+          'Sauvegarde faite',
+          `Fichier « ${done.name} » créé (${done.photos} photo${done.photos > 1 ? 's' : ''}). Garde-le en lieu sûr, par exemple sur ton Drive.`,
+        );
+      }
+    } catch (e) {
+      Alert.alert('Sauvegarde impossible', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const restore = async () => {
+    setBusy('restore');
+    try {
+      const backup = await pickBackup();
+      if (!backup) return;
+      const when = new Date(backup.date).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' });
+      Alert.alert(
+        'Restaurer cette sauvegarde ?',
+        `Sauvegarde du ${when}. Toutes les données actuelles de l’app seront remplacées.`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Restaurer',
+            style: 'destructive',
+            onPress: () => {
+              try {
+                restoreBackup(backup);
+                switchTheme(savedTheme());
+              } catch (e) {
+                Alert.alert('Restauration impossible', e instanceof Error ? e.message : String(e));
+              }
+            },
+          },
+        ],
+      );
+    } catch (e) {
+      Alert.alert('Restauration impossible', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
   };
 
   const themeList = (fun: boolean) =>
@@ -88,6 +143,20 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
 
+      <Text style={s.title}>Mes données</Text>
+      <View style={s.dataCard}>
+        <Text style={s.dataText}>
+          Tes séances, grimpes, réglages et photos restent sur ce téléphone. Sauvegarde-les dans un fichier (par
+          exemple dans Téléchargements, puis sur ton Drive) pour les retrouver si tu changes de téléphone.
+        </Text>
+        <Pressable style={s.action} onPress={save} disabled={busy !== null}>
+          <Text style={s.actionText}>{busy === 'save' ? 'Sauvegarde…' : 'Sauvegarder mes données'}</Text>
+        </Pressable>
+        <Pressable style={s.actionSoft} onPress={restore} disabled={busy !== null}>
+          <Text style={s.actionSoftText}>{busy === 'restore' ? 'Lecture…' : 'Restaurer une sauvegarde'}</Text>
+        </Pressable>
+      </View>
+
       <Text style={s.title}>Application</Text>
       <View style={s.card}>
         <Text style={s.rowLabel}>MyClimb v{currentVersion()}</Text>
@@ -137,5 +206,9 @@ const s = themedStyles({
   },
   stepText: { color: colors.primary, fontWeight: '800', fontSize: 18 },
   action: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.primary },
-  actionText: { color: colors.onPrimary, fontWeight: '700' },
+  actionText: { color: colors.onPrimary, fontWeight: '700', textAlign: 'center' },
+  actionSoft: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.primarySoft },
+  actionSoftText: { color: colors.primary, fontWeight: '700', textAlign: 'center' },
+  dataCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 10 },
+  dataText: { color: colors.text, fontSize: 14, lineHeight: 20 },
 });
