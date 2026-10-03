@@ -376,7 +376,7 @@ const s = themedStyles({
   },
   fontSampleText: { fontSize: 16, color: colors.text, fontWeight: '700' },
   heightCard: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  rowTitle: { fontSize: 16, fontWeight: '600', letterSpacing: -0.2, color: colors.text },
+  rowTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
   rowSub: { fontSize: 13, fontWeight: '400', lineHeight: 18, color: colors.muted },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   step: {

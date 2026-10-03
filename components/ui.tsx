@@ -259,7 +259,7 @@ export function ListRow({
       )}
       <View style={[styles.rowBody, !last && styles.rowDivider]}>
         <View style={styles.rowText}>
-          <Text style={styles.rowTitle} numberOfLines={1}>
+          <Text style={styles.rowTitle} numberOfLines={2}>
             {title}
           </Text>
           {subtitle ? (
@@ -485,7 +485,7 @@ export const styles = themedStyles({
   },
   rowDivider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   rowText: { flex: 1, gap: 2 },
-  rowTitle: { fontSize: 16, fontWeight: '600', letterSpacing: -0.2, color: colors.text },
+  rowTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
   rowSubtitle: { fontSize: 13, fontWeight: '400', lineHeight: 18, color: colors.muted },
   rowValue: { fontSize: 15, fontWeight: '600', color: colors.muted },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.pill },
@@ -508,7 +508,7 @@ export const styles = themedStyles({
   emptyText: { fontSize: 14, fontWeight: '400', lineHeight: 20, color: colors.muted, textAlign: 'center' },
   emptyAction: { marginTop: space.sm, alignSelf: 'center' },
   stat: { flex: 1, minWidth: '45%', gap: 2 },
-  statValue: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: colors.text },
+  statValue: { fontSize: 24, fontWeight: '800', color: colors.text },
   statLabel: { fontSize: 13, fontWeight: '500', color: colors.muted },
   input: {
     minHeight: 50,

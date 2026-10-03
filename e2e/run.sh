@@ -10,7 +10,7 @@ shot() { adb exec-out screencap -p > "$OUT/$1.png"; }
 
 # Touche l'élément dont le texte (ou la description) correspond exactement.
 tap() {
-  for _ in 1 2 3 4 5; do
+  for i in 1 2 3 4 5 6 7 8; do
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
     adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
     xy=$(python3 - "$1" "$OUT/ui.xml" <<'PY'
@@ -28,15 +28,19 @@ PY
 )
     if [ -n "$xy" ]; then
       adb shell input tap $xy
-      echo "Touché « $1 » en $xy"
+      echo "Touché « $1 » en $xy" | tee -a "$OUT/taps.txt"
       return 0
     fi
-    # Pas visible : faire défiler la page vers le bas puis réessayer.
+    # Pas visible : faire défiler vers le bas (3 fois), puis vers le haut.
     read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
-    adb shell input swipe $((W / 2)) $((H * 75 / 100)) $((W / 2)) $((H * 45 / 100)) 300
+    if [ "$i" -le 3 ]; then
+      adb shell input swipe $((W / 2)) $((H * 70 / 100)) $((W / 2)) $((H * 45 / 100)) 400
+    else
+      adb shell input swipe $((W / 2)) $((H * 45 / 100)) $((W / 2)) $((H * 70 / 100)) 400
+    fi
     sleep 2
   done
-  echo "Introuvable : « $1 »"
+  echo "Introuvable : « $1 »" | tee -a "$OUT/taps.txt"
   return 1
 }
 

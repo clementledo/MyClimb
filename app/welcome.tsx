@@ -54,11 +54,11 @@ export default function WelcomeScreen() {
 
 const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { paddingHorizontal: space.xl, paddingTop: 48, paddingBottom: space.xl, gap: space.sm },
-  logo: { width: 76, height: 76, borderRadius: 20, marginBottom: space.lg },
+  content: { paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xl, gap: space.sm },
+  logo: { width: 64, height: 64, borderRadius: 18, marginBottom: space.md },
   title: { ...type.display, fontSize: 32 },
   subtitle: { ...type.body, fontSize: 17, color: colors.muted },
-  features: { gap: space.xl, marginTop: 36 },
+  features: { gap: space.lg, marginTop: space.xl },
   feature: { flexDirection: 'row', gap: space.lg, alignItems: 'flex-start' },
   featureIcon: {
     width: 48,

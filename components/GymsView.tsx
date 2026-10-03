@@ -281,7 +281,7 @@ const s = themedStyles({
   photoEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
   photoLetter: { fontSize: 26, fontWeight: '800', color: colors.primary },
   info: { flex: 1, gap: 3 },
-  name: { fontSize: 16, fontWeight: '700', letterSpacing: -0.2, color: colors.text },
+  name: { fontSize: 16, fontWeight: '700', color: colors.text },
   sub: { fontSize: 13, fontWeight: '400', color: colors.muted },
   badges: { flexDirection: 'row', gap: 6, marginTop: 4 },
   time: { alignItems: 'flex-end', minWidth: 60, gap: 2 },
