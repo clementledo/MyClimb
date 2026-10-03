@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { openSessionAt } from '@/components/startSession';
 import { Button, Chip, Section } from '@/components/ui';
 import { listSpots, saveSpot } from '@/lib/db';
 import type { LatLng } from '@/lib/google';
 import { currentPosition, distanceM, placeName } from '@/lib/location';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 // Un spot connu à moins de 500 m est considéré comme celui où tu te trouves.
 const SAME_SPOT_M = 500;
@@ -71,7 +71,7 @@ export default function OutdoorSessionScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, gap: 20 },
   locating: { flexDirection: 'row', alignItems: 'center', gap: 8 },

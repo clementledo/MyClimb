@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { Climb3D, type Progress } from '@/components/Climb3D';
 import { Button, Chip, Segmented } from '@/components/ui';
@@ -18,7 +18,7 @@ import {
 } from '@/lib/planner';
 import { demoRoute, listSimRoutes, pickRoutePhotos, removeSimRoute, saveSimRoutes, type SimRoute } from '@/lib/simRoutes';
 import type { HoldType, Pt } from '@/lib/simulation';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 type Mode = 'holds' | '3d';
 type Kind = 'hands' | 'feet';
@@ -604,12 +604,12 @@ function Ctrl({
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [s.ctrl, primary && s.ctrlPrimary, (pressed || disabled) && { opacity: 0.45 }]}>
-      <Text style={[s.ctrlText, primary && { color: '#fff' }]}>{label}</Text>
+      <Text style={[s.ctrlText, primary && { color: colors.onPrimary }]}>{label}</Text>
     </Pressable>
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
   top: { paddingHorizontal: 16, paddingTop: 12, gap: 12 },
   thumbs: { gap: 8 },
@@ -642,7 +642,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   handTop: { backgroundColor: colors.success },
-  handText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  handText: { color: colors.onPrimary, fontWeight: '800', fontSize: 12 },
   foot: {
     position: 'absolute',
     width: 22,
@@ -662,7 +662,7 @@ const s = StyleSheet.create({
     minWidth: 18,
     paddingHorizontal: 3,
     borderRadius: 8,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#111111',
     alignItems: 'center',
   },
   typeBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },

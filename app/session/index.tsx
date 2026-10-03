@@ -7,7 +7,7 @@ import { Button, Empty } from '@/components/ui';
 import { isFirstTry, isSent } from '@/lib/climbing';
 import { getGym, listBlocksAddedSince, type Block } from '@/lib/db';
 import { endSession, getSession, type Session } from '@/lib/session';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 function elapsed(since: number) {
   const min = Math.max(0, Math.round((Date.now() - since) / 60_000));
@@ -86,7 +86,7 @@ function Tile({ label, value }: { label: string; value: string }) {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
     padding: 16,

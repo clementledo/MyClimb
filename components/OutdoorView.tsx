@@ -7,7 +7,7 @@ import { formatDate } from '@/components/BlockRow';
 import { openSessionAt } from '@/components/startSession';
 import { Button, Empty, Segmented } from '@/components/ui';
 import { getSetting, listSpots, saveSpot, setSetting, type Spot } from '@/lib/db';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 type SpotView = 'list' | 'map';
 
@@ -97,7 +97,7 @@ export function OutdoorView() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1 },
   header: { padding: 12, gap: 10 },
   title: { fontWeight: '700', fontSize: 15, color: colors.text, marginTop: 6 },

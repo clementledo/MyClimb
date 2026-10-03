@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import Svg, { Circle, G, Line, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 /** Couleurs des résultats : du premier coup, réussi après essais, pas encore. */
 export const RESULT_COLORS = [colors.primary, '#F7A072', '#D9D9D9'];
@@ -228,7 +228,7 @@ export function RateBars({
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },

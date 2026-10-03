@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Button, Chip, Section, Segmented } from '@/components/ui';
 import {
@@ -37,7 +37,7 @@ import { searchGyms } from '@/lib/google';
 import { currentPosition, distanceM } from '@/lib/location';
 import { deletePhoto, pickPhoto } from '@/lib/photos';
 import type { Session } from '@/lib/session';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 const today = () => new Date().toISOString().slice(0, 10);
 // Une salle à moins de 300 m est considérée comme celle où tu te trouves.
@@ -368,7 +368,7 @@ function ChipSection({
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   content: { padding: 16, gap: 20, paddingBottom: 48 },
   group: { gap: 8 },
   photo: { width: '100%', aspectRatio: 4 / 3, borderRadius: 10 },

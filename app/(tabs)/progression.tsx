@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { ClimbList } from '@/components/ClimbList';
 import { Legend, LineChart, RateBars, RESULT_COLORS, StackedBars, StackedColumns } from '@/components/charts';
@@ -15,7 +15,7 @@ import {
 } from '@/lib/climbing';
 import { listBlocks, type Block } from '@/lib/db';
 import { computeStats, periodStart, type Period } from '@/lib/stats';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 type Where = 'all' | 'in' | 'out';
 
@@ -266,7 +266,7 @@ function Tile({ label, value, highlight }: { label: string; value: string; highl
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, gap: 24, paddingBottom: 40 },
   filters: { gap: 8 },

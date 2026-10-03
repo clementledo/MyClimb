@@ -21,7 +21,7 @@ import {
 } from '@/lib/google';
 import { gymPrices } from '@/lib/gymPrices';
 import { currentPosition, distanceM } from '@/lib/location';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 const MODES: TravelMode[] = ['WALK', 'TRANSIT', 'DRIVE'];
 
@@ -226,7 +226,7 @@ export function GymsView() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
   controls: { padding: 12, gap: 8 },
   row: {

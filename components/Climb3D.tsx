@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import type { SimRoute } from '@/lib/simRoutes';
 import { WALL_ANGLES, type Plan } from '@/lib/planner';
 import { contactsAt, skeleton, type P3 } from '@/lib/simulation';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 /** Mouvements par seconde à la vitesse normale. */
 const MOVES_PER_S = 0.8;
@@ -442,7 +442,7 @@ export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#E9EDF2' },
   gl: { flex: 1 },
   overlay: {

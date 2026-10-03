@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 export function Segmented<T extends string>({
   options,
@@ -98,7 +98,7 @@ export function Empty({ text }: { text: string }) {
   return <Text style={styles.empty}>{text}</Text>;
 }
 
-export const styles = StyleSheet.create({
+export const styles = themedStyles({
   segmented: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
@@ -133,7 +133,7 @@ export const styles = StyleSheet.create({
   buttonSecondary: { backgroundColor: colors.primarySoft },
   buttonDanger: { backgroundColor: colors.danger },
   buttonDisabled: { backgroundColor: colors.surface },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  buttonText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
   section: { gap: 8 },
   sectionTitle: { fontWeight: '700', fontSize: 15, color: colors.text },
   empty: { color: colors.muted, textAlign: 'center', padding: 24, lineHeight: 20 },

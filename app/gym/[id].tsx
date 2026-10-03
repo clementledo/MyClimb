@@ -1,6 +1,6 @@
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, Text, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { BlockRow } from '@/components/BlockRow';
@@ -23,7 +23,7 @@ import {
 import { gymPrices } from '@/lib/gymPrices';
 import { currentPosition } from '@/lib/location';
 import { getSession } from '@/lib/session';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 const MODES: TravelMode[] = ['WALK', 'TRANSIT', 'DRIVE'];
 
@@ -194,7 +194,7 @@ export default function GymScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
   map: { height: 260 },
   body: { padding: 16, gap: 16 },

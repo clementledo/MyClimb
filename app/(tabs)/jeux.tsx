@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { Button, Segmented } from '@/components/ui';
 import { GAMES, type Game } from '@/lib/games';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 type Filter = 'all' | 'solo' | 'group';
 
@@ -58,7 +58,7 @@ export default function GamesScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, gap: 12, paddingBottom: 32 },
   card: { padding: 14, gap: 6, borderRadius: 12, backgroundColor: colors.surface },

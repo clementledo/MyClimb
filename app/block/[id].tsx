@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 
 import { formatDate } from '@/components/BlockRow';
 import { Button, Empty } from '@/components/ui';
@@ -17,7 +17,7 @@ import {
 } from '@/lib/climbing';
 import { deleteBlock, getBlock, type Block } from '@/lib/db';
 import { deletePhoto } from '@/lib/photos';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 export default function BlockScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -113,7 +113,7 @@ function Info({ label, value, onPress }: { label: string; value: string; onPress
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
   photo: { width: '100%', aspectRatio: 3 / 4 },
   body: { padding: 16, gap: 14 },

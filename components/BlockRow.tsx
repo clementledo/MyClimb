@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DISCIPLINE_LABELS, holdHex, isFirstTry, placeOf, RESULT_LABELS } from '@/lib/climbing';
 import type { Block } from '@/lib/db';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 export function BlockRow({ block, showGym = true }: { block: Block; showGym?: boolean }) {
   return (
@@ -47,7 +47,7 @@ export function formatDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   row: {
     flexDirection: 'row',
     alignItems: 'center',

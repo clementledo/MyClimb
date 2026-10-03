@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { GymsView } from '@/components/GymsView';
 import { OutdoorView } from '@/components/OutdoorView';
 import { SessionBanner } from '@/components/SessionBanner';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { Segmented } from '@/components/ui';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 type Where = 'gym' | 'outdoor';
 
@@ -32,7 +32,7 @@ export default function ClimbScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
   switcher: { paddingHorizontal: 12, paddingTop: 12 },
 });

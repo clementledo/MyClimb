@@ -1,10 +1,10 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 
 import { getGym } from '@/lib/db';
 import { getSession, type Session } from '@/lib/session';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 export function sessionPlace(session: Session) {
   return session.gymId ? (getGym(session.gymId)?.name ?? 'Salle') : (session.site ?? 'Extérieur');
@@ -25,7 +25,7 @@ export function SessionBanner() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -36,6 +36,6 @@ const s = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.primary,
   },
-  text: { flex: 1, color: '#fff', fontWeight: '600' },
-  action: { color: '#fff', fontWeight: '800' },
+  text: { flex: 1, color: colors.onPrimary, fontWeight: '600' },
+  action: { color: colors.onPrimary, fontWeight: '800' },
 });

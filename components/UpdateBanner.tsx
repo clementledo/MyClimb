@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { checkForUpdate, installUpdate, type Update } from '@/lib/update';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 // Une seule vérification par lancement de l'app.
 let pending: Promise<Update | null> | null = null;
@@ -50,7 +50,7 @@ export function UpdateBanner() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

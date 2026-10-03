@@ -6,7 +6,7 @@ import { BlockRow } from '@/components/BlockRow';
 import { Chip, Empty } from '@/components/ui';
 import { GRADES, isSent, placeKey, placeOf, RESULT_LABELS, type Discipline } from '@/lib/climbing';
 import { listBlocks, type Block } from '@/lib/db';
-import { colors } from '@/lib/theme';
+import { colors, themedStyles } from '@/lib/theme';
 
 type ResultFilter = 'all' | 'done' | 'project';
 
@@ -102,7 +102,7 @@ export function ClimbList() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles({
   container: { flex: 1, backgroundColor: colors.background },
   filters: { paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   chips: { gap: 8, paddingHorizontal: 12 },
