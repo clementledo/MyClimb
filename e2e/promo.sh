@@ -35,7 +35,7 @@ PY
 
 read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
 swipe() { adb shell input swipe $((W / 2)) $((H * $1 / 100)) $((W / 2)) $((H * $2 / 100)) ${3:-500}; }
-rec_start() { adb shell screenrecord --bit-rate 16000000 --time-limit "${2:-20}" "/sdcard/$1.mp4" & REC=$!; sleep 1; }
+rec_start() { adb shell screenrecord --bit-rate 6000000 --time-limit "${2:-20}" "/sdcard/$1.mp4" & REC=$!; sleep 1; }
 rec_stop() { adb shell pkill -INT screenrecord || true; wait $REC 2>/dev/null; sleep 2; adb pull "/sdcard/$1.mp4" "$OUT/$1.mp4" > /dev/null; echo "vidéo $1"; }
 
 # Barre d'état propre (mode démo d'Android) : 9:41, batterie pleine, pas de notifications.

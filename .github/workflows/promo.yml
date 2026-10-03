@@ -75,4 +75,5 @@ jobs:
           git checkout -q -b promo-results
           git add -A
           git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "promo ${GITHUB_SHA::7}"
+          git config http.postBuffer 524288000
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" e2e-results
