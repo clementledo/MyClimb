@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { Climb3D, type Progress } from '@/components/Climb3D';
-import { Button, Chip, Segmented } from '@/components/ui';
+import { Badge, Button, Chip, Icon, Segmented } from '@/components/ui';
 import { getSetting, setSetting } from '@/lib/db';
 import {
   DEFAULT_WALL,
@@ -18,7 +18,7 @@ import {
 } from '@/lib/planner';
 import { demoRoute, listSimRoutes, pickRoutePhotos, removeSimRoute, saveSimRoutes, type SimRoute } from '@/lib/simRoutes';
 import type { HoldType, Pt } from '@/lib/simulation';
-import { colors, themedStyles } from '@/lib/theme';
+import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 
 type Mode = 'holds' | '3d';
 type Kind = 'hands' | 'feet';
@@ -90,13 +90,19 @@ export default function SimulationScreen() {
     return (
       <View style={[s.container, s.emptyWrap]}>
         <View style={s.emptyCard}>
-          <Text style={s.emptyTitle}>Simule une voie en 3D</Text>
+          <View style={s.emptyIcon}>
+            <Icon name="view_in_ar" size={30} color={colors.primary} />
+          </View>
+          <View style={s.emptyHead}>
+            <Text style={s.emptyTitle}>Simule une voie en 3D</Text>
+            <Badge label="Bêta" />
+          </View>
           <Text style={s.emptyText}>
-            Prends en photo une voie ou un bloc, touche les prises dans l&apos;ordre, et regarde un grimpeur la
-            monter.
+            Prends en photo une voie ou un bloc, touche les prises dans l&apos;ordre, et regarde un grimpeur à ta taille la
+            monter, mouvement par mouvement.
           </Text>
-          <Button label="Prendre une photo" onPress={() => add('camera')} />
-          <Button label="Choisir des photos" variant="secondary" onPress={() => add('library')} />
+          <Button label="Prendre une photo" icon="photo_camera" onPress={() => add('camera')} />
+          <Button label="Choisir des photos" icon="photo_library" variant="secondary" onPress={() => add('library')} />
           <Pressable onPress={addDemo} hitSlop={8}>
             <Text style={s.demo}>Essayer avec une voie d’exemple</Text>
           </Pressable>
@@ -121,14 +127,14 @@ export default function SimulationScreen() {
               <Text style={s.thumbNum}>{i + 1}</Text>
             </Pressable>
           ))}
-          <Pressable onPress={askAdd} style={[s.thumb, s.thumbAdd]}>
-            <Text style={s.thumbAddText}>+</Text>
+          <Pressable onPress={askAdd} style={[s.thumb, s.thumbAdd]} accessibilityLabel="Ajouter une voie">
+            <Icon name="add" size={26} color={colors.primary} />
           </Pressable>
         </ScrollView>
         <Segmented
           options={[
-            { value: 'holds', label: 'Prises' },
-            { value: '3d', label: 'Méthode 3D' },
+            { value: 'holds', label: 'Prises', icon: 'touch_app' },
+            { value: '3d', label: 'Méthode 3D', icon: 'view_in_ar' },
           ]}
           value={ready ? mode : 'holds'}
           onChange={(m) => {
@@ -610,10 +616,10 @@ function Ctrl({
 }
 
 const s = themedStyles({
-  container: { flex: 1, backgroundColor: colors.background },
-  top: { paddingHorizontal: 16, paddingTop: 12, gap: 12 },
+  container: { flex: 1 },
+  top: { paddingHorizontal: space.lg, paddingTop: space.xs, gap: space.md },
   thumbs: { gap: 8 },
-  thumb: { width: 56, height: 56, borderRadius: 12, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
+  thumb: { width: 60, height: 60, borderRadius: radius.md, overflow: 'hidden', borderWidth: 2.5, borderColor: 'transparent' },
   thumbActive: { borderColor: colors.primary },
   thumbImg: { width: '100%', height: '100%' },
   thumbNum: {
@@ -625,11 +631,11 @@ const s = themedStyles({
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowRadius: 3,
   },
-  thumbAdd: { backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  thumbAdd: { backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', borderColor: colors.primary, borderWidth: 1.5 },
   thumbAddText: { color: colors.primary, fontSize: 28, fontWeight: '600', marginTop: -2 },
-  editor: { padding: 16, gap: 12, paddingBottom: 40 },
-  hint: { color: colors.muted, fontSize: 13, lineHeight: 18 },
-  photo: { borderRadius: 12 },
+  editor: { padding: space.lg, gap: space.md, paddingBottom: 40 },
+  hint: { color: colors.muted, fontSize: 13, fontWeight: '400', lineHeight: 19 },
+  photo: { borderRadius: radius.lg },
   hand: {
     position: 'absolute',
     width: 28,
@@ -667,22 +673,22 @@ const s = themedStyles({
   },
   typeBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.background, padding: 20, paddingBottom: 32, gap: 14, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  sheetTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+  sheet: { backgroundColor: colors.card, padding: 20, paddingBottom: 32, gap: 14, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  sheetTitle: { ...type.title },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  glWrap: { borderRadius: 16, overflow: 'hidden' },
-  stepCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, gap: 6 },
+  glWrap: { borderRadius: radius.lg, overflow: 'hidden' },
+  stepCard: { backgroundColor: colors.card, borderRadius: radius.lg, padding: space.lg, gap: space.sm, borderWidth: 1, borderColor: colors.border },
   stepHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  stepTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: colors.text },
-  stepCount: { color: colors.muted, fontWeight: '600' },
-  stepStart: { color: colors.text, fontSize: 13, lineHeight: 18 },
-  tip: { color: colors.text, fontSize: 13, lineHeight: 18 },
+  stepTitle: { flex: 1, ...type.headline },
+  stepCount: { color: colors.muted, fontSize: 14, fontWeight: '600' },
+  stepStart: { color: colors.text, fontSize: 14, fontWeight: '400', lineHeight: 20 },
+  tip: { color: colors.text, fontSize: 14, fontWeight: '400', lineHeight: 20 },
   computing: { alignItems: 'center', justifyContent: 'center', gap: 10 },
   recompute: { color: colors.muted, fontSize: 12, textAlign: 'center' },
   learnRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  learnText: { flex: 1, color: colors.text, fontSize: 13 },
+  learnText: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '400' },
   strip: { flexDirection: 'row', gap: 2, paddingVertical: 4 },
-  seg: { flex: 1, height: 8, borderRadius: 3, alignItems: 'center' },
+  seg: { flex: 1, height: 8, borderRadius: 4, alignItems: 'center' },
   segActive: { height: 14, marginTop: -3, borderWidth: 2, borderColor: colors.text },
   cruxDot: { position: 'absolute', top: -9, width: 6, height: 6, borderRadius: 3, backgroundColor: '#1A1A1A' },
   badges: { flexDirection: 'row', gap: 6, alignItems: 'center' },
@@ -692,33 +698,41 @@ const s = themedStyles({
   fixBtn: {
     alignSelf: 'flex-start',
     marginTop: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   fixText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
-  resetFix: { color: colors.muted, fontSize: 13, textDecorationLine: 'underline', paddingTop: 2 },
-  alert: { alignSelf: 'flex-start', backgroundColor: '#FFF3BF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  alertText: { color: '#8A5A00', fontWeight: '700', fontSize: 13 },
+  resetFix: { color: colors.primary, fontSize: 13, fontWeight: '700', paddingTop: 2 },
+  alert: { alignSelf: 'flex-start', backgroundColor: colors.dangerSoft, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  alertText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
   row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   flex: { flex: 1 },
-  demo: { color: colors.primary, textAlign: 'center', fontWeight: '600', paddingTop: 4 },
-  remove: { color: colors.danger, textAlign: 'center', fontWeight: '600', paddingVertical: 8 },
-  emptyWrap: { justifyContent: 'center', padding: 24 },
-  emptyCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 24, gap: 14 },
-  emptyTitle: { fontSize: 22, fontWeight: '800', color: colors.text },
-  emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22, marginBottom: 6 },
-  player: { padding: 12, gap: 8, paddingBottom: 32 },
+  demo: { color: colors.primary, textAlign: 'center', fontSize: 15, fontWeight: '700', paddingTop: 4 },
+  remove: { color: colors.danger, textAlign: 'center', fontSize: 14, fontWeight: '700', paddingVertical: 8 },
+  emptyWrap: { justifyContent: 'center', padding: space.lg },
+  emptyCard: { backgroundColor: colors.card, borderRadius: radius.lg, padding: space.xl, gap: space.md, borderWidth: 1, borderColor: colors.border },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  emptyHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  emptyTitle: { ...type.title, flexShrink: 1 },
+  emptyText: { color: colors.muted, fontSize: 15, fontWeight: '400', lineHeight: 22, marginBottom: 6 },
+  player: { padding: space.lg, gap: space.md, paddingBottom: 40 },
   ctrl: {
     flex: 1,
-    paddingVertical: 9,
-    borderRadius: 10,
-    backgroundColor: colors.primarySoft,
+    paddingVertical: 11,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
     alignItems: 'center',
   },
   ctrlPrimary: { backgroundColor: colors.primary },
-  ctrlText: { color: colors.primary, fontWeight: '700' },
-  sizeLabel: { flex: 1.4, color: colors.text, fontWeight: '600' },
+  ctrlText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  sizeLabel: { flex: 1.4, color: colors.text, fontSize: 14, fontWeight: '600' },
 });

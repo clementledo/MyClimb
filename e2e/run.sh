@@ -46,7 +46,16 @@ adb shell pm grant $APP android.permission.ACCESS_COARSE_LOCATION || true
 adb logcat -c
 adb shell monkey -p $APP -c android.intent.category.LAUNCHER 1
 sleep 25
+shot 0-bienvenue
+tap "Commencer" ; sleep 3
 shot 1-lancement
+tap "Filtres" ; sleep 2 ; shot 1b-filtres
+adb shell input keyevent 4 ; sleep 2
+tap "Extérieur" ; sleep 3 ; shot 1c-exterieur
+tap "En salle" ; sleep 1
+tap "Progression" ; sleep 3 ; shot 1d-progression
+tap "Mes grimpes" ; sleep 2 ; shot 1e-mes-grimpes
+tap "Jeux" ; sleep 2 ; tap "Un jeu au hasard" ; sleep 1 ; shot 1f-jeux
 tap "Simulation" ; sleep 4 ; shot 2-simulation
 tap "Essayer avec une voie d’exemple" ; sleep 6 ; shot 3-exemple
 tap "Méthode 3D" ; sleep 8 ; shot 4-3d-debut
@@ -59,6 +68,9 @@ tap "▶ Tout jouer" ; sleep 8 ; shot 8-3d-fin
 tap "Dévers" ; sleep 6 ; tap "⟲" ; sleep 2 ; tap "▶ Tout jouer" ; sleep 3 ; shot 9-devers
 tap "Paramètres" ; sleep 4 ; shot 10-parametres
 tap "Terminal rétro" ; sleep 6 ; shot 11-theme
+tap "Classique" ; sleep 6 ; shot 11b-classique
+tap "Manrope" ; sleep 6 ; shot 11c-manrope
+tap "Inter" ; sleep 6
 adb shell input keyevent 4 ; sleep 4 ; shot 12-retour
 tap "Paramètres" ; sleep 4
 read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')

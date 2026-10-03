@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { autoBackup } from '@/lib/backup';
+import { getSetting } from '@/lib/db';
 import {
   applyFont,
   applyTheme,
@@ -57,6 +58,13 @@ export default function RootLayout() {
     return () => clearTimeout(t);
   }, [version, router]);
 
+  // Premier lancement : écran de bienvenue.
+  useEffect(() => {
+    if (getSetting('welcomed')) return;
+    const t = setTimeout(() => router.push('/welcome'), 300);
+    return () => clearTimeout(t);
+  }, [router]);
+
   // Sauvegarde automatique (si activée) : peu après l'ouverture et quand on quitte l'app, 6 h au plus souvent.
   useEffect(() => {
     const t = setTimeout(() => autoBackup(), 5000);
@@ -100,6 +108,7 @@ export default function RootLayout() {
           }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="settings" options={{ title: 'Paramètres' }} />
+          <Stack.Screen name="welcome" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="gym/[id]" options={{ title: 'Salle' }} />
           <Stack.Screen name="session/index" options={{ title: 'Séance' }} />
           <Stack.Screen name="session/outdoor" options={{ title: 'Séance en extérieur' }} />

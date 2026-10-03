@@ -1,20 +1,29 @@
 import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
-import { Button, Segmented } from '@/components/ui';
+import { Badge, Button, Icon, Segmented } from '@/components/ui';
 import { GAMES, type Game } from '@/lib/games';
-import { colors, themedStyles } from '@/lib/theme';
+import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 
 type Filter = 'all' | 'solo' | 'group';
 
 function GameCard({ game, highlighted }: { game: Game; highlighted?: boolean }) {
   return (
     <View style={[s.card, highlighted && s.cardHighlighted]}>
+      {highlighted && (
+        <View style={s.pickedRow}>
+          <Icon name="casino" size={16} color={colors.primary} />
+          <Text style={s.picked}>Tiré au sort pour toi</Text>
+        </View>
+      )}
       <View style={s.cardHead}>
         <Text style={s.name}>{game.name}</Text>
-        <Text style={s.tag}>{game.group ? 'À plusieurs' : 'Seul'}</Text>
+        <Badge label={game.group ? 'À plusieurs' : 'Seul'} tone={game.group ? 'primary' : 'neutral'} />
       </View>
-      <Text style={s.works}>{game.works}</Text>
+      <View style={s.worksRow}>
+        <Icon name="fitness_center" size={15} color={colors.muted} />
+        <Text style={s.works}>{game.works}</Text>
+      </View>
       <Text style={s.rules}>{game.rules}</Text>
     </View>
   );
@@ -47,7 +56,8 @@ export default function GamesScreen() {
         value={filter}
         onChange={changeFilter}
       />
-      <Button label="Un jeu au hasard" onPress={pickRandom} />
+      <Text style={s.intro}>Des jeux pour progresser en t&apos;amusant, seul ou entre amis.</Text>
+      <Button label="Un jeu au hasard" icon="casino" onPress={pickRandom} />
       {picked && <GameCard game={picked} highlighted />}
       {games
         .filter((g) => g !== picked)
@@ -59,13 +69,23 @@ export default function GamesScreen() {
 }
 
 const s = themedStyles({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
-  card: { padding: 14, gap: 6, borderRadius: 12, backgroundColor: colors.surface },
-  cardHighlighted: { backgroundColor: colors.primarySoft, borderWidth: 2, borderColor: colors.primary },
-  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  name: { flex: 1, fontSize: 17, fontWeight: '700', color: colors.text },
-  tag: { fontSize: 12, fontWeight: '600', color: colors.primary },
+  container: { flex: 1 },
+  content: { paddingHorizontal: space.lg, paddingTop: space.xs, gap: space.md, paddingBottom: space.xxl },
+  intro: { ...type.body, color: colors.muted },
+  card: {
+    padding: space.lg,
+    gap: space.sm,
+    borderRadius: radius.lg,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cardHighlighted: { borderWidth: 2, borderColor: colors.primary },
+  pickedRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  picked: { ...type.overline, color: colors.primary },
+  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+  name: { flex: 1, ...type.headline },
+  worksRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   works: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  rules: { fontSize: 15, lineHeight: 21, color: colors.text },
+  rules: { ...type.body },
 });
