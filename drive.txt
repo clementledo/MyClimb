@@ -1,0 +1,2 @@
+Touché « Connecter Google Drive » en 173 217
+    topResumedActivity=ActivityRecord{5499134 u0 com.google.android.gms/.auth.uiflows.minutemaid.MinuteMaidActivity t8}

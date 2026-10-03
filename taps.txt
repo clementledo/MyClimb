@@ -1,0 +1,29 @@
+Touché « Commencer » en 160 552
+Touché « Filtres » en 136 169
+Touché « Extérieur » en 242 114
+Touché « En salle » en 101 114
+Touché « Progression » en 120 624
+Touché « Mes grimpes » en 242 114
+Touché « Jeux » en 280 624
+Touché « Un jeu au hasard » en 173 229
+Touché « Simulation » en 199 624
+Touché « Essayer avec une voie d’exemple » en 160 530
+Touché « Méthode 3D » en 241 186
+Introuvable : « Étape ⏭ »
+Touché « Étape ⏭ » en 258 471
+Touché « ⏮ » en 61 383
+Introuvable : « ↔ Prendre avec la main gauche »
+Introuvable : « Annuler mes corrections »
+Touché « × 1 » en 160 545
+Touché « × 2 » en 160 545
+Touché « ▶ Tout jouer » en 160 490
+Touché « Dévers » en 213 489
+Touché « ⟲ » en 61 327
+Touché « ▶ Tout jouer » en 160 490
+Touché « Paramètres » en 284 56
+Touché « Terminal rétro » en 85 487
+Touché « Classique » en 85 277
+Introuvable : « Manrope »
+Introuvable : « Inter »
+Touché « Paramètres » en 284 56
+Touché « Connecter Google Drive » en 173 217
