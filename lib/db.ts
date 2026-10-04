@@ -45,6 +45,17 @@ db.execSync(`
     key TEXT PRIMARY KEY NOT NULL,
     value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS training_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    ref TEXT NOT NULL,
+    name TEXT NOT NULL,
+    date TEXT NOT NULL,
+    minutes INTEGER NOT NULL,
+    intensity INTEGER NOT NULL,
+    feel TEXT,
+    created_at INTEGER NOT NULL
+  );
 `);
 
 // Version 1 : voies, extérieur et caractéristiques détaillées. La salle devient facultative.
@@ -311,4 +322,36 @@ export function writeCache(key: string, value: unknown) {
     'INSERT INTO cache (key, value, ts) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, ts = excluded.ts',
     key, JSON.stringify(value), Date.now(),
   );
+}
+
+/* ---------- Entraînements faits ---------- */
+
+/** Une séance ou un exercice terminé avec le minuteur. */
+export type TrainingLog = {
+  id: number;
+  kind: 'session' | 'exercise';
+  /** Identifiant de la séance type ou de l'exercice. */
+  ref: string;
+  name: string;
+  date: string;
+  minutes: number;
+  intensity: number;
+  feel: Feel | null;
+};
+
+export function insertTrainingLog(l: Omit<TrainingLog, 'id'>) {
+  db.runSync(
+    `INSERT INTO training_logs (kind, ref, name, date, minutes, intensity, feel, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    l.kind, l.ref, l.name, l.date, l.minutes, l.intensity, l.feel, Date.now(),
+  );
+}
+
+export function listTrainingLogs(): TrainingLog[] {
+  return db.getAllSync<TrainingLog>(
+    'SELECT id, kind, ref, name, date, minutes, intensity, feel FROM training_logs ORDER BY date DESC, id DESC',
+  );
+}
+
+export function deleteTrainingLog(id: number) {
+  db.runSync('DELETE FROM training_logs WHERE id = ?', id);
 }

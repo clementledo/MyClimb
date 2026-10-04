@@ -46,6 +46,10 @@ export default function TabLayout() {
         options={{ title: 'Grimper', tabBarIcon: ({ color }) => <TabIcon name="landscape" color={color} /> }}
       />
       <Tabs.Screen
+        name="entrainement"
+        options={{ title: 'Entraînement', tabBarIcon: ({ color }) => <TabIcon name="fitness_center" color={color} /> }}
+      />
+      <Tabs.Screen
         name="progression"
         options={{ title: 'Progression', tabBarIcon: ({ color }) => <TabIcon name="insights" color={color} /> }}
       />

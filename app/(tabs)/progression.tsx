@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
@@ -13,7 +13,7 @@ import {
   type Discipline,
   type GradeSystem,
 } from '@/lib/climbing';
-import { listBlocks, type Block } from '@/lib/db';
+import { listBlocks, listTrainingLogs, type Block, type TrainingLog } from '@/lib/db';
 import { computeStats, periodStart, type Period } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 
@@ -54,7 +54,13 @@ function StatsView() {
   const [systemChoice, setSystemChoice] = useState<GradeSystem | null>(null);
   const [sheet, setSheet] = useState(false);
 
-  useFocusEffect(useCallback(() => setBlocks(listBlocks()), []));
+  const [logs, setLogs] = useState<TrainingLog[]>([]);
+  useFocusEffect(
+    useCallback(() => {
+      setBlocks(listBlocks());
+      setLogs(listTrainingLogs());
+    }, []),
+  );
 
   const disciplines = (['bloc', 'voie'] as Discipline[]).filter((d) => blocks.some((b) => b.discipline === d));
   const current = disciplines.includes(discipline) ? discipline : (disciplines[0] ?? 'bloc');
@@ -70,15 +76,18 @@ function StatsView() {
 
   const st = computeStats(list, system, from);
 
+  const training = <TrainingCard logs={logs} from={period === 'all' ? '' : from} />;
+
   if (blocks.length === 0) {
     return (
-      <View style={s.container}>
+      <ScrollView style={s.container} contentContainerStyle={s.content}>
         <Empty
           icon="insights"
           title="Pas encore de statistiques"
           text="Note tes grimpes pendant tes séances : ta progression s'affichera ici."
         />
-      </View>
+        {training}
+      </ScrollView>
     );
   }
 
@@ -155,7 +164,10 @@ function StatsView() {
       </Sheet>
 
       {list.length === 0 ? (
-        <Empty icon="event_busy" text={`Aucune grimpe en ${kind} sur cette période.`} />
+        <>
+          <Empty icon="event_busy" text={`Aucune grimpe en ${kind} sur cette période.`} />
+          {training}
+        </>
       ) : (
         <>
           <View style={s.hero}>
@@ -180,6 +192,8 @@ function StatsView() {
             <Stat label="Séances" value={String(st.sessions)} />
             <Stat label="Grimpes par séance" value={dec(st.perSession)} />
           </Card>
+
+          {training}
 
           {st.level.some((l) => l.max !== null) && (
             <ChartCard title={`Évolution du niveau, par ${unit}`}>
@@ -297,6 +311,40 @@ function RateSection({
   );
 }
 
+/** Entraînements faits sur la période (séances types et renforcement). */
+function TrainingCard({ logs, from }: { logs: TrainingLog[]; from: string }) {
+  const router = useRouter();
+  const list = logs.filter((l) => l.date >= from);
+  if (logs.length === 0) return null;
+  const minutes = list.reduce((a, l) => a + l.minutes, 0);
+  const first = list.reduce((m, l) => (l.date < m ? l.date : m), list[0]?.date ?? '');
+  const weeks = first ? Math.max(1, (Date.parse(list[0].date) - Date.parse(first)) / (7 * 86400000) + 1) : 1;
+  const counts = new Map<string, number>();
+  list.forEach((l) => counts.set(l.name, (counts.get(l.name) ?? 0) + 1));
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  return (
+    <ChartCard title="Entraînement">
+      {list.length === 0 ? (
+        <Text style={s.muted}>Aucun entraînement sur cette période.</Text>
+      ) : (
+        <>
+          <View style={s.statsRow}>
+            <Stat label="Séances types" value={String(list.filter((l) => l.kind === 'session').length)} />
+            <Stat label="Exercices de renforcement" value={String(list.filter((l) => l.kind === 'exercise').length)} />
+            <Stat label="Temps total" value={minutes >= 60 ? `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}` : `${minutes} min`} />
+            <Stat label="Entraînements par semaine" value={dec(list.length / Math.ceil(weeks))} />
+          </View>
+          <StackedBars labelWidth={130} palette={[colors.primary]} rows={top.map(([label, n]) => ({ label, parts: [n] }))} />
+        </>
+      )}
+      <Pressable style={s.link} onPress={() => router.push('/entrainement')} accessibilityLabel="Voir l’entraînement">
+        <Text style={s.linkText}>Voir mes entraînements</Text>
+        <Icon name="arrow_forward" size={16} color={colors.primary} />
+      </Pressable>
+    </ChartCard>
+  );
+}
+
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card style={s.chartCard}>
@@ -341,4 +389,8 @@ const s = themedStyles({
   chartTitle: { ...type.headline },
   weakRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   weak: { fontSize: 13, fontWeight: '600', color: colors.danger },
+  muted: { ...type.body, color: colors.muted },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', rowGap: space.lg, columnGap: space.md },
+  link: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  linkText: { fontSize: 15, fontWeight: '700', color: colors.primary },
 });

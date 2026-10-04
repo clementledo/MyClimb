@@ -115,6 +115,8 @@ export default function RootLayout() {
           <Stack.Screen name="block/new" options={{ title: 'Nouvelle grimpe', presentation: 'modal' }} />
           <Stack.Screen name="block/[id]" options={{ title: 'Grimpe' }} />
           <Stack.Screen name="block/edit/[id]" options={{ title: 'Modifier la grimpe', presentation: 'modal' }} />
+          <Stack.Screen name="training/[id]" options={{ title: 'Séance' }} />
+          <Stack.Screen name="training/exercise/[id]" options={{ title: 'Exercice' }} />
         </Stack>
       </ThemeProvider>
     </ThemeSwitch.Provider>

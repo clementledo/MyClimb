@@ -60,7 +60,20 @@ tap "Filtres" ; sleep 2 ; shot 1b-filtres
 adb shell input keyevent 4 ; sleep 2
 tap "Extérieur" ; sleep 3 ; shot 1c-exterieur
 tap "En salle" ; sleep 1
+tap "Entraînement" ; sleep 3 ; shot 1g-entrainement
+tap "Voir la séance" ; sleep 3 ; shot 1h-seance
+tap "Marquer comme faite" ; sleep 2 ; tap "Plus" ; sleep 1 ; tap "Juste" ; sleep 1 ; shot 1i-fait
+tap "Enregistrer" ; sleep 2 ; shot 1j-enregistre
+adb shell input keyevent 4 ; sleep 3 ; shot 1k-historique
+tap "Renforcement" ; sleep 2 ; shot 1l-renforcement
+tap "Gainage" ; sleep 2 ; shot 1m-gainage
+tap "Tous" ; sleep 1 ; tap "Tractions" ; sleep 3 ; shot 1n-exercice
+adb shell input keyevent 4 ; sleep 2
+tap "Matériel" ; sleep 2 ; tap "Poutre" ; sleep 1 ; shot 1o-materiel
+tap "Poutre" ; sleep 1 ; tap "Fermer" ; sleep 2
 tap "Progression" ; sleep 3 ; shot 1d-progression
+tap "Voir mes entraînements" ; sleep 1 ; shot 1d2-progression-entrainement
+tap "Progression" ; sleep 2
 tap "Mes grimpes" ; sleep 2 ; shot 1e-mes-grimpes
 tap "Jeux" ; sleep 2 ; tap "Un jeu au hasard" ; sleep 1 ; shot 1f-jeux
 tap "Simulation" ; sleep 4 ; shot 2-simulation
