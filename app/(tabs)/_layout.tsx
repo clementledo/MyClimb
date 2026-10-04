@@ -1,6 +1,6 @@
 import { Tabs, useRouter } from 'expo-router';
 import type { AndroidSymbol } from 'expo-symbols';
-import type { ColorValue } from 'react-native';
+import { Text, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, IconButton } from '@/components/ui';
@@ -33,7 +33,12 @@ export default function TabLayout() {
           paddingTop: 6,
           paddingBottom: bottom + 6,
         },
-        tabBarLabelStyle: { fontFamily: font.family, fontSize: 11, fontWeight: '600' },
+        // Le libellé rétrécit un peu plutôt que d'être coupé sur les petits écrans (5 onglets).
+        tabBarLabel: ({ color, children }) => (
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color, fontFamily: font.family, fontSize: 11, fontWeight: '600', paddingHorizontal: 2 }}>
+            {children}
+          </Text>
+        ),
         headerTitleAlign: 'left',
         headerShadowVisible: false,
         headerStyle: { backgroundColor: colors.background },

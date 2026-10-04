@@ -250,7 +250,7 @@ const s = themedStyles({
   muted: { ...type.body, color: colors.muted },
   listCard: { borderRadius: radius.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   focusRow: { gap: space.sm, paddingRight: space.lg },
-  sessionCard: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  sessionCard: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
   sessionIcon: { width: 48, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
   sessionBody: { flex: 1, gap: 4 },
   sessionName: { ...type.headline },
