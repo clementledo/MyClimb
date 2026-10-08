@@ -61,6 +61,10 @@ adb shell input keyevent 4 ; sleep 2
 tap "Extérieur" ; sleep 3 ; shot 1c-exterieur
 tap "En salle" ; sleep 1
 tap "Entraînement" ; sleep 3 ; shot 1g-entrainement
+tap "Commencer" ; sleep 3 ; shot 1g2-routine
+tap "Marquer comme faite" ; sleep 2 ; tap "Enregistrer" ; sleep 2 ; shot 1g3-routine-faite
+adb shell input keyevent 4 ; sleep 3 ; shot 1g4-semaine
+tap "Séances" ; sleep 2
 tap "Voir la séance" ; sleep 3 ; shot 1h-seance
 tap "Marquer comme faite" ; sleep 2 ; tap "Plus" ; sleep 1 ; tap "Juste" ; sleep 1 ; shot 1i-fait
 tap "Enregistrer" ; sleep 2 ; shot 1j-enregistre
@@ -79,13 +83,15 @@ tap "Jeux" ; sleep 2 ; tap "Un jeu au hasard" ; sleep 1 ; shot 1f-jeux
 tap "Simulation" ; sleep 4 ; shot 2-simulation
 tap "Essayer avec une voie d’exemple" ; sleep 6 ; shot 3-exemple
 tap "Méthode 3D" ; sleep 8 ; shot 4-3d-debut
-tap "Étape ⏭" ; sleep 3 ; tap "Étape ⏭" ; sleep 3 ; shot 5-3d-etapes
-tap "⏮" ; sleep 3 ; shot 6-etape-crux
-tap "↔ Prendre avec la main gauche" ; sleep 4 ; shot 7-correction
+tap "Étape suivante" ; sleep 3 ; tap "Étape suivante" ; sleep 3 ; shot 5-3d-etapes
+tap "Étape précédente" ; sleep 3 ; shot 6-etape-crux
+tap "Corriger l’étape" ; sleep 4 ; shot 7-correction
+tap "Réglages" ; sleep 2 ; shot 7b-reglages
 tap "Annuler mes corrections" ; sleep 3
-tap "× 1" ; sleep 1 ; tap "× 2" ; sleep 1
-tap "▶ Tout jouer" ; sleep 8 ; shot 8-3d-fin
-tap "Dévers" ; sleep 6 ; tap "⟲" ; sleep 2 ; tap "▶ Tout jouer" ; sleep 3 ; shot 9-devers
+tap "Vitesse" ; sleep 1 ; tap "Vitesse" ; sleep 1
+tap "Lecture" ; sleep 8 ; shot 8-3d-fin
+tap "Réglages" ; sleep 2 ; tap "Dévers" ; sleep 2 ; tap "Fermer" ; sleep 5
+tap "Recommencer" ; sleep 2 ; tap "Lecture" ; sleep 3 ; shot 9-devers
 tap "Paramètres" ; sleep 4 ; shot 10-parametres
 tap "Terminal rétro" ; sleep 6 ; shot 11-theme
 tap "Classique" ; sleep 6 ; shot 11b-classique

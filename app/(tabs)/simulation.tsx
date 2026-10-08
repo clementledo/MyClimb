@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
+import type { AndroidSymbol } from 'expo-symbols';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { Climb3D, type Progress } from '@/components/Climb3D';
-import { Badge, Button, Chip, Icon, Segmented } from '@/components/ui';
+import { Badge, Button, Chip, Icon, IconButton, Segmented, Sheet } from '@/components/ui';
 import { getSetting, setSetting } from '@/lib/db';
 import {
   DEFAULT_WALL,
@@ -219,9 +220,9 @@ function HoldsEditor({
       />
       <Text style={s.hint}>
         {kind === 'hands'
-          ? 'Touche les prises de main dans l’ordre : la 1re est le départ, la dernière le top.'
-          : 'Touche les prises de pied, dans n’importe quel ordre. Les prises de main déjà dépassées servent aussi de pieds.'}
-        {' '}Touche une prise placée pour choisir son type (facultatif) ou la retirer.
+          ? 'Touche les prises de main dans l’ordre, du départ au top.'
+          : 'Touche les prises de pied, dans n’importe quel ordre.'}
+        {' '}Touche une prise placée pour la modifier.
       </Text>
       <Pressable onPress={(e) => tap(e.nativeEvent.locationX, e.nativeEvent.locationY)}>
         <View style={{ width: w, height: h }}>
@@ -396,7 +397,6 @@ function PlayerView({
   onLearn: (fix: SimRoute['fix']) => void;
   onForget: () => void;
 }) {
-  const { height: windowHeight } = useWindowDimensions();
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [restartKey, setRestartKey] = useState(0);
@@ -404,6 +404,11 @@ function PlayerView({
   const [seek, setSeek] = useState({ t: -0.6, n: 0 });
   const [step, setStep] = useState(0);
   const [progress, setProgress] = useState<Progress>({ index: 0, total: 0 });
+  const [settings, setSettings] = useState(false);
+  // La 3D prend toute la place laissée par les commandes (mesurées une fois).
+  const [box, setBox] = useState(0);
+  const [below, setBelow] = useState(0);
+  const glHeight = Math.round(Math.max(260, box - below - space.md * 2 - space.lg));
 
   const total = plan.moves.length;
   const index = Math.min(progress.index, total);
@@ -445,173 +450,206 @@ function PlayerView({
   const resetFixes = () => {
     onChange({ fix: undefined });
     goTo(0);
+    setSettings(false);
+  };
+  const togglePlay = () => {
+    if (finished && !playing) setRestartKey((k) => k + 1);
+    setPlaying(!playing);
   };
 
+  const fmt = (v: number, d: number) => v.toFixed(d).replace('.', ',');
+  const title = finished ? 'Top !' : index === 0 && progress.total === 0 ? 'Départ' : (move?.title ?? '');
+  const level = !finished && move ? LEVELS[move.level] : null;
+
   return (
-    <ScrollView style={s.flex} contentContainerStyle={s.player}>
-      <View style={[s.glWrap, { height: Math.max(240, Math.min(420, windowHeight * 0.42)) }]}>
-        <Climb3D
-          route={route}
-          plan={plan}
-          playing={playing}
-          speed={speed}
-          restartKey={restartKey}
-          viewKey={viewKey}
-          seek={seek}
-          step={step}
-          onProgress={setProgress}
-          onEnd={() => setPlaying(false)}
-        />
-      </View>
-
-      {computing && <Text style={s.recompute}>Recalcul de la méthode…</Text>}
-      <View style={s.strip}>
-        {plan.moves.map((m, i) => (
+    <View style={s.flex} onLayout={(e) => setBox(e.nativeEvent.layout.height)}>
+      <ScrollView style={s.flex} contentContainerStyle={s.player}>
+        <View style={[s.glWrap, { height: glHeight }]}>
+          {box > 0 && below > 0 && (
+            <Climb3D
+              key={glHeight}
+              route={route}
+              plan={plan}
+              playing={playing}
+              speed={speed}
+              restartKey={restartKey}
+              viewKey={viewKey}
+              seek={seek}
+              step={step}
+              onProgress={setProgress}
+              onEnd={() => setPlaying(false)}
+            />
+          )}
           <Pressable
-            key={i}
-            onPress={() => goTo(i)}
-            hitSlop={{ top: 8, bottom: 8 }}
-            style={[
-              s.seg,
-              { backgroundColor: LEVELS[m.level].color, opacity: i < index ? 0.35 : 1 },
-              i === index && !finished && s.segActive,
-            ]}>
-            {m.crux && <View style={s.cruxDot} />}
+            onPress={() => setViewKey((k) => k + 1)}
+            accessibilityLabel="Vue de face"
+            hitSlop={6}
+            style={({ pressed }) => [s.glButton, pressed && { opacity: 0.6 }]}>
+            <Icon name="center_focus_strong" size={20} color={colors.text} />
           </Pressable>
-        ))}
-      </View>
-
-      <View style={s.stepCard}>
-        <View style={s.stepHead}>
-          <Text style={s.stepTitle} numberOfLines={2}>
-            {finished ? 'Top !' : index === 0 && progress.total === 0 ? 'Départ' : move?.title}
-          </Text>
-          <Text style={s.stepCount}>
-            {Math.min(index + 1, total)}/{total}
-          </Text>
-        </View>
-        {!finished && move && (
-          <View style={s.badges}>
-            <View style={[s.badge, { backgroundColor: LEVELS[move.level].color }]}>
-              <Text style={s.badgeText}>{LEVELS[move.level].label}</Text>
+          {computing && (
+            <View style={s.glBadge} pointerEvents="none">
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={s.glBadgeText}>Recalcul…</Text>
             </View>
-            {move.crux && (
-              <View style={[s.badge, { backgroundColor: '#1A1A1A' }]}>
-                <Text style={s.badgeText}>Crux</Text>
-              </View>
+          )}
+        </View>
+
+        <View style={s.below} onLayout={(e) => setBelow(e.nativeEvent.layout.height)}>
+          <View style={s.strip}>
+            {plan.moves.map((m, i) => (
+              <Pressable
+                key={i}
+                onPress={() => goTo(i)}
+                hitSlop={{ top: 10, bottom: 10 }}
+                style={[
+                  s.seg,
+                  { backgroundColor: LEVELS[m.level].color, opacity: i < index ? 0.3 : 1 },
+                  i === index && !finished && s.segActive,
+                ]}>
+                {m.crux && <View style={s.cruxDot} />}
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={s.stepRow}>
+            <View style={[s.levelDot, { backgroundColor: level?.color ?? colors.success }]} />
+            <Text style={s.stepTitle} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={s.stepCount}>
+              {Math.min(index + 1, total)}/{total}
+            </Text>
+          </View>
+          <View style={s.tags}>
+            {finished ? (
+              <Text style={s.tagMuted}>Voie enchaînée en {total} mouvements</Text>
+            ) : (
+              <>
+                {level && <Text style={[s.tag, { color: level.color }]}>{level.label}</Text>}
+                {move?.crux && <Text style={[s.tag, s.tagStrong]}>Crux</Text>}
+                {move?.alerts.slice(0, 2).map((a) => (
+                  <Text key={a} style={[s.tag, s.tagAlert]} numberOfLines={1}>
+                    {a}
+                  </Text>
+                ))}
+                {move?.corrected && <Icon name="edit" size={14} color={colors.muted} />}
+              </>
             )}
-            {move.corrected && <Text style={s.corrected}>✎ corrigé par toi</Text>}
+            <View style={s.flex} />
+            {!finished && move?.fix && (
+              <Pressable
+                onPress={correct}
+                accessibilityLabel="Corriger l’étape"
+                hitSlop={6}
+                style={({ pressed }) => [s.fixBtn, pressed && { opacity: 0.6 }]}>
+                <Icon name="swap_horiz" size={16} color={colors.primary} />
+                <Text style={s.fixText}>
+                  {move.fix.kind === 'hand'
+                    ? `Main ${move.limb === 'lh' ? 'droite' : 'gauche'}`
+                    : `Pied ${move.limb === 'lf' ? 'droit' : 'gauche'}`}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
+          <View style={s.controls}>
+            <RoundButton icon="restart_alt" label="Recommencer" onPress={() => { setPlaying(false); setRestartKey((k) => k + 1); }} />
+            <RoundButton icon="skip_previous" label="Étape précédente" onPress={() => goTo(index - 1)} disabled={index === 0} />
+            <Pressable
+              onPress={togglePlay}
+              accessibilityLabel={playing ? 'Pause' : 'Lecture'}
+              style={({ pressed }) => [s.play, pressed && { opacity: 0.8 }]}>
+              <Icon name={playing ? 'pause' : 'play_arrow'} size={34} color={colors.onPrimary} />
+            </Pressable>
+            <RoundButton
+              icon="skip_next"
+              label="Étape suivante"
+              disabled={finished}
+              onPress={() => {
+                setPlaying(false);
+                setStep((k) => k + 1);
+              }}
+            />
+            <Pressable
+              onPress={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}
+              accessibilityLabel="Vitesse"
+              style={({ pressed }) => [s.speed, pressed && { opacity: 0.6 }]}>
+              <Text style={s.speedText}>×{fmt(speed, speed % 1 ? 1 : 0)}</Text>
+            </Pressable>
+          </View>
+
+          <Pressable style={s.summary} onPress={() => setSettings(true)} accessibilityLabel="Réglages">
+            <Icon name="tune" size={18} color={colors.primary} />
+            <Text style={s.summaryText} numberOfLines={1}>
+              {fmt(height, 2)} m · mur {fmt(plan.H, 1)} m · {WALL_ANGLES[plan.angle].label}
+            </Text>
+            <Icon name="expand_more" size={18} color={colors.muted} />
+          </Pressable>
+        </View>
+      </ScrollView>
+
+      <Sheet visible={settings} onClose={() => setSettings(false)} title="Réglages">
+        <Stepper label="Ta taille" value={`${fmt(height, 2)} m`} onMinus={() => changeHeight(-0.05)} onPlus={() => changeHeight(0.05)} />
+        <Stepper label="Hauteur du mur" value={`${fmt(plan.H, 1)} m`} onMinus={() => changeWall(-0.5)} onPlus={() => changeWall(0.5)} />
+        <Text style={s.sheetLabel}>Inclinaison</Text>
+        <View style={s.chips}>
+          {(Object.keys(WALL_ANGLES) as WallAngle[]).map((a) => (
+            <Chip key={a} label={WALL_ANGLES[a].label} selected={plan.angle === a} onPress={() => changeAngle(a)} />
+          ))}
+        </View>
+        {hasFixes && <Button label="Annuler mes corrections" icon="undo" variant="secondary" onPress={resetFixes} />}
+        {learnedCount > 0 && (
+          <View style={s.learnRow}>
+            <Text style={s.learnText}>
+              Le moteur a appris de {learnedCount === 1 ? 'ta correction' : `tes ${learnedCount} corrections`}.
+            </Text>
+            <Pressable onPress={onForget} hitSlop={6}>
+              <Text style={s.link}>Oublier</Text>
+            </Pressable>
           </View>
         )}
-        {index === 0 && <Text style={s.stepStart}>{plan.startText}</Text>}
-        {!finished &&
-          move?.alerts.map((a) => (
-            <View key={a} style={s.alert}>
-              <Text style={s.alertText}>⚠ {a}</Text>
-            </View>
-          ))}
-        {!finished &&
-          move?.tips.map((t) => (
-            <Text key={t} style={s.tip}>
-              • {t}
-            </Text>
-          ))}
-        {!finished && move?.fix && (
-          <Pressable onPress={correct} style={({ pressed }) => [s.fixBtn, pressed && { opacity: 0.5 }]}>
-            <Text style={s.fixText}>
-              {move.fix.kind === 'hand'
-                ? `↔ Prendre avec la main ${move.limb === 'lh' ? 'droite' : 'gauche'}`
-                : `↔ Mettre le pied ${move.limb === 'lf' ? 'droit' : 'gauche'} ici`}
-            </Text>
-          </Pressable>
-        )}
-        {hasFixes && (
-          <Pressable onPress={resetFixes} hitSlop={6}>
-            <Text style={s.resetFix}>Annuler mes corrections</Text>
-          </Pressable>
-        )}
-      </View>
-
-      <View style={s.row}>
-        <Ctrl label="⏮" onPress={() => goTo(index - 1)} disabled={index === 0} />
-        <Ctrl
-          label={playing ? '❚❚ Pause' : '▶ Tout jouer'}
-          primary
-          onPress={() => {
-            if (finished && !playing) setRestartKey((k) => k + 1);
-            setPlaying(!playing);
-          }}
-        />
-        <Ctrl
-          label="Étape ⏭"
-          disabled={finished}
-          onPress={() => {
-            setPlaying(false);
-            setStep((k) => k + 1);
-          }}
-        />
-      </View>
-      <View style={s.row}>
-        <Ctrl label="⟲" onPress={() => { setPlaying(false); setRestartKey((k) => k + 1); }} />
-        <Ctrl
-          label={`× ${String(speed).replace('.', ',')}`}
-          onPress={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}
-        />
-        <Ctrl label="Vue de face" onPress={() => setViewKey((k) => k + 1)} />
-      </View>
-      <View style={s.row}>
-        <Text style={s.sizeLabel}>Ta taille : {String(height.toFixed(2)).replace('.', ',')} m</Text>
-        <Ctrl label="−" onPress={() => changeHeight(-0.05)} />
-        <Ctrl label="+" onPress={() => changeHeight(0.05)} />
-      </View>
-      <View style={s.row}>
-        <Text style={s.sizeLabel}>Mur : {plan.H.toFixed(1).replace('.', ',')} m</Text>
-        <Ctrl label="−" onPress={() => changeWall(-0.5)} />
-        <Ctrl label="+" onPress={() => changeWall(0.5)} />
-      </View>
-      <View style={s.chips}>
-        {(Object.keys(WALL_ANGLES) as WallAngle[]).map((a) => (
-          <Chip key={a} label={WALL_ANGLES[a].label} selected={plan.angle === a} onPress={() => changeAngle(a)} />
-        ))}
-      </View>
-      {learnedCount > 0 && (
-        <View style={s.learnRow}>
-          <Text style={s.learnText}>
-            Le moteur a appris de {learnedCount === 1 ? 'ta correction' : `tes ${learnedCount} corrections`}.
-          </Text>
-          <Pressable onPress={onForget} hitSlop={6}>
-            <Text style={s.resetFix}>Oublier</Text>
-          </Pressable>
-        </View>
-      )}
-      <Text style={s.hint}>
-        « Mur » est la hauteur du mur visible sur la photo, du sol au sommet (6 m par défaut) ; « Ta taille » est
-        la tienne, et choisis l’inclinaison du mur (dalle, vertical, dévers). La barre de couleur montre la difficulté de chaque étape (touche-la pour y aller). Si une étape
-        ne te convient pas, change la main ou le pied : la suite se recalcule. Un doigt fait tourner la caméra, deux
-        doigts zooment.
-      </Text>
-    </ScrollView>
+        <Text style={s.hint}>
+          La hauteur du mur est celle visible sur la photo. Un doigt fait tourner la caméra, deux doigts zooment.
+        </Text>
+      </Sheet>
+    </View>
   );
 }
 
-function Ctrl({
+function RoundButton({
+  icon,
   label,
   onPress,
-  primary,
   disabled,
 }: {
+  icon: AndroidSymbol;
   label: string;
   onPress: () => void;
-  primary?: boolean;
   disabled?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [s.ctrl, primary && s.ctrlPrimary, (pressed || disabled) && { opacity: 0.45 }]}>
-      <Text style={[s.ctrlText, primary && { color: colors.onPrimary }]}>{label}</Text>
+      accessibilityLabel={label}
+      hitSlop={4}
+      style={({ pressed }) => [s.round, (pressed || disabled) && { opacity: 0.4 }]}>
+      <Icon name={icon} size={24} color={colors.text} />
     </Pressable>
+  );
+}
+
+function Stepper({ label, value, onMinus, onPlus }: { label: string; value: string; onMinus: () => void; onPlus: () => void }) {
+  return (
+    <View style={s.stepper}>
+      <View style={s.flex}>
+        <Text style={s.sheetLabel}>{label}</Text>
+        <Text style={s.stepperValue}>{value}</Text>
+      </View>
+      <IconButton icon="remove" label={`${label} moins`} onPress={onMinus} />
+      <IconButton icon="add" label={`${label} plus`} onPress={onPlus} />
+    </View>
   );
 }
 
@@ -676,37 +714,7 @@ const s = themedStyles({
   sheet: { backgroundColor: colors.card, padding: 20, paddingBottom: 32, gap: 14, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   sheetTitle: { ...type.title },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  glWrap: { borderRadius: radius.lg, overflow: 'hidden' },
-  stepCard: { backgroundColor: colors.card, borderRadius: radius.lg, padding: space.lg, gap: space.sm, borderWidth: 1, borderColor: colors.border },
-  stepHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  stepTitle: { flex: 1, ...type.headline },
-  stepCount: { color: colors.muted, fontSize: 14, fontWeight: '600' },
-  stepStart: { color: colors.text, fontSize: 14, fontWeight: '400', lineHeight: 20 },
-  tip: { color: colors.text, fontSize: 14, fontWeight: '400', lineHeight: 20 },
   computing: { alignItems: 'center', justifyContent: 'center', gap: 10 },
-  recompute: { color: colors.muted, fontSize: 12, textAlign: 'center' },
-  learnRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  learnText: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '400' },
-  strip: { flexDirection: 'row', gap: 2, paddingVertical: 4 },
-  seg: { flex: 1, height: 8, borderRadius: 4, alignItems: 'center' },
-  segActive: { height: 14, marginTop: -3, borderWidth: 2, borderColor: colors.text },
-  cruxDot: { position: 'absolute', top: -9, width: 6, height: 6, borderRadius: 3, backgroundColor: '#1A1A1A' },
-  badges: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  corrected: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  fixBtn: {
-    alignSelf: 'flex-start',
-    marginTop: 4,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  fixText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
-  resetFix: { color: colors.primary, fontSize: 13, fontWeight: '700', paddingTop: 2 },
-  alert: { alignSelf: 'flex-start', backgroundColor: colors.dangerSoft, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  alertText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
   row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   flex: { flex: 1 },
   demo: { color: colors.primary, textAlign: 'center', fontSize: 15, fontWeight: '700', paddingTop: 4 },
@@ -724,15 +732,76 @@ const s = themedStyles({
   emptyHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   emptyTitle: { ...type.title, flexShrink: 1 },
   emptyText: { color: colors.muted, fontSize: 15, fontWeight: '400', lineHeight: 22, marginBottom: 6 },
-  player: { padding: space.lg, gap: space.md, paddingBottom: 40 },
-  ctrl: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surface,
+  player: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.lg, gap: space.md },
+  glWrap: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surface },
+  glButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+    opacity: 0.92,
   },
-  ctrlPrimary: { backgroundColor: colors.primary },
-  ctrlText: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  sizeLabel: { flex: 1.4, color: colors.text, fontSize: 14, fontWeight: '600' },
+  glBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.card,
+  },
+  glBadgeText: { fontSize: 12, fontWeight: '600', color: colors.muted },
+  below: { gap: space.md },
+  strip: { flexDirection: 'row', gap: 3, height: 14, alignItems: 'center' },
+  seg: { flex: 1, height: 6, borderRadius: 3, alignItems: 'center' },
+  segActive: { height: 12, borderRadius: 4 },
+  cruxDot: { position: 'absolute', top: -8, width: 5, height: 5, borderRadius: 3, backgroundColor: colors.text },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: -space.xs },
+  levelDot: { width: 10, height: 10, borderRadius: 5 },
+  stepTitle: { flex: 1, ...type.headline },
+  stepCount: { color: colors.muted, fontSize: 14, fontWeight: '600' },
+  tags: { flexDirection: 'row', alignItems: 'center', gap: space.sm, height: 30, marginTop: -space.sm, overflow: 'hidden' },
+  tag: { fontSize: 13, fontWeight: '700' },
+  tagStrong: { color: colors.text },
+  tagAlert: { color: colors.danger, flexShrink: 1 },
+  tagMuted: { fontSize: 13, fontWeight: '500', color: colors.muted },
+  fixBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 30,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  fixText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  round: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  play: { width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, elevation: 3 },
+  speed: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  speedText: { fontSize: 15, fontWeight: '800', color: colors.text },
+  summary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    height: 40,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+  },
+  summaryText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
+  sheetLabel: { ...type.callout },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  stepperValue: { fontSize: 20, fontWeight: '800', color: colors.text },
+  learnRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  learnText: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '400' },
+  link: { color: colors.primary, fontSize: 13, fontWeight: '700' },
 });

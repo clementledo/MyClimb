@@ -329,8 +329,8 @@ function TrainingCard({ logs, from }: { logs: TrainingLog[]; from: string }) {
       ) : (
         <>
           <View style={s.statsRow}>
-            <Stat label="Séances types" value={String(list.filter((l) => l.kind === 'session').length)} />
-            <Stat label="Exercices de renforcement" value={String(list.filter((l) => l.kind === 'exercise').length)} />
+            <Stat label="Routines" value={String(list.filter((l) => l.kind === 'routine').length)} />
+            <Stat label="Séances et exercices" value={String(list.filter((l) => l.kind !== 'routine').length)} />
             <Stat label="Temps total" value={minutes >= 60 ? `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}` : `${minutes} min`} />
             <Stat label="Entraînements par semaine" value={dec(list.length / Math.ceil(weeks))} />
           </View>

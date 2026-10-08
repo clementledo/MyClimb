@@ -146,7 +146,11 @@ export function Segmented<T extends string>({
             accessibilityState={{ selected: active }}
             style={[styles.segment, active && styles.segmentActive]}>
             {o.icon && <Icon name={o.icon} size={17} color={active ? colors.text : colors.muted} />}
-            <Text style={[styles.segmentText, active && styles.segmentTextActive]} numberOfLines={1}>
+            <Text
+              style={[styles.segmentText, active && styles.segmentTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}>
               {o.label}
             </Text>
           </Pressable>

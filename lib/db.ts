@@ -329,8 +329,8 @@ export function writeCache(key: string, value: unknown) {
 /** Une séance ou un exercice terminé avec le minuteur. */
 export type TrainingLog = {
   id: number;
-  kind: 'session' | 'exercise';
-  /** Identifiant de la séance type ou de l'exercice. */
+  kind: 'session' | 'exercise' | 'routine';
+  /** Identifiant de la séance type, de l'exercice ou de la routine. */
   ref: string;
   name: string;
   date: string;

@@ -12,15 +12,31 @@ import {
   FOCUS,
   INTENSITY,
   LEVELS,
+  ROUTINE_KINDS,
+  ROUTINES,
   sessionEquipment,
   SESSIONS,
   type Equipment,
   type Focus,
+  type RoutineKind,
   type SessionType,
 } from '@/lib/training';
-import { canDoExercise, canDoSession, myEquipment, setMyEquipment, suggest, type Suggestion } from '@/lib/trainingPlan';
+import {
+  canDoExercise,
+  canDoRoutine,
+  canDoSession,
+  myEquipment,
+  routineOfDay,
+  routineStreak,
+  routineWeek,
+  setMyEquipment,
+  suggest,
+  type RoutinePick,
+  type Suggestion,
+} from '@/lib/trainingPlan';
+import { todayIso } from '@/lib/stats';
 
-type Mode = 'sessions' | 'exercises';
+type Mode = 'routines' | 'sessions' | 'exercises';
 
 const shortDate = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);
@@ -29,25 +45,34 @@ const shortDate = (iso: string) => {
 
 export default function TrainingScreen() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>('sessions');
+  const [mode, setMode] = useState<Mode>('routines');
   const [equipment, setEquipment] = useState<Equipment[]>(myEquipment);
   const [sheet, setSheet] = useState(false);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [logs, setLogs] = useState<TrainingLog[]>([]);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
+  const [daily, setDaily] = useState<RoutinePick | null>(null);
   const [allLogs, setAllLogs] = useState(false);
 
   const reload = useCallback(() => {
     const l = listTrainingLogs();
+    const b = listBlocks();
     setLogs(l);
-    setSuggestion(suggest(listBlocks(), l, myEquipment()));
+    setSuggestion(suggest(b, l, myEquipment()));
+    setDaily(routineOfDay(b, l, myEquipment()));
   }, []);
   useFocusEffect(reload);
 
   const openLog = (l: TrainingLog) =>
     Alert.alert(l.name, `${shortDate(l.date)} · ${l.minutes} min`, [
       { text: 'Fermer', style: 'cancel' },
-      { text: 'Voir la fiche', onPress: () => router.push(l.kind === 'session' ? `/training/${l.ref}` : `/training/exercise/${l.ref}`) },
+      {
+        text: 'Voir la fiche',
+        onPress: () =>
+          router.push(
+            l.kind === 'session' ? `/training/${l.ref}` : l.kind === 'routine' ? `/training/routine/${l.ref}` : `/training/exercise/${l.ref}`,
+          ),
+      },
       {
         text: 'Supprimer',
         style: 'destructive',
@@ -63,6 +88,7 @@ export default function TrainingScreen() {
     setEquipment(next);
     setMyEquipment(next);
     setSuggestion(suggest(listBlocks(), logs, next));
+    setDaily(routineOfDay(listBlocks(), logs, next));
   };
 
   const all = equipment.length === EQUIPMENT.length;
@@ -70,14 +96,20 @@ export default function TrainingScreen() {
   const sessions = SESSIONS.filter((x) => canDoSession(x, equipment));
   const exercises = EXERCISES.filter((x) => canDoExercise(x, equipment) && (!focus || x.focus === focus));
   const focuses = (Object.keys(FOCUS) as Focus[]).filter((f) => exercises.some((x) => x.focus === f));
+  const routines = ROUTINES.filter((r) => canDoRoutine(r, equipment));
+  const today = todayIso();
+  const doneToday = new Set(logs.filter((l) => l.kind === 'routine' && l.date === today).map((l) => l.ref));
+  const week = routineWeek(logs);
+  const streak = routineStreak(logs);
 
   return (
     <View style={s.container}>
       <View style={s.switcher}>
         <Segmented
           options={[
-            { value: 'sessions', label: 'Séances', icon: 'event_note' },
-            { value: 'exercises', label: 'Renforcement', icon: 'fitness_center' },
+            { value: 'routines', label: 'Routines' },
+            { value: 'sessions', label: 'Séances' },
+            { value: 'exercises', label: 'Renforcement' },
           ]}
           value={mode}
           onChange={setMode}
@@ -101,7 +133,78 @@ export default function TrainingScreen() {
           </View>
         </Sheet>
 
-        {mode === 'sessions' ? (
+        {mode === 'routines' ? (
+          <>
+            {daily && (
+              <Pressable onPress={() => router.push(`/training/routine/${daily.routine.id}`)} style={({ pressed }) => [s.hero, pressed && s.pressed]}>
+                <Text style={s.heroOver}>ROUTINE DU JOUR</Text>
+                <View style={s.heroHead}>
+                  <View style={s.heroIcon}>
+                    <Icon name={daily.routine.icon} size={26} color={colors.primary} />
+                  </View>
+                  <View style={s.heroBody}>
+                    <Text style={s.heroTitle}>{daily.routine.name}</Text>
+                    <Text style={s.heroMeta}>
+                      {daily.routine.minutes} min · {daily.routine.items.length} exercices · {ROUTINE_KINDS[daily.routine.kind].label}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={s.heroReason}>{doneToday.has(daily.routine.id) ? 'Faite aujourd’hui, bravo !' : daily.reason}</Text>
+                <View style={s.heroCta}>
+                  <Text style={s.heroCtaText}>{doneToday.has(daily.routine.id) ? 'Revoir la routine' : 'Commencer'}</Text>
+                  <Icon name="arrow_forward" size={18} color={colors.onPrimary} />
+                </View>
+              </Pressable>
+            )}
+
+            <Card style={s.weekCard}>
+              <View style={s.weekHead}>
+                <Text style={s.weekTitle}>Ma semaine</Text>
+                {streak > 0 && (
+                  <View style={s.streak}>
+                    <Icon name="local_fire_department" size={16} color={colors.primary} />
+                    <Text style={s.streakText}>
+                      {streak} jour{streak > 1 ? 's' : ''} d’affilée
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={s.week}>
+                {week.map((d) => (
+                  <View key={d.date} style={s.day}>
+                    <View style={[s.dayDot, d.done && s.dayDone, d.today && !d.done && s.dayToday]}>
+                      {d.done && <Icon name="check" size={16} color={colors.onPrimary} />}
+                    </View>
+                    <Text style={[s.dayLetter, d.today && s.dayLetterToday]}>{d.letter}</Text>
+                  </View>
+                ))}
+              </View>
+            </Card>
+
+            {(Object.keys(ROUTINE_KINDS) as RoutineKind[]).map((k) => {
+              const list = routines.filter((r) => r.kind === k);
+              if (list.length === 0) return null;
+              return (
+                <Section key={k} title={ROUTINE_KINDS[k].label}>
+                  <View style={s.listCard}>
+                    {list.map((r, i, arr) => (
+                      <ListRow
+                        key={r.id}
+                        icon={r.icon}
+                        title={r.name}
+                        subtitle={`${r.minutes} min · ${r.when}`}
+                        right={doneToday.has(r.id) ? <Badge label="Faite" tone="success" /> : undefined}
+                        onPress={() => router.push(`/training/routine/${r.id}`)}
+                        last={i === arr.length - 1}
+                      />
+                    ))}
+                  </View>
+                </Section>
+              );
+            })}
+            {routines.length === 0 && <Empty icon="fitness_center" text="Aucune routine avec ce matériel." />}
+          </>
+        ) : mode === 'sessions' ? (
           <>
             {suggestion && (
               <Pressable onPress={() => router.push(`/training/${suggestion.session.id}`)} style={({ pressed }) => [s.hero, pressed && s.pressed]}>
@@ -136,14 +239,14 @@ export default function TrainingScreen() {
             <Section title="Mes entraînements">
               {logs.length === 0 ? (
                 <Card>
-                  <Text style={s.muted}>Ouvre une séance ou un exercice et touche « Marquer comme fait » : il apparaîtra ici et dans Progression.</Text>
+                  <Text style={s.muted}>Termine une routine, une séance ou un exercice avec « Marquer comme fait » : il apparaîtra ici et dans Progression.</Text>
                 </Card>
               ) : (
                 <View style={s.listCard}>
                   {(allLogs ? logs : logs.slice(0, 5)).map((l, i, arr) => (
                     <ListRow
                       key={l.id}
-                      icon={l.kind === 'session' ? 'event_available' : 'fitness_center'}
+                      icon={l.kind === 'session' ? 'event_available' : l.kind === 'routine' ? 'repeat' : 'fitness_center'}
                       title={l.name}
                       subtitle={`${shortDate(l.date)} · ${l.minutes} min${l.feel ? ` · ${FEEL_LABELS[l.feel]}` : ''}`}
                       onPress={() => openLog(l)}
@@ -256,4 +359,16 @@ const s = themedStyles({
   sessionName: { ...type.headline },
   sessionGoal: { ...type.subhead, color: colors.muted },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  weekCard: { gap: space.md },
+  weekHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  weekTitle: { ...type.headline },
+  streak: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  streakText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  week: { flexDirection: 'row', justifyContent: 'space-between' },
+  day: { alignItems: 'center', gap: 6 },
+  dayDot: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  dayDone: { backgroundColor: colors.primary },
+  dayToday: { borderWidth: 2, borderColor: colors.primary },
+  dayLetter: { fontSize: 12, fontWeight: '600', color: colors.muted },
+  dayLetterToday: { color: colors.text, fontWeight: '800' },
 });

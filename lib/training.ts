@@ -114,6 +114,18 @@ export const EXERCISES: Exercise[] = [
     dose: { sets: 4, reps: 1, work: 10, rest: 90, sides: true },
     doseText: '4 × 10 s par main, repos 1 min 30',
   },
+  {
+    id: 'daily-hangs',
+    name: 'Suspensions légères',
+    focus: 'doigts',
+    equipment: 'hangboard',
+    level: 1,
+    goal: 'Entretenir les tendons des doigts chaque jour, sans fatigue',
+    how: 'Sur une grosse réglette (20 mm), pieds au sol ou avec un élastique, ne mets qu’une partie de ton poids : tu dois pouvoir tenir bien plus que 10 s.',
+    cues: ['Effort léger, environ 4 sur 10', 'Doigts semi-arqués, jamais arqués', 'Tu dois finir aussi frais qu’au début'],
+    dose: { sets: 1, reps: 10, work: 10, restRep: 20, rest: 0 },
+    doseText: '10 × 10 s légères, repos 20 s',
+  },
   /* ---------- Tirage ---------- */
   {
     id: 'pullups',
@@ -212,6 +224,18 @@ export const EXERCISES: Exercise[] = [
     dose: { sets: 5, reps: 1, work: 8, rest: 90 },
     doseText: '5 × 8 s, repos 1 min 30',
   },
+  {
+    id: 'dead-bug',
+    name: 'Dead bug',
+    focus: 'gainage',
+    equipment: 'none',
+    level: 1,
+    goal: 'Gainage du bas du dos, pour garder les pieds sur les prises',
+    how: 'Sur le dos, bras tendus vers le plafond, genoux à 90°. Descends lentement un bras et la jambe opposée sans décoller le bas du dos, puis change.',
+    cues: ['Bas du dos plaqué au sol', 'Lent et contrôlé', 'Expire en descendant'],
+    dose: { sets: 3, reps: 10, work: 0, rest: 30, sides: true },
+    doseText: '3 × 10 par côté',
+  },
   /* ---------- Antagonistes et épaules ---------- */
   {
     id: 'pushups',
@@ -273,6 +297,18 @@ export const EXERCISES: Exercise[] = [
     dose: { sets: 3, reps: 10, work: 0, rest: 90 },
     doseText: '3 × 10 répétitions, repos 1 min 30',
   },
+  {
+    id: 'scap-pulls',
+    name: 'Tirages d’omoplates',
+    focus: 'antagonistes',
+    equipment: 'bar',
+    level: 1,
+    goal: 'Réveiller les omoplates et protéger les épaules en suspension',
+    how: 'Suspendu bras tendus, abaisse et resserre les omoplates pour monter de quelques centimètres sans plier les coudes, puis relâche lentement.',
+    cues: ['Coudes toujours tendus', 'Épaules loin des oreilles', 'Tiens 1 s en haut'],
+    dose: { sets: 3, reps: 8, work: 0, rest: 45 },
+    doseText: '3 × 8',
+  },
   /* ---------- Mobilité ---------- */
   {
     id: 'frog',
@@ -321,6 +357,90 @@ export const EXERCISES: Exercise[] = [
     cues: ['Prise large au début', 'Bras tendus', 'Lent'],
     dose: { sets: 2, reps: 12, work: 0, rest: 30 },
     doseText: '2 × 12 passages',
+  },
+  {
+    id: 'wrist-warmup',
+    name: 'Poignets et doigts',
+    focus: 'mobilite',
+    equipment: 'none',
+    level: 1,
+    goal: 'Échauffer poignets et doigts, le matin ou avant de grimper',
+    how: 'Cercles de poignets dans les deux sens, puis ouvre et ferme les mains vite. Termine en tirant doucement chaque doigt vers l’arrière.',
+    cues: ['Mouvements amples', 'Aucune douleur', 'Les deux mains'],
+    dose: { sets: 1, reps: 1, work: 120, rest: 0 },
+    doseText: '2 min',
+  },
+  {
+    id: 'deep-squat',
+    name: 'Squat profond',
+    focus: 'mobilite',
+    equipment: 'none',
+    level: 1,
+    goal: 'Chevilles et hanches mobiles pour les pieds hauts',
+    how: 'Pieds largeur d’épaules, descends le plus bas possible talons au sol, coudes qui poussent les genoux vers l’extérieur, buste droit.',
+    cues: ['Talons au sol', 'Dos long', 'Tiens-toi à un meuble au début'],
+    dose: { sets: 3, reps: 1, work: 40, rest: 20 },
+    doseText: '3 × 40 s',
+  },
+  {
+    id: 'thoracic-open',
+    name: 'Ouverture thoracique',
+    focus: 'mobilite',
+    equipment: 'none',
+    level: 1,
+    goal: 'Redresser le haut du dos et ouvrir la poitrine, souvent fermés chez les grimpeurs',
+    how: 'Allongé sur le côté, genoux pliés, bras tendus devant toi. Ouvre le bras du dessus vers l’arrière en suivant la main des yeux, puis reviens.',
+    cues: ['Genoux collés au sol', 'Expire en ouvrant', 'Lent'],
+    dose: { sets: 2, reps: 8, work: 0, rest: 15, sides: true },
+    doseText: '2 × 8 par côté',
+  },
+  {
+    id: 'straddle',
+    name: 'Écart assis',
+    focus: 'mobilite',
+    equipment: 'none',
+    level: 1,
+    goal: 'Ouvrir les adducteurs pour les grands écarts de pieds',
+    how: 'Assis jambes tendues écartées au maximum, dos droit, penche le buste vers l’avant en gardant les genoux vers le plafond.',
+    cues: ['Dos droit plutôt que bas', 'Respire profondément', 'Gagne un peu à chaque expiration'],
+    dose: { sets: 2, reps: 1, work: 60, rest: 20 },
+    doseText: '2 × 1 min',
+  },
+  {
+    id: 'hamstring-fold',
+    name: 'Pince jambes tendues',
+    focus: 'mobilite',
+    equipment: 'none',
+    level: 1,
+    goal: 'Ischios souples pour monter les pieds haut',
+    how: 'Debout ou assis jambes tendues, plie-toi depuis les hanches, dos long, et descends les mains vers les pieds.',
+    cues: ['Plie depuis les hanches', 'Genoux tendus mais pas verrouillés', 'Relâche la nuque'],
+    dose: { sets: 2, reps: 1, work: 45, rest: 15 },
+    doseText: '2 × 45 s',
+  },
+  {
+    id: 'high-step',
+    name: 'Pieds hauts contrôlés',
+    focus: 'mobilite',
+    equipment: 'none',
+    level: 1,
+    goal: 'Souplesse active : lever le pied haut sans l’aide des mains',
+    how: 'Debout à côté d’un mur, monte un genou le plus haut possible sur le côté, comme pour poser un pied haut. Tiens 3 s, redescends lentement.',
+    cues: ['Buste droit', 'Tiens 3 s en haut', 'Lent à la descente'],
+    dose: { sets: 2, reps: 8, work: 0, rest: 20, sides: true },
+    doseText: '2 × 8 par jambe',
+  },
+  {
+    id: 'dead-hang',
+    name: 'Suspension passive',
+    focus: 'mobilite',
+    equipment: 'bar',
+    level: 1,
+    goal: 'Décompresser le dos et ouvrir les épaules',
+    how: 'Suspendu à la barre bras tendus, relâche tout le corps et respire. Garde les pieds au sol si c’est trop dur.',
+    cues: ['Relâche les épaules', 'Respire lentement', 'Descends doucement'],
+    dose: { sets: 3, reps: 1, work: 30, rest: 30 },
+    doseText: '3 × 30 s',
   },
   /* ---------- Sur le mur ---------- */
   {
@@ -575,3 +695,111 @@ export function exerciseMinutes(x: Exercise) {
   const repTime = d.work > 0 ? 0 : (d.sides ? 2 : 1) * d.sets * d.reps * 4;
   return Math.max(5, Math.round((exerciseSeconds(d) + repTime) / 300) * 5);
 }
+
+/* ---------- Routines du quotidien ---------- */
+
+/** De la force à la souplesse. */
+export type RoutineKind = 'force' | 'prevention' | 'souplesse';
+
+export const ROUTINE_KINDS: Record<RoutineKind, { label: string; icon: AndroidSymbol }> = {
+  force: { label: 'Force', icon: 'fitness_center' },
+  prevention: { label: 'Prévention', icon: 'shield' },
+  souplesse: { label: 'Souplesse', icon: 'self_improvement' },
+};
+
+export type Routine = {
+  id: string;
+  name: string;
+  goal: string;
+  icon: AndroidSymbol;
+  minutes: number;
+  kind: RoutineKind;
+  /** Quand la faire, en quelques mots. */
+  when: string;
+  /** Faisable tous les jours ; sinon un jour sur deux, pour laisser récupérer. */
+  daily: boolean;
+  /** Exercices, dans l'ordre. */
+  items: string[];
+};
+
+export const ROUTINES: Routine[] = [
+  {
+    id: 'tirage',
+    name: 'Force de tirage',
+    goal: 'Tractions et blocages pour les mouvements durs',
+    icon: 'keyboard_double_arrow_up',
+    minutes: 15,
+    kind: 'force',
+    when: 'Un jour sur deux',
+    daily: false,
+    items: ['scap-pulls', 'pullups', 'lockoffs'],
+  },
+  {
+    id: 'doigts',
+    name: 'Doigts en forme',
+    goal: 'Des tendons plus solides, petit à petit',
+    icon: 'back_hand',
+    minutes: 10,
+    kind: 'force',
+    when: 'Tous les jours, sans fatigue',
+    daily: true,
+    items: ['wrist-warmup', 'daily-hangs', 'finger-extensors'],
+  },
+  {
+    id: 'gainage',
+    name: 'Gainage express',
+    goal: 'Garder les pieds sur les prises dans les dévers',
+    icon: 'accessibility_new',
+    minutes: 10,
+    kind: 'force',
+    when: 'Un jour sur deux',
+    daily: false,
+    items: ['plank', 'side-plank', 'hollow', 'dead-bug'],
+  },
+  {
+    id: 'epaules',
+    name: 'Épaules solides',
+    goal: 'Équilibrer les muscles et éviter les blessures',
+    icon: 'shield',
+    minutes: 10,
+    kind: 'prevention',
+    when: 'Tous les jours',
+    daily: true,
+    items: ['scap-pulls', 'external-rotation', 'ytw', 'pushups'],
+  },
+  {
+    id: 'reveil',
+    name: 'Réveil du grimpeur',
+    goal: 'Poignets, hanches et dos prêts pour la journée',
+    icon: 'wb_sunny',
+    minutes: 8,
+    kind: 'souplesse',
+    when: 'Le matin',
+    daily: true,
+    items: ['wrist-warmup', 'deep-squat', 'thoracic-open', 'high-step'],
+  },
+  {
+    id: 'hanches',
+    name: 'Hanches de grimpeur',
+    goal: 'Hanches collées au mur et pieds plus hauts',
+    icon: 'self_improvement',
+    minutes: 12,
+    kind: 'souplesse',
+    when: 'Tous les jours',
+    daily: true,
+    items: ['frog', 'pigeon', 'straddle', 'high-step'],
+  },
+  {
+    id: 'soir',
+    name: 'Étirements du soir',
+    goal: 'Relâcher avant-bras, dos et jambes, et mieux récupérer',
+    icon: 'bedtime',
+    minutes: 8,
+    kind: 'souplesse',
+    when: 'Le soir ou après la grimpe',
+    daily: true,
+    items: ['forearm-stretch', 'thoracic-open', 'hamstring-fold', 'pigeon'],
+  },
+];
+
+export const routineById = (id: string) => ROUTINES.find((r) => r.id === id) ?? null;
