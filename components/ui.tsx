@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
+  KeyboardAvoidingView,
   ScrollView,
   Text,
   View,
@@ -392,22 +393,25 @@ export function Sheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer" />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + space.lg }]}>
-        <View style={styles.grabber} />
-        <View style={styles.sheetHead}>
-          <Text style={styles.sheetTitle}>{title}</Text>
-          <IconButton icon="close" label="Fermer" onPress={onClose} />
+      {/* Le panneau remonte au-dessus du clavier (champ de recherche) au lieu d'être caché dessous. */}
+      <KeyboardAvoidingView style={styles.sheetRoot} behavior="padding">
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer" />
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + space.lg }]}>
+          <View style={styles.grabber} />
+          <View style={styles.sheetHead}>
+            <Text style={styles.sheetTitle}>{title}</Text>
+            <IconButton icon="close" label="Fermer" onPress={onClose} />
+          </View>
+          <ScrollView
+            style={styles.sheetScroll}
+            contentContainerStyle={styles.sheetContent}
+            bounces={false}
+            keyboardShouldPersistTaps="handled">
+            {children}
+          </ScrollView>
+          {footer}
         </View>
-        <ScrollView
-          style={styles.sheetScroll}
-          contentContainerStyle={styles.sheetContent}
-          bounces={false}
-          keyboardShouldPersistTaps="handled">
-          {children}
-        </ScrollView>
-        {footer}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -543,7 +547,9 @@ export const styles = themedStyles({
     paddingTop: space.sm,
     gap: space.lg,
     maxHeight: '88%',
+    flexShrink: 1,
   },
+  sheetRoot: { flex: 1 },
   sheetScroll: { flexGrow: 0, flexShrink: 1 },
   sheetContent: { gap: space.lg, paddingBottom: space.xs },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },

@@ -77,9 +77,9 @@ tap "Marquer comme faite" ; sleep 2 ; tap "Enregistrer" ; sleep 2 ; shot 1g3-rou
 adb shell input keyevent 4 ; sleep 3 ; shot 1g4-semaine
 tap "Rappel quotidien" ; sleep 2 ; shot 1g5-rappel ; tap "Fermer" ; sleep 2
 tap "Créer ma routine" ; sleep 3 ; tap "Ajouter des exercices" ; sleep 2
-tap "Chercher un exercice" ; sleep 1 ; adb shell input text "planche" ; sleep 2 ; tap "Planche" ; sleep 1
-tap "Effacer la recherche" ; sleep 1 ; tap "Chercher un exercice" ; sleep 1 ; adb shell input text "pigeon" ; sleep 2
-tap "Pigeon" ; sleep 1 ; shot 1g6-choix ; hidekb ; tap "Terminé (2)" ; sleep 2 ; shot 1g7-ma-routine
+tap "Chercher un exercice" ; sleep 1 ; adb shell input text "planche" ; sleep 2 ; shot 1g6-recherche ; hidekb ; tap "Planche" ; sleep 1
+tap "Effacer la recherche" ; sleep 1 ; tap "Chercher un exercice" ; sleep 1 ; adb shell input text "pigeon" ; sleep 2 ; hidekb
+tap "Pigeon" ; sleep 1 ; shot 1g6-choix ; tap "Terminé (2)" ; sleep 2 ; shot 1g7-ma-routine
 tap "Enregistrer la routine" ; sleep 3 ; shot 1g8-mes-routines
 tap "Séances" ; sleep 2
 tap "Voir la séance" ; sleep 3 ; shot 1h-seance

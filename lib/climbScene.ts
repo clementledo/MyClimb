@@ -457,7 +457,8 @@ export function createClimbScene(renderer: THREE.WebGLRenderer, w: number, h: nu
     if (first) focus.copy(follow);
     else focus.lerp(follow, 0.06);
     first = false;
-    const dist = p.height * 2.9 * cam.zoom;
+    // Écran étroit (plein écran en portrait) : on recule pour garder le grimpeur entier en largeur.
+    const dist = p.height * 2.9 * cam.zoom * Math.max(1, 0.85 / camera.aspect);
     camera.position.set(
       focus.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * dist,
       Math.max(0.25, focus.y + Math.sin(cam.pitch) * dist),
