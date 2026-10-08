@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import type { AndroidSymbol } from 'expo-symbols';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Climb3D, type Progress } from '@/components/Climb3D';
 import { Badge, Button, Chip, Icon, IconButton, Segmented, Sheet } from '@/components/ui';
@@ -405,6 +406,8 @@ function PlayerView({
   const [step, setStep] = useState(0);
   const [progress, setProgress] = useState<Progress>({ index: 0, total: 0 });
   const [settings, setSettings] = useState(false);
+  const [full, setFull] = useState(false);
+  const insets = useSafeAreaInsets();
   // La 3D prend toute la place laissée par les commandes (mesurées une fois).
   const [box, setBox] = useState(0);
   const [below, setBelow] = useState(0);
@@ -452,6 +455,12 @@ function PlayerView({
     goTo(0);
     setSettings(false);
   };
+  /** Passe en plein écran (ou en sort) en gardant l'étape en cours. */
+  const openFull = (on: boolean) => {
+    setPlaying(false);
+    setSeek((x) => ({ t: Math.max(0, Math.min(total, index)), n: x.n + 1 }));
+    setFull(on);
+  };
   const togglePlay = () => {
     if (finished && !playing) setRestartKey((k) => k + 1);
     setPlaying(!playing);
@@ -461,11 +470,100 @@ function PlayerView({
   const title = finished ? 'Top !' : index === 0 && progress.total === 0 ? 'Départ' : (move?.title ?? '');
   const level = !finished && move ? LEVELS[move.level] : null;
 
+  const strip = (
+    <View style={s.strip}>
+      {plan.moves.map((m, i) => (
+        <Pressable
+          key={i}
+          onPress={() => goTo(i)}
+          hitSlop={{ top: 10, bottom: 10 }}
+          style={[
+            s.seg,
+            { backgroundColor: LEVELS[m.level].color, opacity: i < index ? 0.3 : 1 },
+            i === index && !finished && s.segActive,
+          ]}>
+          {m.crux && <View style={s.cruxDot} />}
+        </Pressable>
+      ))}
+    </View>
+  );
+  const info = (
+    <>
+      <View style={s.stepRow}>
+        <View style={[s.levelDot, { backgroundColor: level?.color ?? colors.success }]} />
+        <Text style={s.stepTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={s.stepCount}>
+          {Math.min(index + 1, total)}/{total}
+        </Text>
+      </View>
+      <View style={s.tags}>
+        {finished ? (
+          <Text style={s.tagMuted}>Voie enchaînée en {total} mouvements</Text>
+        ) : (
+          <>
+            {level && <Text style={[s.tag, { color: level.color }]}>{level.label}</Text>}
+            {move?.crux && <Text style={[s.tag, s.tagStrong]}>Crux</Text>}
+            {move?.alerts.slice(0, 2).map((a) => (
+              <Text key={a} style={[s.tag, s.tagAlert]} numberOfLines={1}>
+                {a}
+              </Text>
+            ))}
+            {move?.corrected && <Icon name="edit" size={14} color={colors.muted} />}
+          </>
+        )}
+        <View style={s.flex} />
+        {!finished && move?.fix && (
+          <Pressable
+            onPress={correct}
+            accessibilityLabel="Corriger l’étape"
+            hitSlop={6}
+            style={({ pressed }) => [s.fixBtn, pressed && { opacity: 0.6 }]}>
+            <Icon name="swap_horiz" size={16} color={colors.primary} />
+            <Text style={s.fixText}>
+              {move.fix.kind === 'hand'
+                ? `Main ${move.limb === 'lh' ? 'droite' : 'gauche'}`
+                : `Pied ${move.limb === 'lf' ? 'droit' : 'gauche'}`}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+    </>
+  );
+  const controls = (
+    <View style={s.controls}>
+      <RoundButton icon="restart_alt" label="Recommencer" onPress={() => { setPlaying(false); setRestartKey((k) => k + 1); }} />
+      <RoundButton icon="skip_previous" label="Étape précédente" onPress={() => goTo(index - 1)} disabled={index === 0} />
+      <Pressable
+        onPress={togglePlay}
+        accessibilityLabel={playing ? 'Pause' : 'Lecture'}
+        style={({ pressed }) => [s.play, pressed && { opacity: 0.8 }]}>
+        <Icon name={playing ? 'pause' : 'play_arrow'} size={34} color={colors.onPrimary} />
+      </Pressable>
+      <RoundButton
+        icon="skip_next"
+        label="Étape suivante"
+        disabled={finished}
+        onPress={() => {
+          setPlaying(false);
+          setStep((k) => k + 1);
+        }}
+      />
+      <Pressable
+        onPress={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}
+        accessibilityLabel="Vitesse"
+        style={({ pressed }) => [s.speed, pressed && { opacity: 0.6 }]}>
+        <Text style={s.speedText}>×{fmt(speed, speed % 1 ? 1 : 0)}</Text>
+      </Pressable>
+    </View>
+  );
+
   return (
     <View style={s.flex} onLayout={(e) => setBox(e.nativeEvent.layout.height)}>
       <ScrollView style={s.flex} contentContainerStyle={s.player}>
         <View style={[s.glWrap, { height: glHeight }]}>
-          {box > 0 && below > 0 && (
+          {box > 0 && below > 0 && !full && (
             <Climb3D
               key={glHeight}
               route={route}
@@ -487,6 +585,13 @@ function PlayerView({
             style={({ pressed }) => [s.glButton, pressed && { opacity: 0.6 }]}>
             <Icon name="center_focus_strong" size={20} color={colors.text} />
           </Pressable>
+          <Pressable
+            onPress={() => openFull(true)}
+            accessibilityLabel="Plein écran"
+            hitSlop={6}
+            style={({ pressed }) => [s.glButton, s.glButton2, pressed && { opacity: 0.6 }]}>
+            <Icon name="fullscreen" size={22} color={colors.text} />
+          </Pressable>
           {computing && (
             <View style={s.glBadge} pointerEvents="none">
               <ActivityIndicator size="small" color={colors.primary} />
@@ -496,88 +601,11 @@ function PlayerView({
         </View>
 
         <View style={s.below} onLayout={(e) => setBelow(e.nativeEvent.layout.height)}>
-          <View style={s.strip}>
-            {plan.moves.map((m, i) => (
-              <Pressable
-                key={i}
-                onPress={() => goTo(i)}
-                hitSlop={{ top: 10, bottom: 10 }}
-                style={[
-                  s.seg,
-                  { backgroundColor: LEVELS[m.level].color, opacity: i < index ? 0.3 : 1 },
-                  i === index && !finished && s.segActive,
-                ]}>
-                {m.crux && <View style={s.cruxDot} />}
-              </Pressable>
-            ))}
-          </View>
+          {strip}
 
-          <View style={s.stepRow}>
-            <View style={[s.levelDot, { backgroundColor: level?.color ?? colors.success }]} />
-            <Text style={s.stepTitle} numberOfLines={1}>
-              {title}
-            </Text>
-            <Text style={s.stepCount}>
-              {Math.min(index + 1, total)}/{total}
-            </Text>
-          </View>
-          <View style={s.tags}>
-            {finished ? (
-              <Text style={s.tagMuted}>Voie enchaînée en {total} mouvements</Text>
-            ) : (
-              <>
-                {level && <Text style={[s.tag, { color: level.color }]}>{level.label}</Text>}
-                {move?.crux && <Text style={[s.tag, s.tagStrong]}>Crux</Text>}
-                {move?.alerts.slice(0, 2).map((a) => (
-                  <Text key={a} style={[s.tag, s.tagAlert]} numberOfLines={1}>
-                    {a}
-                  </Text>
-                ))}
-                {move?.corrected && <Icon name="edit" size={14} color={colors.muted} />}
-              </>
-            )}
-            <View style={s.flex} />
-            {!finished && move?.fix && (
-              <Pressable
-                onPress={correct}
-                accessibilityLabel="Corriger l’étape"
-                hitSlop={6}
-                style={({ pressed }) => [s.fixBtn, pressed && { opacity: 0.6 }]}>
-                <Icon name="swap_horiz" size={16} color={colors.primary} />
-                <Text style={s.fixText}>
-                  {move.fix.kind === 'hand'
-                    ? `Main ${move.limb === 'lh' ? 'droite' : 'gauche'}`
-                    : `Pied ${move.limb === 'lf' ? 'droit' : 'gauche'}`}
-                </Text>
-              </Pressable>
-            )}
-          </View>
+          {info}
 
-          <View style={s.controls}>
-            <RoundButton icon="restart_alt" label="Recommencer" onPress={() => { setPlaying(false); setRestartKey((k) => k + 1); }} />
-            <RoundButton icon="skip_previous" label="Étape précédente" onPress={() => goTo(index - 1)} disabled={index === 0} />
-            <Pressable
-              onPress={togglePlay}
-              accessibilityLabel={playing ? 'Pause' : 'Lecture'}
-              style={({ pressed }) => [s.play, pressed && { opacity: 0.8 }]}>
-              <Icon name={playing ? 'pause' : 'play_arrow'} size={34} color={colors.onPrimary} />
-            </Pressable>
-            <RoundButton
-              icon="skip_next"
-              label="Étape suivante"
-              disabled={finished}
-              onPress={() => {
-                setPlaying(false);
-                setStep((k) => k + 1);
-              }}
-            />
-            <Pressable
-              onPress={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}
-              accessibilityLabel="Vitesse"
-              style={({ pressed }) => [s.speed, pressed && { opacity: 0.6 }]}>
-              <Text style={s.speedText}>×{fmt(speed, speed % 1 ? 1 : 0)}</Text>
-            </Pressable>
-          </View>
+          {controls}
 
           <Pressable style={s.summary} onPress={() => setSettings(true)} accessibilityLabel="Réglages">
             <Icon name="tune" size={18} color={colors.primary} />
@@ -588,6 +616,35 @@ function PlayerView({
           </Pressable>
         </View>
       </ScrollView>
+
+      <Modal visible={full} animationType="fade" onRequestClose={() => openFull(false)} statusBarTranslucent>
+        <View style={s.full}>
+          {full && (
+            <Climb3D
+              route={route}
+              plan={plan}
+              playing={playing}
+              speed={speed}
+              restartKey={restartKey}
+              viewKey={viewKey}
+              seek={seek}
+              step={step}
+              onProgress={setProgress}
+              onEnd={() => setPlaying(false)}
+            />
+          )}
+          <View style={[s.fullTop, { paddingTop: insets.top + space.sm }]} pointerEvents="box-none">
+            <RoundButton icon="close" label="Quitter le plein écran" onPress={() => openFull(false)} glass />
+            <View style={s.flex} />
+            <RoundButton icon="center_focus_strong" label="Vue de face" onPress={() => setViewKey((k) => k + 1)} glass />
+          </View>
+          <View style={[s.fullPanel, { paddingBottom: insets.bottom + space.md }]}>
+            {strip}
+            {info}
+            {controls}
+          </View>
+        </View>
+      </Modal>
 
       <Sheet visible={settings} onClose={() => setSettings(false)} title="Réglages">
         <Stepper label="Ta taille" value={`${fmt(height, 2)} m`} onMinus={() => changeHeight(-0.05)} onPlus={() => changeHeight(0.05)} />
@@ -622,11 +679,14 @@ function RoundButton({
   label,
   onPress,
   disabled,
+  glass,
 }: {
   icon: AndroidSymbol;
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  /** Sur la 3D : fond de carte légèrement transparent. */
+  glass?: boolean;
 }) {
   return (
     <Pressable
@@ -634,7 +694,7 @@ function RoundButton({
       disabled={disabled}
       accessibilityLabel={label}
       hitSlop={4}
-      style={({ pressed }) => [s.round, (pressed || disabled) && { opacity: 0.4 }]}>
+      style={({ pressed }) => [s.round, glass && s.roundGlass, (pressed || disabled) && { opacity: 0.4 }]}>
       <Icon name={icon} size={24} color={colors.text} />
     </Pressable>
   );
@@ -746,6 +806,23 @@ const s = themedStyles({
     backgroundColor: colors.card,
     opacity: 0.92,
   },
+  glButton2: { top: 56 },
+  full: { flex: 1, backgroundColor: colors.background },
+  fullTop: { position: 'absolute', left: 0, right: 0, top: 0, flexDirection: 'row', paddingHorizontal: space.lg },
+  fullPanel: {
+    position: 'absolute',
+    left: space.md,
+    right: space.md,
+    bottom: 0,
+    gap: space.md,
+    padding: space.lg,
+    paddingBottom: space.md,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    backgroundColor: colors.card,
+    opacity: 0.96,
+  },
+  roundGlass: { backgroundColor: colors.card, opacity: 0.92 },
   glBadge: {
     position: 'absolute',
     top: 10,

@@ -1,25 +1,31 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { HoldTimer, hasTimer } from '@/components/HoldTimer';
 import { TrainingDone } from '@/components/TrainingDone';
-import { Badge, Banner, Button, Empty, Icon, ListRow, Section } from '@/components/ui';
+import { Badge, Banner, Button, Empty, Icon, IconButton, ListRow, Section } from '@/components/ui';
 import { listTrainingLogs } from '@/lib/db';
 import { todayIso } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
-import { exerciseById, ROUTINE_KINDS, routineById } from '@/lib/training';
-import { routineChecks, setRoutineChecks } from '@/lib/trainingPlan';
+import { exerciseById, ROUTINE_KINDS, type Exercise } from '@/lib/training';
+import { findRoutine, isCustomRoutine, routineChecks, setRoutineChecks } from '@/lib/trainingPlan';
 
 export default function RoutineScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
-  const routine = routineById(String(id));
+  const [version, setVersion] = useState(0);
+  // Relue à chaque retour sur l'écran : une routine perso a pu être modifiée.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const routine = useMemo(() => findRoutine(String(id)), [id, version]);
+  const [timer, setTimer] = useState<Exercise | null>(null);
   const [checked, setChecked] = useState<string[]>(() => routineChecks(String(id)));
   const [sheet, setSheet] = useState(false);
   const [doneToday, setDoneToday] = useState(false);
   const refresh = useCallback(() => {
+    setVersion((v) => v + 1);
     setDoneToday(listTrainingLogs().some((l) => l.kind === 'routine' && l.ref === String(id) && l.date === todayIso()));
   }, [id]);
   useFocusEffect(refresh);
@@ -35,7 +41,16 @@ export default function RoutineScreen() {
 
   return (
     <View style={s.container}>
-      <Stack.Screen options={{ title: routine.name }} />
+      <Stack.Screen
+        options={{
+          title: routine.name,
+          headerRight: isCustomRoutine(routine.id)
+            ? () => (
+                <IconButton icon="edit" label="Modifier la routine" onPress={() => router.push(`/training/routine-edit?id=${routine.id}`)} />
+              )
+            : undefined,
+        }}
+      />
       <ScrollView contentContainerStyle={s.content}>
         <View style={s.head}>
           <View style={s.icon}>
@@ -68,13 +83,18 @@ export default function RoutineScreen() {
                   }
                   title={x.name}
                   subtitle={x.doseText}
+                  right={
+                    hasTimer(x) ? (
+                      <IconButton icon="timer" label={`Minuteur ${x.name}`} onPress={() => setTimer(x)} />
+                    ) : undefined
+                  }
                   onPress={() => router.push(`/training/exercise/${x.id}`)}
                   last={i === arr.length - 1}
                 />
               );
             })}
           </View>
-          <Text style={s.hint}>Coche chaque exercice fini ; touche son nom pour voir comment le faire.</Text>
+          <Text style={s.hint}>Coche chaque exercice fini. Touche son nom pour voir comment le faire, ou le minuteur pour te laisser guider.</Text>
         </Section>
       </ScrollView>
       <View style={[s.bar, { paddingBottom: bottom + space.md }]}>
@@ -85,6 +105,15 @@ export default function RoutineScreen() {
           onPress={() => setSheet(true)}
         />
       </View>
+      {timer && (
+        <HoldTimer
+          exercise={timer}
+          onClose={() => setTimer(null)}
+          onDone={() => {
+            if (!checked.includes(timer.id)) toggle(timer.id);
+          }}
+        />
+      )}
       <TrainingDone
         visible={sheet}
         onClose={() => setSheet(false)}

@@ -1,4 +1,5 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
@@ -65,6 +66,18 @@ export default function RootLayout() {
     return () => clearTimeout(t);
   }, [router]);
 
+  // Toucher le rappel de routine ouvre l'onglet Entraînement.
+  useEffect(() => {
+    const open = (n: Notifications.Notification) => {
+      const url = n.request.content.data?.url;
+      if (typeof url === 'string') setTimeout(() => router.push(url as never), 300);
+    };
+    const last = Notifications.getLastNotificationResponse();
+    if (last) open(last.notification);
+    const sub = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification));
+    return () => sub.remove();
+  }, [router]);
+
   // Sauvegarde automatique (si activée) : peu après l'ouverture et quand on quitte l'app, 6 h au plus souvent.
   useEffect(() => {
     const t = setTimeout(() => autoBackup(), 5000);
@@ -118,6 +131,7 @@ export default function RootLayout() {
           <Stack.Screen name="training/[id]" options={{ title: 'Séance' }} />
           <Stack.Screen name="training/exercise/[id]" options={{ title: 'Exercice' }} />
           <Stack.Screen name="training/routine/[id]" options={{ title: 'Routine' }} />
+          <Stack.Screen name="training/routine-edit" options={{ title: 'Nouvelle routine', presentation: 'modal' }} />
         </Stack>
       </ThemeProvider>
     </ThemeSwitch.Provider>

@@ -64,6 +64,10 @@ tap "Entraînement" ; sleep 3 ; shot 1g-entrainement
 tap "Commencer" ; sleep 3 ; shot 1g2-routine
 tap "Marquer comme faite" ; sleep 2 ; tap "Enregistrer" ; sleep 2 ; shot 1g3-routine-faite
 adb shell input keyevent 4 ; sleep 3 ; shot 1g4-semaine
+tap "Rappel quotidien" ; sleep 2 ; shot 1g5-rappel ; tap "Fermer" ; sleep 2
+tap "Créer ma routine" ; sleep 3 ; tap "Ajouter des exercices" ; sleep 2
+tap "Planche" ; sleep 1 ; tap "Pigeon" ; sleep 1 ; shot 1g6-choix ; tap "Terminé (2)" ; sleep 2 ; shot 1g7-ma-routine
+tap "Enregistrer la routine" ; sleep 3 ; shot 1g8-mes-routines
 tap "Séances" ; sleep 2
 tap "Voir la séance" ; sleep 3 ; shot 1h-seance
 tap "Marquer comme faite" ; sleep 2 ; tap "Plus" ; sleep 1 ; tap "Juste" ; sleep 1 ; shot 1i-fait
@@ -72,6 +76,9 @@ adb shell input keyevent 4 ; sleep 3 ; shot 1k-historique
 tap "Renforcement" ; sleep 2 ; shot 1l-renforcement
 tap "Gainage" ; sleep 2 ; shot 1m-gainage
 tap "Tous" ; sleep 1 ; tap "Tractions" ; sleep 3 ; shot 1n-exercice
+adb shell input keyevent 4 ; sleep 2
+tap "Planche" ; sleep 3 ; tap "Minuteur" ; sleep 7 ; shot 1n2-minuteur
+tap "Passer" ; sleep 2 ; shot 1n3-minuteur-suite ; tap "Fermer" ; sleep 2
 adb shell input keyevent 4 ; sleep 2
 tap "Matériel" ; sleep 2 ; tap "Poutre" ; sleep 1 ; shot 1o-materiel
 tap "Poutre" ; sleep 1 ; tap "Fermer" ; sleep 2
@@ -92,6 +99,9 @@ tap "Vitesse" ; sleep 1 ; tap "Vitesse" ; sleep 1
 tap "Lecture" ; sleep 8 ; shot 8-3d-fin
 tap "Réglages" ; sleep 2 ; tap "Dévers" ; sleep 2 ; tap "Fermer" ; sleep 5
 tap "Recommencer" ; sleep 2 ; tap "Lecture" ; sleep 3 ; shot 9-devers
+tap "Plein écran" ; sleep 6 ; shot 9b-plein-ecran
+tap "Lecture" ; sleep 4 ; shot 9c-plein-ecran-jeu
+tap "Quitter le plein écran" ; sleep 3
 tap "Paramètres" ; sleep 4 ; shot 10-parametres
 tap "Terminal rétro" ; sleep 6 ; shot 11-theme
 tap "Classique" ; sleep 6 ; shot 11b-classique

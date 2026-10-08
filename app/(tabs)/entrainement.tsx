@@ -1,8 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
-import { Badge, Button, Card, Chip, Empty, Icon, ListRow, Section, Segmented, Sheet } from '@/components/ui';
+import { Badge, Button, Card, Chip, Empty, Icon, IconButton, ListRow, Section, Segmented, Sheet } from '@/components/ui';
 import { FEEL_LABELS } from '@/lib/climbing';
 import { deleteTrainingLog, listBlocks, listTrainingLogs, type TrainingLog } from '@/lib/db';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
@@ -18,6 +18,7 @@ import {
   SESSIONS,
   type Equipment,
   type Focus,
+  type Routine,
   type RoutineKind,
   type SessionType,
 } from '@/lib/training';
@@ -25,6 +26,7 @@ import {
   canDoExercise,
   canDoRoutine,
   canDoSession,
+  customRoutines,
   myEquipment,
   routineOfDay,
   routineStreak,
@@ -34,6 +36,7 @@ import {
   type RoutinePick,
   type Suggestion,
 } from '@/lib/trainingPlan';
+import { applyReminder, formatTime, readReminder, type Reminder } from '@/lib/reminder';
 import { todayIso } from '@/lib/stats';
 
 type Mode = 'routines' | 'sessions' | 'exercises';
@@ -53,6 +56,9 @@ export default function TrainingScreen() {
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [daily, setDaily] = useState<RoutinePick | null>(null);
   const [allLogs, setAllLogs] = useState(false);
+  const [mine, setMine] = useState<Routine[]>([]);
+  const [reminder, setReminder] = useState<Reminder>(readReminder);
+  const [draft, setDraft] = useState<Reminder | null>(null);
 
   const reload = useCallback(() => {
     const l = listTrainingLogs();
@@ -60,7 +66,19 @@ export default function TrainingScreen() {
     setLogs(l);
     setSuggestion(suggest(b, l, myEquipment()));
     setDaily(routineOfDay(b, l, myEquipment()));
+    setMine(customRoutines());
   }, []);
+
+  const saveReminder = async (r: Reminder) => {
+    setDraft(null);
+    try {
+      const ok = await applyReminder(r);
+      setReminder(ok ? r : { ...r, on: false });
+      if (!ok) Alert.alert('Notifications refusées', 'Autorise les notifications de MyClimb dans les réglages d’Android pour recevoir le rappel.');
+    } catch (e) {
+      Alert.alert('Rappel', e instanceof Error ? e.message : String(e));
+    }
+  };
   useFocusEffect(reload);
 
   const openLog = (l: TrainingLog) =>
@@ -124,6 +142,29 @@ export default function TrainingScreen() {
           <Icon name="expand_more" size={18} color={colors.muted} />
         </Pressable>
 
+        <Sheet visible={draft !== null} onClose={() => setDraft(null)} title="Rappel quotidien">
+          {draft && (
+            <>
+              <View style={s.switchRow}>
+                <Text style={s.switchText}>Me rappeler ma routine chaque jour</Text>
+                <Switch
+                  value={draft.on}
+                  onValueChange={(on) => setDraft({ ...draft, on })}
+                  trackColor={{ true: colors.primary, false: colors.border }}
+                  thumbColor={colors.card}
+                  accessibilityLabel="Activer le rappel"
+                />
+              </View>
+              <View style={[s.timeRow, !draft.on && s.dim]}>
+                <IconButton icon="remove" label="Plus tôt" onPress={() => setDraft(shift(draft, -15))} />
+                <Text style={s.time}>{formatTime(draft)}</Text>
+                <IconButton icon="add" label="Plus tard" onPress={() => setDraft(shift(draft, 15))} />
+              </View>
+              <Button label="Enregistrer" icon="check" onPress={() => saveReminder(draft)} />
+            </>
+          )}
+        </Sheet>
+
         <Sheet visible={sheet} onClose={() => setSheet(false)} title="Mon matériel">
           <Text style={s.sheetText}>Les séances et exercices s’adaptent à ce que tu as sous la main.</Text>
           <View style={s.chips}>
@@ -179,7 +220,38 @@ export default function TrainingScreen() {
                   </View>
                 ))}
               </View>
+              <Pressable style={s.reminder} onPress={() => setDraft(reminder)} accessibilityLabel="Rappel quotidien">
+                <Icon name={reminder.on ? 'notifications_active' : 'notifications_off'} size={20} color={reminder.on ? colors.primary : colors.muted} />
+                <Text style={s.reminderText}>Rappel quotidien</Text>
+                <Text style={[s.reminderValue, reminder.on && { color: colors.primary }]}>{reminder.on ? formatTime(reminder) : 'Désactivé'}</Text>
+                <Icon name="chevron_right" size={18} color={colors.muted} />
+              </Pressable>
             </Card>
+
+            <Section title="Mes routines">
+              {mine.length > 0 && (
+                <View style={s.listCard}>
+                  {mine.map((r, i, arr) => (
+                    <ListRow
+                      key={r.id}
+                      icon="star"
+                      title={r.name}
+                      subtitle={`${r.minutes} min · ${r.items.length} exercices`}
+                      right={doneToday.has(r.id) ? <Badge label="Faite" tone="success" /> : undefined}
+                      onPress={() => router.push(`/training/routine/${r.id}`)}
+                      last={i === arr.length - 1}
+                    />
+                  ))}
+                </View>
+              )}
+              <Button
+                label="Créer ma routine"
+                icon="add"
+                variant="secondary"
+                style={mine.length > 0 ? s.createBtn : undefined}
+                onPress={() => router.push('/training/routine-edit')}
+              />
+            </Section>
 
             {(Object.keys(ROUTINE_KINDS) as RoutineKind[]).map((k) => {
               const list = routines.filter((r) => r.kind === k);
@@ -299,6 +371,12 @@ export default function TrainingScreen() {
   );
 }
 
+/** Avance ou recule l'heure du rappel par pas de 15 min, sur 24 h. */
+function shift(r: Reminder, minutes: number): Reminder {
+  const total = (r.hour * 60 + r.minute + minutes + 24 * 60) % (24 * 60);
+  return { ...r, hour: Math.floor(total / 60), minute: total % 60 };
+}
+
 function SessionCard({ session, onPress }: { session: SessionType; onPress: () => void }) {
   const eq = sessionEquipment(session).filter((e) => e !== 'wall');
   return (
@@ -360,6 +438,15 @@ const s = themedStyles({
   sessionGoal: { ...type.subhead, color: colors.muted },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   weekCard: { gap: space.md },
+  reminder: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingTop: space.md, borderTopWidth: 1, borderTopColor: colors.border },
+  reminderText: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text },
+  reminderValue: { fontSize: 15, fontWeight: '700', color: colors.muted },
+  createBtn: { marginTop: space.md },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  switchText: { flex: 1, ...type.body },
+  timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: space.sm, borderRadius: radius.md, backgroundColor: colors.surface },
+  dim: { opacity: 0.4 },
+  time: { fontSize: 28, fontWeight: '800', color: colors.text },
   weekHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   weekTitle: { ...type.headline },
   streak: { flexDirection: 'row', alignItems: 'center', gap: 4 },

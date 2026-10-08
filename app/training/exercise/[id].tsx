@@ -1,8 +1,9 @@
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { HoldTimer, hasTimer } from '@/components/HoldTimer';
 import { TrainingDone } from '@/components/TrainingDone';
 import { Badge, Banner, Button, Card, Empty, Icon, Section } from '@/components/ui';
 import { listTrainingLogs } from '@/lib/db';
@@ -15,6 +16,7 @@ export default function ExerciseScreen() {
   const { bottom } = useSafeAreaInsets();
   const x = exerciseById(String(id));
   const [sheet, setSheet] = useState(false);
+  const [timer, setTimer] = useState(false);
   const [doneToday, setDoneToday] = useState(false);
   const refresh = useCallback(() => {
     setDoneToday(listTrainingLogs().some((l) => l.ref === String(id) && l.date === todayIso()));
@@ -49,7 +51,7 @@ export default function ExerciseScreen() {
           <View style={s.doseBody}>
             <Text style={s.doseText}>{x.doseText}</Text>
             {x.dose.sides && <Text style={s.muted}>De chaque côté</Text>}
-            {secs > 0 && <Text style={s.muted}>Environ {formatSeconds(secs)} avec les repos</Text>}
+            {secs > 0 && <Text style={s.muted}>Environ {formatSeconds(secs)} avec les repos{hasTimer(x) ? ' · minuteur disponible' : ''}</Text>}
           </View>
         </Card>
 
@@ -71,13 +73,20 @@ export default function ExerciseScreen() {
         </Section>
       </ScrollView>
       <View style={[s.bar, { paddingBottom: bottom + space.md }]}>
+        {hasTimer(x) && (
+          <Pressable onPress={() => setTimer(true)} accessibilityLabel="Minuteur" style={({ pressed }) => [s.timerBtn, pressed && { opacity: 0.6 }]}>
+            <Icon name="timer" size={24} color={colors.primary} />
+          </Pressable>
+        )}
         <Button
           label={doneToday ? 'Refait ? L’enregistrer encore' : 'Marquer comme fait'}
           icon="check"
           variant={doneToday ? 'secondary' : 'primary'}
+          style={s.flex}
           onPress={() => setSheet(true)}
         />
       </View>
+      {timer && <HoldTimer exercise={x} onClose={() => setTimer(false)} />}
       <TrainingDone
         visible={sheet}
         onClose={() => setSheet(false)}
@@ -107,5 +116,15 @@ const s = themedStyles({
   cues: { gap: space.md },
   cue: { flexDirection: 'row', gap: space.sm, alignItems: 'flex-start' },
   cueText: { flex: 1, ...type.body },
-  bar: { paddingHorizontal: space.lg, paddingTop: space.md, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border },
+  bar: {
+    flexDirection: 'row',
+    gap: space.sm,
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  flex: { flex: 1 },
+  timerBtn: { width: 52, height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
 });

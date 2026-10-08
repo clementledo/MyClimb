@@ -7,6 +7,8 @@ import { computeStats, todayIso } from './stats';
 import {
   EQUIPMENT,
   exerciseById,
+  exerciseSeconds,
+  routineById,
   ROUTINES,
   SESSIONS,
   sessionEquipment,
@@ -209,4 +211,46 @@ export function setRoutineChecks(id: string, done: string[]) {
   const c = readChecks();
   c.byId[id] = done;
   setSetting(CHECKS_KEY, JSON.stringify(c));
+}
+
+/* ---------- Routines créées par l'utilisateur ---------- */
+
+const CUSTOM_KEY = 'customRoutines';
+
+export const isCustomRoutine = (id: string) => id.startsWith('perso-');
+
+export function customRoutines(): Routine[] {
+  try {
+    const list = JSON.parse(getSetting(CUSTOM_KEY) ?? '[]') as Routine[];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomRoutine(r: Routine) {
+  const list = customRoutines();
+  const i = list.findIndex((x) => x.id === r.id);
+  if (i >= 0) list[i] = r;
+  else list.push(r);
+  setSetting(CUSTOM_KEY, JSON.stringify(list));
+}
+
+export function deleteCustomRoutine(id: string) {
+  setSetting(CUSTOM_KEY, JSON.stringify(customRoutines().filter((r) => r.id !== id)));
+}
+
+/** Routine toute faite ou créée par l'utilisateur. */
+export const findRoutine = (id: string) => customRoutines().find((r) => r.id === id) ?? routineById(id);
+
+/** Durée approximative d'une liste d'exercices, en minutes (repos compris, quelques secondes par répétition). */
+export function routineMinutes(items: string[]) {
+  const secs = items.reduce((sum, id) => {
+    const x = exerciseById(id);
+    if (!x) return sum;
+    const d = x.dose;
+    const counted = d.work > 0 ? 0 : (d.sides ? 2 : 1) * d.sets * d.reps * 4;
+    return sum + exerciseSeconds(d) + counted + 30;
+  }, 0);
+  return Math.max(5, Math.round(secs / 60));
 }

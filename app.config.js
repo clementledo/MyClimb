@@ -58,6 +58,8 @@ module.exports = {
         },
       ],
       'expo-sqlite',
+      // Rappel quotidien des routines.
+      ['expo-notifications', { icon: './assets/images/android-icon-monochrome.png', color: '#EE5A24' }],
       [
         'expo-location',
         {
