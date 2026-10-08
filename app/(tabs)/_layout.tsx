@@ -1,10 +1,13 @@
 import { Tabs, useRouter } from 'expo-router';
 import type { AndroidSymbol } from 'expo-symbols';
+import { useEffect } from 'react';
 import { Text, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, IconButton } from '@/components/ui';
+import { syncFromJournal } from '@/lib/collection';
 import { colors, font } from '@/lib/theme';
+import { useCollectionSummary } from '@/lib/useCollection';
 
 export const unstable_settings = { initialRouteName: 'index' };
 
@@ -21,6 +24,11 @@ function SettingsButton() {
 export default function TabLayout() {
   // Place sous les onglets pour la barre système d'Android (boutons ou geste).
   const { bottom } = useSafeAreaInsets();
+  // Pastille sur Progression tant qu'il reste des packs à ouvrir.
+  const { packs } = useCollectionSummary();
+  useEffect(() => {
+    syncFromJournal();
+  }, []);
   return (
     <Tabs
       screenOptions={{
@@ -56,7 +64,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="progression"
-        options={{ title: 'Progression', tabBarIcon: ({ color }) => <TabIcon name="insights" color={color} /> }}
+        options={{
+          title: 'Progression',
+          tabBarIcon: ({ color }) => <TabIcon name="insights" color={color} />,
+          tabBarBadge: packs > 0 ? packs : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.primary, color: colors.onPrimary, fontSize: 11, fontWeight: '700' },
+        }}
       />
       <Tabs.Screen
         name="simulation"

@@ -3,8 +3,9 @@ import { useCallback, useState } from 'react';
 import { Alert, FlatList, Text, View } from 'react-native';
 
 import { BlockRow } from '@/components/BlockRow';
-import { Button, Empty, Icon } from '@/components/ui';
+import { Banner, Button, Empty, Icon } from '@/components/ui';
 import { isFirstTry, isSent } from '@/lib/climbing';
+import { syncFromJournal, type Pack } from '@/lib/collection';
 import { getGym, listBlocksAddedSince, type Block } from '@/lib/db';
 import { endSession, getSession, type Session } from '@/lib/session';
 import { MIN_SESSION_CLIMBS } from '@/lib/stats';
@@ -18,12 +19,16 @@ function elapsed(since: number) {
 export default function SessionScreen() {
   const [session, setSession] = useState<Session | null>(() => getSession());
   const [blocks, setBlocks] = useState<Block[]>([]);
+  // Packs gagnés pendant la séance (la 5e grimpe valide la séance : un pack).
+  const [won, setWon] = useState<Pack[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       const current = getSession();
       setSession(current);
       setBlocks(current ? listBlocksAddedSince(current.startedAt) : []);
+      const added = syncFromJournal();
+      if (added.length) setWon((w) => [...w, ...added]);
     }, []),
   );
 
@@ -101,6 +106,21 @@ export default function SessionScreen() {
                 </View>
               </View>
             </View>
+            {won.length > 0 && (
+              <Banner
+                tone="success"
+                icon="redeem"
+                title={won.length > 1 ? `${won.length} packs de cartes gagnés !` : 'Pack de cartes gagné !'}
+                text={won.map((p) => p.reason).join(' · ')}
+                action={{
+                  label: 'Ouvrir',
+                  onPress: () => {
+                    setWon([]);
+                    router.push('/collection/packs');
+                  },
+                }}
+              />
+            )}
             <Button label="Ajouter une grimpe" icon="add" onPress={() => router.push('/block/new')} />
             {blocks.length > 0 && <Text style={s.listTitle}>Grimpes de la séance</Text>}
           </View>

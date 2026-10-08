@@ -1,22 +1,32 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
+import { PackArt } from '@/components/Collectible';
 import { PlayerCardView } from '@/components/PlayerCard';
 import { SkinPicker } from '@/components/SkinPicker';
 import { Button, Card, Icon, Sheet, styles as ui } from '@/components/ui';
+import { equipped, ownsSkin, pendingPacks, syncFromJournal } from '@/lib/collection';
+import type { BackdropId, FrameId, TitleId } from '@/lib/cosmetics';
 import { getSetting, setSetting, type Block, type TrainingLog } from '@/lib/db';
 import { cardTrend, STATS, type StatId } from '@/lib/playerCard';
 import { DEFAULT_SKIN, isSkin, SKIN_KEY, type SkinId } from '@/lib/skins';
 import { todayIso } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
+import { useCollectionSummary } from '@/lib/useCollection';
+import { useTicker } from '@/lib/useTicker';
 
 const NAME_KEY = 'playerName';
 const readName = () => getSetting(NAME_KEY) ?? 'Clement';
 const readSkin = (): SkinId => {
   const v = getSetting(SKIN_KEY);
-  return isSkin(v) ? v : DEFAULT_SKIN;
+  return isSkin(v) && ownsSkin(v) ? v : DEFAULT_SKIN;
 };
+const readLook = () => ({
+  frame: equipped('contour') as FrameId | null,
+  backdrop: equipped('fond') as BackdropId | null,
+  title: equipped('titre') as TitleId | null,
+});
 const signed = (v: number) => {
   const r = Math.round(v * 10) / 10;
   const t = Math.abs(r).toFixed(1).replace('.', ',').replace(',0', '');
@@ -30,8 +40,17 @@ export function PlayerSection({ blocks, logs }: { blocks: Block[]; logs: Trainin
   const [skin, setSkin] = useState(readSkin);
   const [edit, setEdit] = useState(false);
   const [help, setHelp] = useState(false);
-  // Le costume peut aussi changer dans les réglages de la simulation.
-  useFocusEffect(useCallback(() => setSkin(readSkin()), []));
+  const [look, setLook] = useState(readLook);
+  const focused = useIsFocused();
+  // Le costume peut aussi changer dans la simulation, les objets dans la collection ; les packs
+  // mérités depuis la dernière fois sont donnés ici.
+  useFocusEffect(
+    useCallback(() => {
+      syncFromJournal();
+      setSkin(readSkin());
+      setLook(readLook());
+    }, []),
+  );
   const today = todayIso();
   const { card, week, month } = useMemo(() => cardTrend(blocks, logs, today), [blocks, logs, today]);
 
@@ -51,12 +70,25 @@ export function PlayerSection({ blocks, logs }: { blocks: Block[]; logs: Trainin
   return (
     <>
       <View style={s.cardWrap}>
-        <PlayerCardView card={card} name={name} skin={skin} changes={changes} width={cardW} onPress={() => setEdit(true)} />
+        <PlayerCardView
+          card={card}
+          name={name}
+          skin={skin}
+          frame={look.frame}
+          backdrop={look.backdrop}
+          title={look.title}
+          animate={focused}
+          changes={changes}
+          width={cardW}
+          onPress={() => setEdit(true)}
+        />
         <Pressable onPress={() => setEdit(true)} style={s.link} hitSlop={8} accessibilityLabel="Costume et nom">
           <Icon name="checkroom" size={18} color={colors.primary} />
           <Text style={s.linkText}>Costume et nom</Text>
         </Pressable>
       </View>
+
+      <CollectionEntry focused={focused} />
 
       <Card style={s.panel}>
         <View style={s.row}>
@@ -129,7 +161,56 @@ export function PlayerSection({ blocks, logs }: { blocks: Block[]; logs: Trainin
   );
 }
 
+/** Packs à ouvrir et collection, sous la carte. */
+function CollectionEntry({ focused }: { focused: boolean }) {
+  const router = useRouter();
+  const sum = useCollectionSummary();
+  const next = sum.packs ? pendingPacks()[0] : null;
+  const t = useTicker(focused && sum.packs > 0, 20);
+  return (
+    <Card style={s.collection}>
+      <Pressable
+        onPress={() => router.push('/collection/packs')}
+        style={({ pressed }) => [s.packRow, pressed && { opacity: 0.7 }]}
+        accessibilityRole="button"
+        accessibilityLabel={sum.packs ? 'Ouvrir mes packs' : 'Gagner des packs'}>
+        <View style={!next && { opacity: 0.4 }}>
+          <PackArt kind={next?.kind ?? 'seance'} w={48} t={t} count={sum.packs} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={s.title}>{sum.packs ? `${sum.packs} pack${sum.packs > 1 ? 's' : ''} à ouvrir` : 'Aucun pack à ouvrir'}</Text>
+          <Text style={s.helpMuted} numberOfLines={2}>
+            {next ? next.reason : 'Une séance de 5 grimpes ou plus = un pack de cartes.'}
+          </Text>
+        </View>
+        {next ? <Button label="Ouvrir" size="sm" onPress={() => router.push('/collection/packs')} /> : <Icon name="chevron_right" size={20} color={colors.muted} />}
+      </Pressable>
+      <Pressable
+        onPress={() => router.push('/collection')}
+        style={({ pressed }) => [s.collRow, pressed && { opacity: 0.7 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Ma collection">
+        <Icon name="collections_bookmark" size={20} color={colors.primary} />
+        <Text style={s.collTitle}>Ma collection</Text>
+        {sum.fresh > 0 && <View style={s.freshDot} />}
+        <Text style={s.collCount}>
+          {sum.owned}/{sum.total}
+        </Text>
+        <Icon name="water_drop" size={16} color={colors.primary} />
+        <Text style={s.collCount}>{sum.chalk}</Text>
+        <Icon name="chevron_right" size={20} color={colors.muted} />
+      </Pressable>
+    </Card>
+  );
+}
+
 const s = themedStyles({
+  collection: { gap: space.md },
+  packRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  collRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingTop: space.md, borderTopWidth: 1, borderTopColor: colors.border },
+  collTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text },
+  collCount: { fontSize: 14, fontWeight: '700', color: colors.muted },
+  freshDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
   cardWrap: { alignItems: 'center', paddingVertical: space.sm, gap: space.md },
   panel: { gap: space.md },
   title: { ...type.headline, flex: 1 },

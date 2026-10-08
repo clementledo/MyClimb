@@ -9,6 +9,7 @@ import Svg, { Polyline } from 'react-native-svg';
 import { Climb3D, type Progress } from '@/components/Climb3D';
 import { SkinPicker } from '@/components/SkinPicker';
 import { Badge, Button, Chip, Icon, IconButton, Segmented, Sheet } from '@/components/ui';
+import { ownsSkin } from '@/lib/collection';
 import { getSetting, setSetting } from '@/lib/db';
 import {
   DEFAULT_WALL,
@@ -360,7 +361,7 @@ const readWeights = (): Weights => {
 };
 const readSkin = (): SkinId => {
   const v = getSetting(SKIN_KEY);
-  return isSkin(v) ? v : DEFAULT_SKIN;
+  return isSkin(v) && ownsSkin(v) ? v : DEFAULT_SKIN;
 };
 const readHeight = () => {
   const v = Number(getSetting(HEIGHT_KEY));

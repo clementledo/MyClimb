@@ -195,26 +195,86 @@ function hairGeometry(style: 'short' | 'long') {
 }
 
 /** Silhouette du buste (rayon selon la hauteur, du bassin aux épaules) : taille marquée, poitrine large. */
+const TORSO: [number, number][] = [
+  [0.0, -0.5],
+  [0.8, -0.5],
+  [0.88, -0.4],
+  [0.84, -0.22],
+  [0.78, -0.08],
+  [0.86, 0.1],
+  [0.98, 0.26],
+  [1.0, 0.36],
+  [0.9, 0.46],
+  [0.58, 0.5],
+  [0.0, 0.5],
+];
+
 function torsoGeometry() {
-  const profile: [number, number][] = [
-    [0.0, -0.5],
-    [0.8, -0.5],
-    [0.88, -0.4],
-    [0.84, -0.22],
-    [0.78, -0.08],
-    [0.86, 0.1],
-    [0.98, 0.26],
-    [1.0, 0.36],
-    [0.9, 0.46],
-    [0.58, 0.5],
-    [0.0, 0.5],
-  ];
   // Le milieu de la texture (u = 0,5) tombe au milieu du dos.
   return new THREE.LatheGeometry(
-    profile.map(([r, y]) => new THREE.Vector2(r, y)),
+    TORSO.map(([r, y]) => new THREE.Vector2(r, y)),
     32,
     Math.PI,
   );
+}
+
+/** Rayon du buste à une hauteur (de -0,5 au bassin à 0,5 aux épaules). */
+function torsoRadius(y: number) {
+  const side = TORSO.slice(1, -1);
+  const k = side.findIndex(([, py]) => py >= y);
+  const i = k < 0 ? side.length - 1 : Math.max(1, k);
+  const [r0, y0] = side[i - 1];
+  const [r1, y1] = side[i];
+  return r0 + ((r1 - r0) * Math.min(1, Math.max(0, (y - y0) / (y1 - y0 || 1))));
+}
+
+/** Courbe une forme dressée selon y : la pointe se décale de `dir` (chapeau pointu, cornes). */
+function bend(g: THREE.BufferGeometry, dir: V) {
+  g.computeBoundingBox();
+  const { min, max } = g.boundingBox!;
+  const pos = g.getAttribute('position');
+  for (let i = 0; i < pos.count; i++) {
+    const t = ((pos.getY(i) - min.y) / (max.y - min.y)) ** 2;
+    pos.setXYZ(i, pos.getX(i) + dir.x * t, pos.getY(i) + dir.y * t, pos.getZ(i) + dir.z * t);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Étoile à cinq branches en relief, de rayon 1, face vers +z. */
+function starGeometry(inner = 0.45) {
+  const s = new THREE.Shape();
+  for (let i = 0; i < 10; i++) {
+    const a = Math.PI / 2 + (i * Math.PI) / 5;
+    const r = i % 2 ? inner : 1;
+    if (i) s.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    else s.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.3, bevelEnabled: false });
+  g.translate(0, 0, -0.15);
+  return g;
+}
+
+/** Copies d'une forme (taille, rotation, place), fondues en une seule géométrie : dents, tresses. */
+function copies(geo: THREE.BufferGeometry, places: [V, V, THREE.Euler][]) {
+  const q = new THREE.Quaternion();
+  return merge(places.map(([p, s, r]) => geo.clone().scale(s.x, s.y, s.z).applyQuaternion(q.setFromEuler(r)).translate(p.x, p.y, p.z)));
+}
+
+/** Rocher : boule à facettes un peu cabossée (golem). */
+function rockGeometry(seed: number) {
+  const g = new THREE.IcosahedronGeometry(1, 1);
+  const pos = g.getAttribute('position');
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    // Même bosse pour les sommets confondus (les faces ne sont pas partagées).
+    const k = 1 + 0.13 * Math.sin(x * 5.1 + seed) * Math.sin(y * 4.3 + z * 3.7 + seed * 2);
+    pos.setXYZ(i, x * k, y * k, z * k);
+  }
+  g.computeVertexNormals();
+  return g;
 }
 
 /** Membre galbé : rayon le long de l'os (de -0,5 à l'attache à 0,5 au bout), extrémités fermées. */
@@ -314,15 +374,250 @@ function hornTexture() {
   return dataTexture(32, 32, (x, y) => (Math.floor((x + y * 1.5) / 6) % 2 ? a : b));
 }
 
+type RGB = [number, number, number];
+const mix = (a: RGB, b: RGB, t: number) => a.map((x, i) => x + (b[i] - x) * Math.min(1, Math.max(0, t))) as RGB;
+
+/** Hasard fixe entre 0 et 1 pour une case (i, j). */
+function hash(i: number, j: number, seed: number) {
+  const s = Math.sin(i * 127.1 + j * 311.7 + seed * 74.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+/** Bruit doux qui se raccorde aux bords : `nx` cases sur la largeur, `ny` sur la hauteur (x de 0 à nx, y de 0 à ny). */
+function tileNoise(nx: number, ny: number, seed: number) {
+  const h = (i: number, j: number) => hash(((i % nx) + nx) % nx, ((j % ny) + ny) % ny, seed);
+  return (x: number, y: number) => {
+    const i = Math.floor(x);
+    const j = Math.floor(y);
+    const sx = (x - i) ** 2 * (3 - 2 * (x - i));
+    const sy = (y - j) ** 2 * (3 - 2 * (y - j));
+    const a = h(i, j);
+    const b = h(i + 1, j);
+    const c = h(i, j + 1);
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + h(i + 1, j + 1)) * sx * sy;
+  };
+}
+
+/** Carreaux rouges et noirs de la chemise de bûcheron, en flanelle. */
+function plaidTexture() {
+  const red = rgb('#c3262c');
+  const dark = rgb('#5a1418');
+  const black = rgb('#1d1c21');
+  return dataTexture(64, 64, (x, y) => {
+    const a = Math.floor(x / 8) % 2;
+    const b = Math.floor(y / 8) % 2;
+    const c = a && b ? black : a || b ? dark : red;
+    return (x + y) % 4 ? c : mix(c, black, 0.25);
+  });
+}
+
+/** Rayures d'abeille ou de chat tigré : bandes ondulées de `dark` sur `light`. */
+function bandsTexture(light: string, dark: string, n: number, part: number, wave: number) {
+  const L = rgb(light);
+  const D = rgb(dark);
+  const step = 64 / n;
+  return dataTexture(64, 64, (x, y) => {
+    const f = (y + wave * Math.sin((x / 64) * Math.PI * 4)) / step;
+    return f - Math.floor(f) < part ? D : L;
+  });
+}
+
+/** Bandelettes de momie en biais, et par endroits une seconde couche croisée par-dessus. */
+function bandageTexture() {
+  const cols = [rgb('#efe7d3'), rgb('#d9cdae')];
+  const seam = rgb('#8f7f60');
+  const n = tileNoise(4, 4, 4);
+  return dataTexture(64, 64, (x, y) => {
+    const over = n(x / 16, y / 16) > 0.56;
+    const t = over ? y - x * 0.25 : y + x * 0.5;
+    const k = Math.floor(t / 8);
+    const f = (t - k * 8) / 8;
+    // Ombre sous le bord de la bande du dessus, puis la toile avec sa trame.
+    if (f < 0.14) return seam;
+    const c = cols[((k % 2) + 2) % 2];
+    if (f < 0.3) return mix(c, seam, 0.45 - f);
+    return mix(c, seam, (x * 3 + y * 5) % 7 ? 0 : 0.12);
+  });
+}
+
+/** Écailles de dragon : rangées de demi-ronds décalées, bord sombre et reflet au centre. */
+function scalesTexture(base: string, edge: string, shine: string) {
+  const B = rgb(base);
+  const E = rgb(edge);
+  const S = rgb(shine);
+  return dataTexture(64, 64, (x, y) => {
+    // Chaque écaille couvre le haut de celles de la rangée d'en dessous.
+    for (let r = Math.floor(y / 8) + 1; r >= Math.floor(y / 8) - 1; r--) {
+      const cy = r * 8;
+      const cx = (r % 2 ? 8 : 0) + Math.round((x - (r % 2 ? 8 : 0)) / 16) * 16;
+      const d = Math.hypot(x - cx, (y - cy) * 1.15) / 10;
+      if (d < 1) return d > 0.8 ? E : mix(S, B, d * 1.4);
+    }
+    return B;
+  });
+}
+
+/** Plaques du ventre du dragon (et du plastron du samouraï) : bandes avec un sillon sombre. */
+function platesTexture(face: string, groove: string, n: number) {
+  const F = rgb(face);
+  const G = rgb(groove);
+  const step = 64 / n;
+  return dataTexture(4, 64, (_, y) => {
+    const f = (y % step) / step;
+    return f < 0.14 ? G : mix(F, G, f > 0.7 ? (f - 0.7) * 1.2 : 0);
+  });
+}
+
+/** Armure de samouraï : lamelles laquées rouges en rangées, laçage noir. */
+function lamellarTexture() {
+  const red = rgb('#b3201c');
+  const lit = rgb('#e0483a');
+  const lace = rgb('#18181c');
+  return dataTexture(64, 64, (x, y) => {
+    const f = y % 8;
+    if (f === 0) return lace;
+    if ((x % 8 === 3 || x % 8 === 4) && f > 1 && f < 6) return lace;
+    return f === 7 ? lit : mix(red, lace, (7 - f) * 0.04);
+  });
+}
+
+/** Fourrure à mèches (yéti, viking) : chaque mèche foncée à la racine, claire au bout, en quinconce. */
+function furTexture(light: string, dark: string) {
+  const L = rgb(light);
+  const D = rgb(dark);
+  return dataTexture(64, 64, (x, y) => {
+    const lock = Math.floor(x / 4);
+    const f = ((y + hash(lock, 0, 5) * 16) % 16) / 16;
+    return mix(L, D, f * 0.9 + (x % 4 === 0 ? 0.15 : 0) - 0.1);
+  });
+}
+
+/** Robe du magicien : nuit bleue semée d'étoiles dorées. */
+function starsTexture(sky: string) {
+  const S = rgb(sky);
+  const gold = rgb('#ffd43b');
+  const spots: [number, number, number][] = [
+    [12, 14, 5],
+    [42, 8, 3.5],
+    [30, 34, 4.5],
+    [56, 40, 3],
+    [10, 50, 3.5],
+    [44, 56, 4],
+  ];
+  return dataTexture(64, 64, (x, y) => {
+    for (const [cx, cy, R] of spots) {
+      const dx = ((x - cx + 96) % 64) - 32;
+      const dy = ((y - cy + 96) % 64) - 32;
+      const rho = Math.hypot(dx, dy);
+      if (rho > R) continue;
+      // Branche la plus proche : dedans si du bon côté du segment pointe - creux.
+      const seg = Math.PI / 5;
+      const a = Math.atan2(dy, dx) - Math.PI / 2;
+      const phi = Math.abs((((a % (2 * seg)) + 3 * seg) % (2 * seg)) - seg);
+      const ix = 0.42 * R * Math.cos(seg) - R;
+      const iy = 0.42 * R * Math.sin(seg);
+      const px = rho * Math.cos(phi) - R;
+      const py = rho * Math.sin(phi);
+      if (ix * py - iy * px >= 0) return gold;
+    }
+    return hash(x, y, 7) < 0.01 ? mix(S, gold, 0.7) : S;
+  });
+}
+
+/** Roche sombre fendue de lave (golem) ; `glow` : les fissures seules, pour la lueur. */
+function lavaTexture(glow: boolean) {
+  const N = 128;
+  const G = 4;
+  const cell = N / G;
+  const rock = [rgb('#2b2421'), rgb('#4a3d35')];
+  const hot = [rgb('#ff5a0a'), rgb('#ffd23f')];
+  const n = tileNoise(16, 16, 2);
+  return dataTexture(N, N, (x, y) => {
+    // Cellules de Voronoï qui se raccordent aux bords : fissure là où deux cellules se touchent.
+    let d1 = 1e9;
+    let d2 = 1e9;
+    const ci = Math.floor(x / cell);
+    const cj = Math.floor(y / cell);
+    for (let j = cj - 1; j <= cj + 1; j++) {
+      for (let i = ci - 1; i <= ci + 1; i++) {
+        const wi = (i + G) % G;
+        const wj = (j + G) % G;
+        const px = (i + 0.15 + 0.7 * hash(wi, wj, 1)) * cell;
+        const py = (j + 0.15 + 0.7 * hash(wi, wj, 2)) * cell;
+        const d = Math.hypot(x - px, y - py);
+        if (d < d1) [d1, d2] = [d, d1];
+        else if (d < d2) d2 = d;
+      }
+    }
+    const e = (d2 - d1) / (1.6 + 1.6 * n(x / 8, y / 8));
+    const heat = Math.max(0, 1 - e);
+    if (glow) return mix([0, 0, 0], mix(hot[0], hot[1], heat - 0.3), Math.min(1, heat * 1.6));
+    const stone = mix(rock[0], rock[1], n((x / N) * 16, (y / N) * 16) * 0.9 + (e > 3 ? 0 : 0.2));
+    return heat > 0 ? mix(stone, mix(hot[0], hot[1], heat - 0.3), Math.min(1, heat * 1.6)) : stone;
+  });
+}
+
+/** Ciel cosmique : nébuleuse bleue et violette, étoiles. */
+function cosmosTexture() {
+  const N = 128;
+  const ramp = ['#090c33', '#1b1d6e', '#4a2a9a', '#9a3fb8', '#e37ad2'].map(rgb);
+  const n1 = tileNoise(4, 4, 11);
+  const n2 = tileNoise(8, 8, 12);
+  const n3 = tileNoise(16, 16, 13);
+  return dataTexture(N, N, (x, y) => {
+    const u = x / N;
+    const w = y / N;
+    const f = n1(u * 4, w * 4) * 0.55 + n2(u * 8, w * 8) * 0.3 + n3(u * 16, w * 16) * 0.15;
+    const t = Math.max(0, f - 0.25) * 1.9 * (ramp.length - 1);
+    const k = Math.min(ramp.length - 2, Math.floor(t));
+    const sky = mix(ramp[k], ramp[k + 1], t - k);
+    const s = hash(x, y, 21);
+    if (s < 0.018) return mix(sky, [255, 255, 255], 0.55 + s * 25);
+    return sky;
+  });
+}
+
+/** Bande réfléchissante des pompiers : jaune, argent au milieu. */
+function reflectTexture() {
+  const yellow = rgb('#f2d228');
+  const silver = rgb('#dde3e9');
+  return dataTexture(4, 16, (_, y) => (y >= 6 && y < 10 ? silver : yellow));
+}
+
+/** Motifs des vêtements (haut, bas, pièces des costumes), dessinés à la première utilisation. */
+const PATTERNS = {
+  stripes: () => stripesTexture('#e03131', '#f8f9fa', 7),
+  zigzag: zigzagTexture,
+  plaid: plaidTexture,
+  bee: () => bandsTexture('#ffd02e', '#1b1c1f', 4, 0.5, 0),
+  tabby: () => bandsTexture('#f4a04a', '#c8641e', 6, 0.32, 2.5),
+  bandage: bandageTexture,
+  scales: () => scalesTexture('#b8322a', '#6e1512', '#e05a40'),
+  belly: () => platesTexture('#f0c76e', '#b98536', 6),
+  lamellar: lamellarTexture,
+  fur: () => furTexture('#f6f9fc', '#b9c8d8'),
+  pelt: () => furTexture('#a07e5c', '#4f3b29'),
+  stars: () => starsTexture('#2f2a7e'),
+  lava: () => lavaTexture(false),
+  lavaGlow: () => lavaTexture(true),
+  cosmos: cosmosTexture,
+  reflect: reflectTexture,
+};
+type Pattern = keyof typeof PATTERNS;
+
 /* ---------- Costumes ---------- */
 
 type Look = {
   skin: string;
   top: string;
-  topMap?: 'stripes';
+  topMap?: Pattern;
   sleeves: 'short' | 'long' | 'none';
+  /** Couleur des manches longues et des épaules ; sinon celle du haut. */
+  arms?: string;
   bottom: string;
-  bottomMap?: 'zigzag';
+  bottomMap?: Pattern;
+  /** Motif lumineux du haut et du bas (fissures de lave, étoiles), que le costume fait pulser. */
+  glowMap?: Pattern;
   legs: 'long' | 'shorts';
   shoe: string;
   rubber: string;
@@ -483,6 +778,207 @@ const LOOKS: Record<SkinId, Partial<Look>> = {
     bag: '#cc5de8',
     belt: '#f783ac',
   },
+  bucheron: {
+    topMap: 'plaid',
+    sleeves: 'long',
+    bottom: '#3d5a86',
+    shoe: '#7a4a24',
+    rubber: '#2b1d14',
+    strap: '#e0a526',
+    hairColor: '#5a3820',
+    bag: '#e0a526',
+    belt: '#3a2a20',
+  },
+  cowboy: {
+    top: '#eadcbf',
+    sleeves: 'long',
+    bottom: '#3d5a86',
+    shoe: '#7a4a24',
+    rubber: '#2b1d14',
+    strap: '#c9a227',
+    hairColor: '#6b4423',
+    bag: '#a8743a',
+    belt: '#4a2f1d',
+  },
+  pompier: {
+    top: '#28344b',
+    sleeves: 'long',
+    bottom: '#28344b',
+    shoe: '#1b1c1f',
+    rubber: '#111214',
+    strap: '#f2d228',
+    gloves: '#2b2d31',
+    hairColor: '#2b2118',
+    bag: '#c92a2a',
+    belt: '#1b1c1f',
+  },
+  abeille: {
+    topMap: 'bee',
+    sleeves: 'long',
+    arms: '#1b1c1f',
+    bottom: '#1b1c1f',
+    shoe: '#1b1c1f',
+    rubber: '#111214',
+    strap: '#ffd02e',
+    hairColor: '#3a2a20',
+    bag: '#ffd02e',
+    belt: '#1b1c1f',
+  },
+  chat: {
+    topMap: 'tabby',
+    sleeves: 'long',
+    bottomMap: 'tabby',
+    shoe: '#f8f9fa',
+    rubber: '#c8641e',
+    strap: '#f783ac',
+    gloves: '#f8f9fa',
+    hair: 'none',
+    bag: '#f783ac',
+    belt: '#c8641e',
+  },
+  momie: {
+    skin: '#6b5a48',
+    topMap: 'bandage',
+    sleeves: 'long',
+    bottomMap: 'bandage',
+    shoe: '#d6c9a8',
+    rubber: '#5c5040',
+    strap: '#9b8d6c',
+    gloves: '#e6dcc3',
+    hair: 'none',
+    bag: '#9b8d6c',
+    belt: '#9b8d6c',
+  },
+  viking: {
+    top: '#3f5a7a',
+    sleeves: 'long',
+    bottom: '#6b4f2a',
+    shoe: '#5a3e22',
+    rubber: '#2b1d14',
+    strap: '#c9a227',
+    hair: 'long',
+    hairColor: '#d9822b',
+    bag: '#8a5a2b',
+    belt: '#3a2a20',
+  },
+  requin: {
+    top: '#6d8aa6',
+    sleeves: 'long',
+    bottom: '#6d8aa6',
+    shoe: '#4f6a85',
+    rubber: '#2b3440',
+    strap: '#f1f3f5',
+    hair: 'none',
+    bag: '#f1f3f5',
+    belt: '#4f6a85',
+  },
+  panda: {
+    top: '#f8f9fa',
+    sleeves: 'long',
+    arms: '#1d1e22',
+    bottom: '#1d1e22',
+    shoe: '#1d1e22',
+    rubber: '#0f1012',
+    strap: '#f8f9fa',
+    gloves: '#1d1e22',
+    hair: 'none',
+    bag: '#69db7c',
+    belt: '#1d1e22',
+  },
+  sorcier: {
+    topMap: 'stars',
+    sleeves: 'long',
+    bottomMap: 'stars',
+    shoe: '#2f2a7e',
+    rubber: '#17153d',
+    strap: '#ffd43b',
+    hair: 'long',
+    hairColor: '#f1f3f5',
+    bag: '#ffd43b',
+    belt: '#ffd43b',
+  },
+  chevalier: {
+    top: '#aab4bf',
+    sleeves: 'long',
+    bottom: '#9aa4af',
+    shoe: '#8d959e',
+    rubber: '#3b4046',
+    strap: '#c92a2a',
+    gloves: '#8d959e',
+    hair: 'none',
+    noFace: true,
+    metal: true,
+    bag: '#c92a2a',
+    belt: '#5c3d2e',
+  },
+  yeti: {
+    skin: '#9cc9ef',
+    topMap: 'fur',
+    sleeves: 'long',
+    bottomMap: 'fur',
+    shoe: '#e9eef3',
+    rubber: '#7a8a9c',
+    strap: '#9cc9ef',
+    gloves: '#9cc9ef',
+    hair: 'none',
+    bag: '#9cc9ef',
+    belt: '#d3dce6',
+  },
+  samourai: {
+    top: '#1d1e24',
+    sleeves: 'long',
+    bottom: '#23252e',
+    shoe: '#1b1c1f',
+    rubber: '#111214',
+    strap: '#c92a2a',
+    hairColor: '#111214',
+    bag: '#c92a2a',
+    belt: '#c9a227',
+  },
+  dragon: {
+    skin: '#b8322a',
+    topMap: 'scales',
+    sleeves: 'long',
+    bottomMap: 'scales',
+    shoe: '#6e1512',
+    rubber: '#2b0f0d',
+    strap: '#f0c76e',
+    gloves: '#7a1c17',
+    hair: 'none',
+    noFace: true,
+    bag: '#f0c76e',
+    belt: '#6e1512',
+  },
+  golem: {
+    skin: '#3a302a',
+    topMap: 'lava',
+    sleeves: 'long',
+    bottomMap: 'lava',
+    glowMap: 'lavaGlow',
+    shoe: '#2b2421',
+    rubber: '#1b1614',
+    strap: '#ff9f1a',
+    gloves: '#3a302a',
+    hair: 'none',
+    noFace: true,
+    bag: '#2b2421',
+    belt: '#2b2421',
+  },
+  cosmique: {
+    skin: '#1b1d6e',
+    topMap: 'cosmos',
+    sleeves: 'long',
+    bottomMap: 'cosmos',
+    glowMap: 'cosmos',
+    shoe: '#2b1d6b',
+    rubber: '#0b0c2a',
+    strap: '#9be7ff',
+    gloves: '#3b2a8a',
+    hair: 'none',
+    noFace: true,
+    bag: '#9be7ff',
+    belt: '#3b2a8a',
+  },
 };
 
 const RAINBOW = ['#ff6b6b', '#ffa94d', '#ffd43b', '#69db7c', '#4dabf7', '#9775fa'];
@@ -495,6 +991,7 @@ export function createClimber() {
   const M = {
     skin: mat(BASE_LOOK.skin, 0.55),
     top: mat(BASE_LOOK.top, 0.85),
+    sleeve: mat(BASE_LOOK.top, 0.85),
     bottom: mat(BASE_LOOK.bottom, 0.9),
     hair: new THREE.MeshStandardMaterial({ color: BASE_LOOK.hairColor, roughness: 0.95, side: THREE.DoubleSide }),
     shoe: [mat(BASE_LOOK.shoe, 0.55), mat(BASE_LOOK.shoe, 0.55)],
@@ -509,11 +1006,17 @@ export function createClimber() {
     brow: mat('#3a2a20', 0.9),
     lips: mat('#b5655a', 0.6),
   };
-  const textures = { stripes: stripesTexture('#e03131', '#f8f9fa', 7), zigzag: zigzagTexture() };
+  // Motifs gardés pour toute la vie du grimpeur (jamais libérés au changement de costume).
+  const textures: Partial<Record<Pattern, THREE.Texture>> = {};
+  const pattern = (p: Pattern) => (textures[p] ??= PATTERNS[p]());
 
   const sphere = new THREE.SphereGeometry(1, 24, 16);
   const cylGeo = new THREE.CylinderGeometry(1, 1, 1, 20);
   const sleeveGeo = new THREE.CylinderGeometry(0.9, 1, 1, 20, 1, true);
+  // Bas du haut et bas du pantalon : une tranche fine du motif, pas tout le motif écrasé.
+  const hemGeo = new THREE.CylinderGeometry(1, 1, 1, 20);
+  const hemUv = hemGeo.getAttribute('uv');
+  for (let i = 0; i < hemUv.count; i++) hemUv.setY(i, 0.45 + hemUv.getY(i) * 0.1);
   const torsoGeo = torsoGeometry();
   const upperGeo = limbGeometry([
     [-0.47, 0.8],
@@ -641,8 +1144,11 @@ export function createClimber() {
     return mesh;
   };
 
-  /** Queue du bas du dos vers le sol, qui se balance : chaîne de cônes, ou touffue (boules). */
-  const tail = (colors: string[], len: number, r0: number, puffy = false) => {
+  /**
+   * Queue du bas du dos vers le sol, qui se balance : chaîne de cônes, ou touffue (boules).
+   * `lift` : le bout remonte (queue de chat).
+   */
+  const tail = (colors: string[], len: number, r0: number, puffy = false, lift = 0) => {
     const n = puffy ? 9 : 7;
     const segs = Array.from({ length: n }, (_, i) =>
       add(puffy ? sphere : new THREE.CylinderGeometry(1, 1, 1, 10), own(mat(colors[i % colors.length], 0.85)), extraRoot),
@@ -657,7 +1163,7 @@ export function createClimber() {
           const dir = f.zAx
             .clone()
             .multiplyScalar(0.9 - k * 0.6)
-            .addScaledVector(f.yAx, -0.6 - k * 0.5)
+            .addScaledVector(f.yAx, -0.6 - k * 0.5 + lift * k * k)
             .addScaledVector(f.xAx, sway)
             .normalize();
           const next = at.clone().addScaledVector(dir, step);
@@ -715,6 +1221,75 @@ export function createClimber() {
       const s = 0.03 - i * 0.003;
       piece(chestExtras, cone, m, v(0, y, 0.062), v(s * 0.6, s * 1.4, s), new THREE.Euler(Math.PI / 2, 0, 0));
     }
+  };
+
+  /**
+   * Pièce collée au buste (gilet, plastron, bandes) : le buste entre deux hauteurs (de -0,5 au
+   * bassin à 0,5 aux épaules), un peu plus large, sur une part du tour (angle 0 : le milieu du ventre).
+   * `fringe` : bord du bas en dents de scie (fourrure).
+   */
+  const shell = (m: THREE.Material, y0: number, y1: number, from = 0, around = Math.PI * 2, grow = 1.05, fringe = 0) => {
+    const pts = Array.from({ length: 9 }, (_, i) => {
+      const y = y0 + ((y1 - y0) * i) / 8;
+      return new THREE.Vector2(torsoRadius(y) * grow, y);
+    });
+    const geo = new THREE.LatheGeometry(pts, 32, Math.PI + from, around);
+    if (fringe) {
+      // Les sommets du bas sont les premiers de chaque colonne de 9.
+      const pos = geo.getAttribute('position');
+      for (let i = 0; i < pos.count; i += 18) pos.setY(i, pos.getY(i) - fringe);
+      geo.computeVertexNormals();
+    }
+    const mesh = add(geo, m, extraRoot);
+    extras.push({
+      update: () => {
+        mesh.position.copy(torso.position);
+        mesh.quaternion.copy(torso.quaternion);
+        mesh.scale.copy(torso.scale);
+      },
+    });
+    return mesh;
+  };
+
+  /** Anneaux autour des membres (bandes, manchettes) : os, place le long de l'os (0 à 1), rayon et hauteur. */
+  type Spot = ['upper' | 'fore' | 'thigh' | 'shin', number, number, number];
+  const rings = (m: THREE.Material, spots: Spot[], geo: THREE.BufferGeometry = cylGeo) => {
+    const meshes = spots.map(() => [add(geo, m, extraRoot), add(geo, m, extraRoot)]);
+    extras.push({
+      update: (b, _info, f) => {
+        spots.forEach(([bone, t, r, len], k) => {
+          b.arms.forEach((a, i) => {
+            const l = b.legs[i];
+            const [p, q] = bone === 'upper' ? [a.shoulder, a.elbow] : bone === 'fore' ? [a.elbow, a.hand] : bone === 'thigh' ? [l.hip, l.knee] : [l.knee, l.foot];
+            const d = q.clone().sub(p);
+            const mesh = meshes[k][i];
+            mesh.position.copy(p).addScaledVector(d, t);
+            mesh.quaternion.setFromUnitVectors(UP, d.normalize());
+            mesh.scale.set(r * f.hgt, len * f.hgt, r * f.hgt);
+          });
+        });
+      },
+    });
+  };
+
+  /** Baguette de `a` à `b` dans le repère `parent` (manche, antenne, moustache de chat). */
+  const rod = (parent: THREE.Object3D, m: THREE.Material, a: V, b: V, r: number, geo: THREE.BufferGeometry = cylGeo) => {
+    const d = b.clone().sub(a);
+    const mesh = piece(parent, geo, m, a.clone().add(b).multiplyScalar(0.5), v(r, d.length(), r));
+    mesh.quaternion.setFromUnitVectors(UP, d.normalize());
+    return mesh;
+  };
+
+  /** Capuche de costume (comme celle du dinosaure) : calotte qui laisse le visage dégagé. */
+  const hood = (m: THREE.Material, open = 0.6, tilt = -0.45, s = v(0.067, 0.075, 0.072)) =>
+    piece(headExtras, new THREE.SphereGeometry(1, 24, 16, 0, Math.PI * 2, 0, Math.PI * open), m, v(0, 0.008, -0.006), s, new THREE.Euler(tilt, 0, 0));
+
+  /** Repère qui pivote (ailes qui battent, nageoire) : enfant de `parent`, en `p`. */
+  const pivot = (parent: THREE.Object3D, p: V) => {
+    const g = new THREE.Group();
+    g.position.copy(p);
+    parent.add(g);
+    return g;
   };
 
   const fur = own(mat('#f8f9fa', 1));
@@ -880,6 +1455,227 @@ export function createClimber() {
         extras.push(tail(RAINBOW, 0.42, 0.03, true));
         break;
       }
+      case 'bucheron': {
+        // Bonnet de laine à revers et pompon, grosse barbe, hache dans le dos.
+        const wool = own(mat('#2f5d46', 1));
+        piece(H, new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), wool, v(0, 0.016, -0.004), v(0.064, 0.074, 0.068), new THREE.Euler(-0.25, 0, 0));
+        piece(H, new THREE.TorusGeometry(1, 0.16, 8, 28), wool, v(0, 0.016, -0.004), v(0.066, 0.07, 0.05), new THREE.Euler(Math.PI / 2 - 0.25, 0, 0));
+        piece(H, sphere, wool, v(0, 0.093, -0.022), 0.017);
+        const beard = own(mat('#5e3b22', 1));
+        piece(H, new THREE.SphereGeometry(1, 20, 12, Math.PI / 2 - 1.35, 2.7, Math.PI * 0.55, Math.PI * 0.45), beard, v(0, -0.012, 0.006), v(0.057, 0.086, 0.056));
+        for (const [x, y] of [
+          [-0.022, -0.072],
+          [0, -0.082],
+          [0.022, -0.072],
+        ])
+          piece(H, sphere, beard, v(x, y, 0.036), v(0.02, 0.018, 0.016));
+        for (const s of [-1, 1]) piece(H, sphere, beard, v(s * 0.013, -0.01, 0.056), v(0.017, 0.0075, 0.009), new THREE.Euler(0, 0, s * 0.3));
+        // Fer en coin (tranchant plus haut que le talon) sur un manche en travers du dos.
+        const wood = own(mat('#a0703c', 0.7));
+        const steel = own(new THREE.MeshStandardMaterial({ color: '#aeb6bf', roughness: 0.35, metalness: 0.3 }));
+        const top = v(0.085, 0.09, 0.078);
+        rod(C, wood, v(-0.07, -0.19, 0.078), top, 0.009);
+        const blade = new THREE.BoxGeometry(1, 1, 1);
+        const bp = blade.getAttribute('position');
+        for (let i = 0; i < bp.count; i++) bp.setY(i, bp.getY(i) * (bp.getX(i) > 0 ? 1.8 : 0.8));
+        blade.computeVertexNormals();
+        const tilt = new THREE.Euler(0, 0, -0.505);
+        piece(C, blade, steel, top.clone().add(v(0.021, -0.012, 0)), v(0.05, 0.03, 0.009), tilt);
+        piece(C, new THREE.BoxGeometry(1, 1, 1), own(mat('#eef1f4', 0.3)), top.clone().add(v(0.044, -0.024, 0)), v(0.006, 0.054, 0.0095), tilt);
+        break;
+      }
+      case 'cowboy': {
+        // Chapeau à bord relevé, foulard rouge, gilet de cuir avec l'étoile du shérif, lasso.
+        const felt = own(mat('#9a6a3a', 0.85));
+        const crown = new THREE.LatheGeometry(
+          [
+            [1.0, 0.0],
+            [0.97, 0.45],
+            [0.86, 0.72],
+            [0.5, 0.64],
+            [0.0, 0.6],
+          ].map(([r, y]) => new THREE.Vector2(r, y)),
+          24,
+        );
+        const hat = new THREE.Group();
+        hat.position.set(0, 0.043, -0.004);
+        hat.rotation.x = -0.12;
+        H.add(hat);
+        piece(hat, crown, felt, v(0, 0, 0), v(0.058, 0.072, 0.064));
+        const brim = new THREE.LatheGeometry(
+          [
+            [0.9, -0.03],
+            [1.85, -0.02],
+            [1.92, 0.0],
+            [1.85, 0.02],
+            [0.9, 0.03],
+          ].map(([r, y]) => new THREE.Vector2(r, y)),
+          32,
+        );
+        const pos = brim.getAttribute('position');
+        for (let i = 0; i < pos.count; i++) pos.setY(i, pos.getY(i) + 0.13 * pos.getX(i) ** 2 - 0.03 * pos.getZ(i) ** 2);
+        brim.computeVertexNormals();
+        piece(hat, brim, felt, v(0, 0.002, 0), v(0.058, 0.07, 0.064));
+        piece(hat, new THREE.CylinderGeometry(1, 1, 1, 24, 1, true), own(mat('#3a2a20', 0.8)), v(0, 0.008, 0), v(0.0585, 0.012, 0.0645));
+        const beard = own(mat('#6b4423', 0.95));
+        for (const s of [-1, 1]) piece(H, sphere, beard, v(s * 0.012, -0.009, 0.055), v(0.014, 0.0055, 0.007), new THREE.Euler(0, 0, s * 0.45));
+        const red = own(mat('#d9363e', 0.8));
+        piece(C, new THREE.TorusGeometry(1, 0.35, 8, 20), red, v(0, 0.036, 0.002), v(0.034, 0.034, 0.024), new THREE.Euler(Math.PI / 2, 0, 0));
+        piece(C, new THREE.ConeGeometry(1, 1, 3), red, v(0, 0.0, -0.06), v(0.05, 0.07, 0.012), new THREE.Euler(Math.PI - 0.15, 0, 0));
+        const leather = own(mat('#6e4020', 0.8));
+        shell(leather, -0.32, 0.47, 0.42, Math.PI * 2 - 0.84);
+        const gold = own(new THREE.MeshStandardMaterial({ color: '#f2c12e', roughness: 0.3, metalness: 0.5 }));
+        piece(C, starGeometry(), gold, v(-0.058, 0.004, -0.055), v(0.015, 0.015, 0.02), new THREE.Euler(0, Math.PI + 0.55, 0));
+        piece(P, new THREE.BoxGeometry(1, 1, 1), gold, v(0, 0.018, -0.06), v(0.034, 0.024, 0.008));
+        const rope = own(mat('#c8a165', 0.9));
+        for (const k of [0, 1]) piece(P, new THREE.TorusGeometry(1, 0.12, 6, 20), rope, v(0.104 + k * 0.006, -0.03, 0.005), v(0.04, 0.046, 0.04), new THREE.Euler(0, Math.PI / 2, k * 0.3));
+        break;
+      }
+      case 'pompier': {
+        // Casque rouge à long bord derrière et écusson doré, bandes réfléchissantes partout.
+        const red = own(new THREE.MeshStandardMaterial({ color: '#c92a2a', roughness: 0.3 }));
+        piece(H, new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), red, v(0, 0.02, -0.006), v(0.066, 0.072, 0.072), new THREE.Euler(-0.1, 0, 0));
+        piece(H, sphere, red, v(0, 0.022, -0.03), v(0.083, 0.008, 0.1), new THREE.Euler(-0.18, 0, 0));
+        piece(H, new THREE.TorusGeometry(1, 0.1, 6, 20, Math.PI), red, v(0, 0.02, -0.006), v(0.074, 0.075, 0.03), new THREE.Euler(-0.1, Math.PI / 2, 0));
+        const gold = own(new THREE.MeshStandardMaterial({ color: '#f2c12e', roughness: 0.35, metalness: 0.4 }));
+        // Écusson en forme de blason (pointe en bas), le milieu rouge.
+        const shield = new THREE.CylinderGeometry(1, 1, 1, 5);
+        piece(H, shield, gold, v(0, 0.06, 0.058), v(0.024, 0.006, 0.027), new THREE.Euler(Math.PI / 2 - 0.4, 0, 0));
+        piece(H, shield, own(mat('#a51d1d', 0.5)), v(0, 0.06, 0.0615), v(0.015, 0.004, 0.017), new THREE.Euler(Math.PI / 2 - 0.4, 0, 0));
+        const band = own(new THREE.MeshStandardMaterial({ map: pattern('reflect'), roughness: 0.5 }));
+        shell(band, 0.08, 0.17);
+        shell(band, -0.36, -0.27);
+        rings(band, [
+          ['fore', 0.62, 0.031, 0.04],
+          ['upper', 0.55, 0.04, 0.04],
+          ['shin', 0.55, 0.05, 0.045],
+          ['shin', 0.78, 0.045, 0.045],
+        ]);
+        break;
+      }
+      case 'abeille': {
+        // Serre-tête à antennes, ailes transparentes qui battent, dard.
+        const black = own(mat('#1b1c1f', 0.6));
+        piece(H, new THREE.TorusGeometry(1, 0.06, 6, 24, Math.PI), black, v(0, 0.004, 0.008), v(0.062, 0.072, 0.06));
+        const ball = own(mat('#ffd02e', 0.5));
+        for (const s of [-1, 1]) {
+          const curve = new THREE.QuadraticBezierCurve3(v(s * 0.026, 0.068, 0.012), v(s * 0.03, 0.104, 0.024), v(s * 0.05, 0.108, 0.038));
+          piece(H, new THREE.TubeGeometry(curve, 8, 0.0028, 5), black, v(0, 0, 0), 1);
+          piece(H, sphere, ball, v(s * 0.052, 0.109, 0.04), 0.011);
+        }
+        const wing = own(new THREE.MeshStandardMaterial({ color: '#dff3ff', roughness: 0.15, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+        const flaps: [THREE.Group, number][] = [];
+        for (const s of [-1, 1]) {
+          for (const [lift, len, wid] of [
+            [0.5, 0.11, 0.05],
+            [-0.4, 0.075, 0.035],
+          ]) {
+            const p = pivot(C, v(s * 0.025, -0.015, 0.07));
+            p.rotation.z = s * lift;
+            piece(p, sphere, wing, v(s * len, 0, 0), v(len, wid, 0.004)).castShadow = false;
+            flaps.push([p, s]);
+          }
+        }
+        extras.push({ update: (_b, info) => flaps.forEach(([p, s]) => (p.rotation.y = -s * (0.55 + 0.35 * Math.sin(info.now / 45)))) });
+        piece(P, new THREE.ConeGeometry(1, 1, 10), black, v(0, -0.055, 0.058), v(0.012, 0.035, 0.012), new THREE.Euler(Math.PI / 2, 0, 0));
+        break;
+      }
+      case 'chat': {
+        // Capuche tigrée à oreilles pointues, nez rose, moustaches, ventre blanc, queue qui remonte.
+        hood(M.top);
+        const pink = own(mat('#f7a1c0', 0.6));
+        const ear = new THREE.ConeGeometry(1, 1, 4);
+        for (const s of [-1, 1]) {
+          piece(H, ear, M.top, v(s * 0.04, 0.078, -0.006), v(0.022, 0.04, 0.012), new THREE.Euler(0, 0, -s * 0.38));
+          piece(H, ear, pink, v(s * 0.04, 0.076, -0.0005), v(0.013, 0.026, 0.006), new THREE.Euler(0, 0, -s * 0.38));
+        }
+        piece(H, sphere, pink, v(0, -0.001, 0.0655), v(0.0085, 0.0055, 0.005));
+        const dark = own(mat('#3b2a20', 0.6));
+        for (const s of [-1, 1]) for (let k = -1; k <= 1; k++) rod(H, dark, v(s * 0.024, -0.012 + k * 0.004, 0.0535), v(s * 0.068, -0.012 + k * 0.011, 0.045), 0.0016);
+        piece(C, sphere, own(mat('#fff4e6', 0.9)), v(0, -0.12, -0.033), v(0.052, 0.11, 0.025));
+        extras.push(tail(['#f4a04a', '#c8641e'], 0.6, 0.032, false, 2.2));
+        break;
+      }
+      case 'momie': {
+        // Tête emmaillotée avec une fente pour les yeux, cou bandé, bandelettes qui pendent.
+        piece(H, new THREE.SphereGeometry(1, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.43), M.top, v(0, 0.002, -0.002), v(0.06, 0.07, 0.066));
+        piece(H, new THREE.SphereGeometry(1, 28, 16, 0, Math.PI * 2, Math.PI * 0.56, Math.PI * 0.44), M.top, v(0, 0.002, -0.002), v(0.06, 0.07, 0.068));
+        piece(C, cylGeo, M.top, v(0, 0.045, 0.003), v(0.03, 0.06, 0.03));
+        extras.push(ribbon('#ddd1b3'));
+        break;
+      }
+      case 'viking': {
+        // Casque à cornes et nasal, barbe rousse à deux tresses, fourrure sur les épaules, bouclier rond.
+        const steel = own(new THREE.MeshStandardMaterial({ color: '#a3acb6', roughness: 0.35, metalness: 0.4 }));
+        piece(H, new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), steel, v(0, 0.018, -0.004), v(0.063, 0.07, 0.067), new THREE.Euler(-0.15, 0, 0));
+        const bronze = own(new THREE.MeshStandardMaterial({ color: '#b5833a', roughness: 0.4, metalness: 0.5 }));
+        piece(H, new THREE.TorusGeometry(1, 0.14, 6, 28), bronze, v(0, 0.018, -0.004), v(0.065, 0.068, 0.04), new THREE.Euler(Math.PI / 2 - 0.15, 0, 0));
+        piece(H, new THREE.TorusGeometry(1, 0.08, 6, 20, Math.PI), bronze, v(0, 0.018, -0.004), v(0.068, 0.074, 0.03), new THREE.Euler(-0.15, Math.PI / 2, 0));
+        piece(H, new THREE.BoxGeometry(1, 1, 1), steel, v(0, 0.01, 0.066), v(0.008, 0.032, 0.006), new THREE.Euler(-0.15, 0, 0));
+        const ivory = own(mat('#efe6cf', 0.5));
+        for (const s of [-1, 1]) {
+          const horn = bend(new THREE.ConeGeometry(0.014, 0.065, 10, 6), v(-s * 0.035, 0, 0));
+          piece(H, horn, ivory, v(s * 0.075, 0.045, -0.006), 1, new THREE.Euler(0, 0, -s * (Math.PI / 2 - 0.3)));
+        }
+        const ginger = own(mat('#d9822b', 0.95));
+        piece(H, new THREE.SphereGeometry(1, 20, 12, Math.PI / 2 - 1.2, 2.4, Math.PI * 0.55, Math.PI * 0.45), ginger, v(0, -0.016, 0.008), v(0.054, 0.076, 0.053));
+        for (const s of [-1, 1]) piece(H, new THREE.CapsuleGeometry(1, 2, 2, 6), ginger, v(s * 0.016, -0.014, 0.055), v(0.006, 0.01, 0.006), new THREE.Euler(0, 0, s * 1.1));
+        const braid: [V, V, THREE.Euler][] = [];
+        for (const s of [-1, 1]) for (let k = 0; k < 3; k++) braid.push([v(s * 0.013, -0.078 - k * 0.014, 0.04 - k * 0.004), v(0.0085 - k * 0.001, 0.009, 0.0085 - k * 0.001), new THREE.Euler()]);
+        piece(H, copies(sphere, braid), ginger, v(0, 0, 0), 1);
+        for (const s of [-1, 1]) piece(H, sphere, bronze, v(s * 0.013, -0.12, 0.031), 0.006);
+        // Peau de bête sur les épaules et le dos, col bien gonflé.
+        const pelt = own(new THREE.MeshStandardMaterial({ map: pattern('pelt'), roughness: 1 }));
+        shell(pelt, 0.12, 0.5, 0.9, Math.PI * 2 - 1.8, 1.14, 0.08);
+        piece(C, new THREE.TorusGeometry(1, 0.45, 10, 24), pelt, v(0, 0.036, 0.006), v(0.05, 0.05, 0.034), new THREE.Euler(Math.PI / 2, 0, 0));
+        for (const s of [-1, 1]) piece(C, sphere, pelt, v(s * 0.098, 0.014, 0.006), v(0.054, 0.036, 0.058));
+        const paint = own(mat('#b0302a', 0.7));
+        piece(C, cylGeo, paint, v(0, -0.11, 0.085), v(0.1, 0.012, 0.1), new THREE.Euler(Math.PI / 2, 0, 0));
+        piece(C, new THREE.TorusGeometry(1, 0.06, 6, 32), steel, v(0, -0.11, 0.085), v(0.1, 0.1, 0.1));
+        piece(C, sphere, steel, v(0, -0.11, 0.092), v(0.022, 0.022, 0.014));
+        break;
+      }
+      case 'requin': {
+        // Capuche de requin : gueule ouverte autour du visage (deux rangées de dents), aileron, queue.
+        const cap = hood(M.top, 0.58, -0.6, v(0.071, 0.08, 0.078));
+        cap.position.set(0, 0.012, -0.01);
+        cap.updateMatrix();
+        const jaw = new THREE.Matrix4().compose(v(0, -0.004, 0.004), new THREE.Quaternion(), v(0.066, 0.078, 0.066));
+        const edge = (a: number, theta: number, m: THREE.Matrix4) =>
+          v(Math.sin(a) * Math.sin(theta), Math.cos(theta), Math.cos(a) * Math.sin(theta)).applyMatrix4(m);
+        piece(H, new THREE.SphereGeometry(1, 24, 10, Math.PI / 2 - 1.25, 2.5, Math.PI * 0.62, Math.PI * 0.3), M.top, v(0, -0.004, 0.004), v(0.066, 0.078, 0.066));
+        const teeth: [V, V, THREE.Euler][] = [];
+        for (let i = 0; i < 9; i++) teeth.push([edge(-1.05 + (i * 2.1) / 8, Math.PI * 0.58, cap.matrix).add(v(0, -0.006, -0.004)), v(0.006, 0.016, 0.006), new THREE.Euler(Math.PI, 0, 0)]);
+        for (let i = 0; i < 7; i++) teeth.push([edge(-0.9 + (i * 1.8) / 6, Math.PI * 0.62, jaw).add(v(0, 0.006, -0.002)), v(0.005, 0.014, 0.005), new THREE.Euler()]);
+        piece(H, copies(new THREE.ConeGeometry(1, 1, 4), teeth), own(mat('#f8f9fa', 0.35)), v(0, 0, 0), 1);
+        const black = own(mat('#15171a', 0.3));
+        for (const s of [-1, 1]) piece(H, sphere, black, v(s * 0.062, 0.035, 0.03), 0.0075);
+        piece(H, bend(new THREE.ConeGeometry(0.032, 0.064, 8), v(0, 0, -0.022)), M.top, v(0, 0.092, -0.024), v(0.25, 1, 1));
+        piece(C, sphere, own(mat('#f1f3f5', 0.8)), v(0, -0.11, -0.034), v(0.068, 0.15, 0.026));
+        // Queue de requin : corps effilé, nageoire en croissant (lobe du haut plus grand).
+        const fin = pivot(P, v(0, -0.05, 0.05));
+        fin.rotation.x = 0.12;
+        piece(fin, new THREE.ConeGeometry(1, 1, 12), M.top, v(0, 0, 0.1), v(0.045, 0.2, 0.04), new THREE.Euler(Math.PI / 2, 0, 0));
+        const lobe = new THREE.ConeGeometry(1, 1, 8);
+        piece(fin, lobe, M.top, v(0, 0.045, 0.21), v(0.008, 0.11, 0.028), new THREE.Euler(0.55, 0, 0));
+        piece(fin, lobe, M.top, v(0, -0.026, 0.205), v(0.008, 0.07, 0.022), new THREE.Euler(Math.PI - 0.75, 0, 0));
+        extras.push({ update: (_b, info) => (fin.rotation.y = Math.sin(info.now / 380) * 0.35) });
+        break;
+      }
+      case 'panda': {
+        // Capuche blanche à oreilles rondes noires, taches autour des yeux, nez noir, petite queue.
+        hood(M.top);
+        const black = own(mat('#1d1e22', 0.8));
+        for (const s of [-1, 1]) {
+          piece(H, sphere, black, v(s * 0.047, 0.07, -0.012), v(0.021, 0.021, 0.012), new THREE.Euler(0, 0, -s * 0.5));
+          piece(H, sphere, black, v(s * 0.022, 0.004, 0.049), v(0.017, 0.021, 0.006), new THREE.Euler(0.15, 0, s * 0.5));
+        }
+        piece(H, sphere, black, v(0, -0.001, 0.0655), v(0.0085, 0.006, 0.005));
+        // Bande noire sur les épaules et le haut du dos, comme un vrai panda.
+        shell(black, 0.28, 0.5, 0.95, Math.PI * 2 - 1.9, 1.03);
+        piece(P, sphere, M.top, v(0, -0.045, 0.066), 0.022);
+        break;
+      }
       default:
         break;
     }
@@ -975,9 +1771,11 @@ export function createClimber() {
       });
       g.clear();
     }
+    const shared = Object.values(textures);
     owned.splice(0).forEach((m) => {
       if (m === fur) return;
-      (m as THREE.MeshStandardMaterial).map?.dispose();
+      const map = (m as THREE.MeshStandardMaterial).map;
+      if (map && !shared.includes(map)) map.dispose();
       m.dispose();
     });
     owned.push(fur);
@@ -986,11 +1784,17 @@ export function createClimber() {
     const L = look;
     M.skin.color.set(L.skin);
     M.top.color.set(L.topMap ? '#ffffff' : L.top);
-    M.top.map = L.topMap ? textures.stripes : null;
+    M.top.map = L.topMap ? pattern(L.topMap) : null;
+    M.sleeve.color.set(L.arms ?? L.top);
     M.bottom.color.set(L.bottomMap ? '#ffffff' : L.bottom);
-    M.bottom.map = L.bottomMap ? textures.zigzag : null;
-    for (const m of [M.top, M.bottom]) m.needsUpdate = true;
-    for (const m of [M.skin, M.top, M.bottom, ...M.hands]) {
+    M.bottom.map = L.bottomMap ? pattern(L.bottomMap) : null;
+    for (const m of [M.top, M.bottom]) {
+      m.emissiveMap = L.glowMap ? pattern(L.glowMap) : null;
+      m.emissive.set(L.glowMap ? '#ffffff' : '#000000');
+      m.emissiveIntensity = 1;
+      m.needsUpdate = true;
+    }
+    for (const m of [M.skin, M.top, M.sleeve, M.bottom, ...M.hands]) {
       m.metalness = L.metal ? 0.3 : 0;
       m.roughness = L.metal ? 0.4 : m === M.skin ? 0.55 : 0.85;
     }
@@ -1007,15 +1811,18 @@ export function createClimber() {
     if (L.hair !== 'none') hair.geometry = hairGeos[L.hair];
     face.visible = !L.noFace;
     for (const p of [head, nose, ...ears]) p.visible = id !== 'robot';
-    const sleeveMat = L.sleeves === 'long' ? M.top : M.skin;
+    const armMat = L.arms ? M.sleeve : M.top;
+    const sleeveMat = L.sleeves === 'long' ? armMat : M.skin;
     arms.forEach((a) => {
       a.sleeve.visible = L.sleeves === 'short';
-      a.shoulder.material = L.sleeves === 'none' ? M.skin : M.top;
+      a.shoulder.material = L.sleeves === 'none' ? M.skin : armMat;
       a.upper.material = sleeveMat;
       a.fore.material = sleeveMat;
       a.elbow.material = sleeveMat;
       a.wrist.material = L.gloves ? M.hands[0] : sleeveMat;
     });
+    // Les rayures du pirate et le zigzag rétro restent comme sur leurs images.
+    hem.geometry = L.topMap === 'stripes' ? cylGeo : hemGeo;
     const shinMat = L.legs === 'shorts' ? M.skin : M.bottom;
     legs.forEach((l) => {
       l.thigh.material = L.legs === 'shorts' ? M.skin : M.bottom;
@@ -1023,6 +1830,7 @@ export function createClimber() {
       l.knee.material = shinMat;
       l.shin.material = shinMat;
       l.cuff.visible = L.legs !== 'shorts';
+      l.cuff.geometry = L.bottomMap === 'zigzag' ? cylGeo : hemGeo;
     });
     build(id);
   };

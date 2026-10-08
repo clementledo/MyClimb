@@ -1,5 +1,6 @@
+import { useRouter } from 'expo-router';
 import { useContext, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Icon, ListRow, Section } from '@/components/ui';
 
@@ -15,7 +16,9 @@ import {
   pickBackup,
   restoreBackup,
 } from '@/lib/backup';
+import { ownsTheme, PRICE } from '@/lib/collection';
 import { getSetting, setSetting } from '@/lib/db';
+import { rarityOf } from '@/lib/rarity';
 import {
   colors,
   currentFont,
@@ -24,6 +27,7 @@ import {
   radius,
   space,
   ThemeSwitch,
+  themeOf,
   THEMES,
   themedStyles,
   type,
@@ -50,6 +54,7 @@ const readHeight = () => {
 
 export default function SettingsScreen() {
   const switcher = useContext(ThemeSwitch);
+  const router = useRouter();
   const selected = currentTheme();
   const [height, setHeight] = useState(readHeight);
   const [checking, setChecking] = useState(false);
@@ -167,18 +172,31 @@ export default function SettingsScreen() {
 
   const fontId = currentFont();
 
-  const themeGrid = (fun: boolean) => (
+  const locked = (id: ThemeId) => {
+    const r = rarityOf(themeOf(id).rarity!);
+    Alert.alert(`${THEMES[id].name} · ${r.name}`, `Ce thème se gagne dans les packs de cartes, ou s’achète ${PRICE[r.id]} magnésie dans ta collection.`, [
+      { text: 'OK', style: 'cancel' },
+      { text: 'Voir la collection', onPress: () => router.push('/collection') },
+    ]);
+  };
+  const themeGrid = (collectible: boolean) => {
+    const list = ids.filter((id) => !!themeOf(id).rarity === collectible);
+    // Les thèmes qu'on a d'abord ; une case vide garde la dernière ligne alignée.
+    list.sort((a, b) => Number(!ownsTheme(a)) - Number(!ownsTheme(b)));
+    return (
     <View style={s.grid}>
-      {ids
-        .filter((id) => THEMES[id].fun === fun)
+      {list
         .map((id) => {
           const t = THEMES[id];
           const active = id === selected;
+          const mine = ownsTheme(id);
+          const rarity = themeOf(id).rarity;
           return (
             <Pressable
               key={id}
-              onPress={() => !active && switcher.theme(id)}
+              onPress={() => (!mine ? locked(id) : !active && switcher.theme(id))}
               accessibilityState={{ selected: active }}
+              accessibilityLabel={`Thème ${t.name}${mine ? '' : ', à gagner'}`}
               style={({ pressed }) => [s.theme, active && s.themeActive, pressed && { opacity: 0.7 }]}>
               {/* Aperçu miniature du thème */}
               <View style={[s.preview, { backgroundColor: t.colors.background, borderColor: t.colors.border }]}>
@@ -192,25 +210,39 @@ export default function SettingsScreen() {
                     <Icon name="check" size={14} color={colors.onPrimary} />
                   </View>
                 )}
+                {!mine && (
+                  <View style={s.lockCover}>
+                    <View style={s.lock}>
+                      <Icon name="lock" size={16} color="#FFFFFF" />
+                    </View>
+                  </View>
+                )}
               </View>
               <Text style={s.themeName} numberOfLines={1}>
                 {t.name}
               </Text>
-              <Text style={s.themeBlurb} numberOfLines={2}>
-                {t.blurb}
-              </Text>
+              {rarity ? (
+                <Text style={[s.themeRarity, { color: rarityOf(rarity).color }]}>{rarityOf(rarity).name}</Text>
+              ) : (
+                <Text style={s.themeBlurb} numberOfLines={2}>
+                  {t.blurb}
+                </Text>
+              )}
             </Pressable>
           );
         })}
+      {list.length % 2 === 1 && <View style={[s.theme, s.spacer]} />}
     </View>
-  );
+    );
+  };
 
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
       <Section title="Thème">
         <Text style={s.groupTitle}>Classiques</Text>
         {themeGrid(false)}
-        <Text style={s.groupTitle}>Loufoques</Text>
+        <Text style={s.groupTitle}>Collection</Text>
+        <Text style={s.themeBlurb}>À gagner dans les packs de cartes (Progression › Ma collection).</Text>
         {themeGrid(true)}
       </Section>
 
@@ -357,6 +389,10 @@ const s = themedStyles({
     justifyContent: 'center',
     backgroundColor: colors.primary,
   },
+  lockCover: { ...StyleSheet.absoluteFill, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.45)', alignItems: 'center', justifyContent: 'center' },
+  lock: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(20,24,31,0.72)', alignItems: 'center', justifyContent: 'center' },
+  themeRarity: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
+  spacer: { opacity: 0 },
   themeName: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 4 },
   themeBlurb: { fontSize: 12, fontWeight: '400', lineHeight: 16, color: colors.muted },
   listCard: {

@@ -34,16 +34,17 @@ export default function RootLayout() {
   }, [path]);
   // Compteur de redessins : changer de thème (ou restaurer une sauvegarde) redessine toute l'app.
   const [version, setVersion] = useState(0);
-  const reopen = useRef(false);
+  // Écran à rouvrir après le redessin (Paramètres, collection…).
+  const reopen = useRef<string | null>(null);
   const switcher = useMemo(() => {
-    const redraw = () => {
-      reopen.current = true;
+    const redraw = (back?: string) => {
+      reopen.current = back ?? pathname.current;
       setVersion((v) => v + 1);
     };
     return {
-      theme: (id: ThemeId) => {
+      theme: (id: ThemeId, back?: string) => {
         applyTheme(id);
-        redraw();
+        redraw(back);
       },
       font: (id: FontId) => {
         applyFont(id);
@@ -52,10 +53,16 @@ export default function RootLayout() {
     };
   }, []);
   useEffect(() => {
-    if (!reopen.current) return;
-    reopen.current = false;
-    // Le redessin garde parfois la page Paramètres ouverte : on ne la rouvre que si elle a disparu.
-    const t = setTimeout(() => pathname.current !== '/settings' && router.push('/settings'), 50);
+    const back = reopen.current;
+    if (!back) return;
+    reopen.current = null;
+    // Le redessin garde parfois l'écran ouvert : on ne le rouvre que s'il a disparu. La collection
+    // se rouvre par-dessus la Progression, d'où on y va.
+    const t = setTimeout(() => {
+      if (pathname.current === back) return;
+      if (back.startsWith('/collection')) router.navigate('/progression');
+      router.push(back as never);
+    }, 50);
     return () => clearTimeout(t);
   }, [version, router]);
 
@@ -132,6 +139,8 @@ export default function RootLayout() {
           <Stack.Screen name="training/exercise/[id]" options={{ title: 'Exercice' }} />
           <Stack.Screen name="training/routine/[id]" options={{ title: 'Routine' }} />
           <Stack.Screen name="training/routine-edit" options={{ title: 'Nouvelle routine', presentation: 'modal' }} />
+          <Stack.Screen name="collection/index" options={{ title: 'Ma collection' }} />
+          <Stack.Screen name="collection/packs" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
         </Stack>
       </ThemeProvider>
     </ThemeSwitch.Provider>

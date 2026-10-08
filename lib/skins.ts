@@ -1,4 +1,6 @@
-/** Costumes du grimpeur 3D (simulation et carte joueur), tous disponibles. */
+import type { Rarity } from './rarity';
+
+/** Costumes du grimpeur 3D (simulation et carte joueur). */
 export type SkinId =
   | 'classique'
   | 'competition'
@@ -11,21 +13,54 @@ export type SkinId =
   | 'pirate'
   | 'robot'
   | 'noel'
-  | 'licorne';
+  | 'licorne'
+  | 'bucheron'
+  | 'cowboy'
+  | 'pompier'
+  | 'abeille'
+  | 'chat'
+  | 'momie'
+  | 'viking'
+  | 'requin'
+  | 'panda'
+  | 'sorcier'
+  | 'chevalier'
+  | 'yeti'
+  | 'samourai'
+  | 'dragon'
+  | 'golem'
+  | 'cosmique';
 
-export const SKINS: { id: SkinId; name: string; wacky?: boolean }[] = [
+/** Les costumes sans rareté sont à tout le monde ; les autres se gagnent dans les packs. */
+export const SKINS: { id: SkinId; name: string; rarity?: Rarity }[] = [
   { id: 'classique', name: 'Classique' },
   { id: 'competition', name: 'Compétition' },
   { id: 'retro', name: 'Rétro 80' },
-  { id: 'astronaute', name: 'Astronaute', wacky: true },
-  { id: 'dino', name: 'Dinosaure', wacky: true },
-  { id: 'banane', name: 'Banane', wacky: true },
-  { id: 'heros', name: 'Super-héros', wacky: true },
-  { id: 'ninja', name: 'Ninja', wacky: true },
-  { id: 'pirate', name: 'Pirate', wacky: true },
-  { id: 'robot', name: 'Robot', wacky: true },
-  { id: 'noel', name: 'Père Noël', wacky: true },
-  { id: 'licorne', name: 'Licorne', wacky: true },
+  { id: 'ninja', name: 'Ninja', rarity: 'commun' },
+  { id: 'pirate', name: 'Pirate', rarity: 'commun' },
+  { id: 'noel', name: 'Père Noël', rarity: 'commun' },
+  { id: 'bucheron', name: 'Bûcheron', rarity: 'commun' },
+  { id: 'cowboy', name: 'Cow-boy', rarity: 'commun' },
+  { id: 'pompier', name: 'Pompier', rarity: 'commun' },
+  { id: 'abeille', name: 'Abeille', rarity: 'commun' },
+  { id: 'heros', name: 'Super-héros', rarity: 'rare' },
+  { id: 'robot', name: 'Robot', rarity: 'rare' },
+  { id: 'banane', name: 'Banane', rarity: 'rare' },
+  { id: 'chat', name: 'Chat', rarity: 'rare' },
+  { id: 'momie', name: 'Momie', rarity: 'rare' },
+  { id: 'viking', name: 'Viking', rarity: 'rare' },
+  { id: 'requin', name: 'Requin', rarity: 'rare' },
+  { id: 'panda', name: 'Panda', rarity: 'rare' },
+  { id: 'dino', name: 'Dinosaure', rarity: 'epique' },
+  { id: 'astronaute', name: 'Astronaute', rarity: 'epique' },
+  { id: 'sorcier', name: 'Magicien', rarity: 'epique' },
+  { id: 'chevalier', name: 'Chevalier', rarity: 'epique' },
+  { id: 'yeti', name: 'Yéti', rarity: 'epique' },
+  { id: 'licorne', name: 'Licorne', rarity: 'legendaire' },
+  { id: 'samourai', name: 'Samouraï', rarity: 'legendaire' },
+  { id: 'dragon', name: 'Dragon', rarity: 'legendaire' },
+  { id: 'golem', name: 'Golem de lave', rarity: 'mythique' },
+  { id: 'cosmique', name: 'Esprit cosmique', rarity: 'mythique' },
 ];
 
 export const DEFAULT_SKIN: SkinId = 'classique';

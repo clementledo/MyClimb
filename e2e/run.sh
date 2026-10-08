@@ -164,8 +164,17 @@ scrolltop ; tap "Matériel" ; sleep 2 ; tap "Poutre" ; sleep 1 ; shot 1o-materie
 tap "Poutre" ; sleep 1 ; tap "Fermer" ; sleep 2
 tap "Progression" ; sleep 3 ; shot 1d-progression
 tap "Costume et nom" ; sleep 2 ; shot 1d1-ma-carte
-tapcostume "Pirate" ; sleep 1 ; shot 1d1b-pirate
-tap "OK" ; sleep 2 ; scrolltop ; shot 1d1c-carte-pirate
+tapcostume "Compétition" ; sleep 1 ; shot 1d1b-costume
+tap "OK" ; sleep 2 ; scrolltop ; shot 1d1c-carte-costume
+tap "Ouvrir mes packs" ; sleep 3 ; shot 1p-pack
+tap "Ouvrir le pack" ; sleep 1 ; shot 1p1-pack-charge ; sleep 3 ; shot 1p2-cartes
+tap "Carte 1" ; sleep 2 ; shot 1p3-carte-1
+tap "Tout révéler" ; sleep 6 ; shot 1p4-revele
+tap "Continuer" ; sleep 3 ; tap "Tout révéler" ; sleep 6 ; tap "Continuer" ; sleep 3 ; shot 1p5-bilan
+tap "Voir ma collection" ; sleep 3 ; shot 1q-collection
+tap "Contours" ; sleep 2 ; shot 1q1-contours
+tap "Célébrations" ; sleep 2 ; shot 1q2-celebrations
+adb shell input keyevent 4 ; sleep 3 ; scrolltop
 tap "Comment faire monter mes stats" ; sleep 1 ; shot 1d1d-aide
 tap "Comment faire monter mes stats" ; sleep 1
 tap "Voir mes entraînements" ; sleep 1 ; shot 1d2-progression-entrainement
@@ -183,14 +192,14 @@ tap "Annuler mes corrections" ; sleep 3
 tap "Vitesse" ; sleep 1 ; tap "Vitesse" ; sleep 1
 tap "Lecture" ; sleep 8 ; shot 8-3d-fin
 tap "Réglages" ; sleep 2 ; shot 7c-costumes
-tapcostume "Banane" ; sleep 2
+tapcostume "Rétro 80" ; sleep 2
 tap "Dévers" ; sleep 2 ; tap "Fermer" ; sleep 5
 tap "Recommencer" ; sleep 2 ; tap "Lecture" ; sleep 3 ; shot 9-devers
 scrolltop ; tap "Plein écran" ; sleep 6 ; shot 9b-plein-ecran
 tap "Lecture" ; sleep 4 ; shot 9c-plein-ecran-jeu
 tap "Quitter le plein écran" ; sleep 3
 tap "Paramètres" ; sleep 4 ; shot 10-parametres
-tap "Terminal rétro" ; sleep 6 ; shot 11-theme
+tap "Nuit" ; sleep 6 ; shot 11-theme
 tap "Classique" ; sleep 6 ; shot 11b-classique
 tap "Manrope" ; sleep 6 ; shot 11c-manrope
 tap "Inter" ; sleep 6

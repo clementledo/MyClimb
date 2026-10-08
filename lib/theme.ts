@@ -2,6 +2,7 @@ import { createContext } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { getSetting, setSetting } from './db';
+import type { Rarity } from './rarity';
 
 export type Palette = {
   primary: string;
@@ -28,8 +29,8 @@ export type Theme = {
   blurb: string;
   /** Thème sombre : barre d'état claire. */
   dark: boolean;
-  /** Classique ou loufoque. */
-  fun: boolean;
+  /** Les thèmes avec une rareté se gagnent dans les packs ; les autres sont à tout le monde. */
+  rarity?: Rarity;
   colors: Palette;
 };
 
@@ -38,7 +39,6 @@ export const THEMES = {
     name: 'Classique',
     blurb: 'Le design MyClimb : clair, net, une touche d’orange.',
     dark: false,
-    fun: false,
     colors: {
       primary: '#EE5A24',
       primarySoft: '#FFF0E8',
@@ -59,7 +59,6 @@ export const THEMES = {
     name: 'Nuit',
     blurb: 'Fond sombre pour les séances du soir.',
     dark: true,
-    fun: false,
     colors: {
       primary: '#FF8A3D',
       primarySoft: '#3A2518',
@@ -80,7 +79,6 @@ export const THEMES = {
     name: 'Océan',
     blurb: 'Bleu calme, comme un bloc au bord de l’eau.',
     dark: false,
-    fun: false,
     colors: {
       primary: '#1C7ED6',
       primarySoft: '#E6F0FB',
@@ -101,7 +99,6 @@ export const THEMES = {
     name: 'Forêt',
     blurb: 'Vert sapin, pour les jours de grimpe en extérieur.',
     dark: false,
-    fun: false,
     colors: {
       primary: '#2F7D4F',
       primarySoft: '#E4F1E8',
@@ -122,7 +119,6 @@ export const THEMES = {
     name: 'Magnésie',
     blurb: 'Noir et blanc, tout en craie.',
     dark: false,
-    fun: false,
     colors: {
       primary: '#222222',
       primarySoft: '#EDEDED',
@@ -143,7 +139,7 @@ export const THEMES = {
     name: 'Banane',
     blurb: 'Jaune vif, pour grimper avec la patate.',
     dark: false,
-    fun: true,
+    rarity: 'commun',
     colors: {
       primary: '#7A4B00',
       primarySoft: '#FFE066',
@@ -164,7 +160,7 @@ export const THEMES = {
     name: 'Barbe à papa',
     blurb: 'Rose bonbon et bleu fête foraine.',
     dark: false,
-    fun: true,
+    rarity: 'commun',
     colors: {
       primary: '#E64980',
       primarySoft: '#D0F4FF',
@@ -185,7 +181,7 @@ export const THEMES = {
     name: 'Terminal rétro',
     blurb: 'Vert phosphore sur écran noir, comme en 1985.',
     dark: true,
-    fun: true,
+    rarity: 'rare',
     colors: {
       primary: '#39FF14',
       primarySoft: '#0F2A0B',
@@ -206,7 +202,7 @@ export const THEMES = {
     name: 'Coulée de lave',
     blurb: 'Rouge brûlant : tes avant-bras en fin de séance.',
     dark: true,
-    fun: true,
+    rarity: 'epique',
     colors: {
       primary: '#FF5722',
       primarySoft: '#4A1608',
@@ -227,7 +223,7 @@ export const THEMES = {
     name: 'Licorne',
     blurb: 'Violet pailleté, pour les croix magiques.',
     dark: false,
-    fun: true,
+    rarity: 'rare',
     colors: {
       primary: '#9C36B5',
       primarySoft: '#FBE6FF',
@@ -248,7 +244,7 @@ export const THEMES = {
     name: 'Apéro au pied des voies',
     blurb: 'Jaune anis et bleu cigale, accent du Sud compris.',
     dark: false,
-    fun: true,
+    rarity: 'commun',
     colors: {
       primary: '#1864AB',
       primarySoft: '#FFF3BF',
@@ -265,9 +261,242 @@ export const THEMES = {
       dangerSoft: '#FAE9E9',
     },
   },
+  menthe: {
+    name: 'Menthe à l’eau',
+    blurb: 'Vert menthe tout frais, comme un sirop après la séance.',
+    dark: false,
+    rarity: 'commun',
+    colors: {
+      primary: '#12A07A',
+      primarySoft: '#DDF5EC',
+      text: '#123D33',
+      muted: '#5E8278',
+      border: '#CDE9DF',
+      background: '#F1FAF6',
+      surface: '#E2F3EC',
+      success: '#1F9D55',
+      danger: '#D64545',
+      onPrimary: '#FBFFFD',
+      card: '#FCFFFE',
+      successSoft: '#DDF3E5',
+      dangerSoft: '#FDE8DE',
+    },
+  },
+  cafe: {
+    name: 'Café crème',
+    blurb: 'Brun chaud et crème, pour le café avant la grimpe.',
+    dark: false,
+    rarity: 'commun',
+    colors: {
+      primary: '#8B5A3C',
+      primarySoft: '#F3E6DA',
+      text: '#2E1F16',
+      muted: '#85715F',
+      border: '#E8DACB',
+      background: '#FAF5EF',
+      surface: '#F1E8DD',
+      success: '#3E8E41',
+      danger: '#C0392B',
+      onPrimary: '#FFFCF8',
+      card: '#FFFDF9',
+      successSoft: '#E3F1E1',
+      dangerSoft: '#F9E3DF',
+    },
+  },
+  glacier: {
+    name: 'Glacier',
+    blurb: 'Bleu glacé, pour garder la tête froide dans le crux.',
+    dark: false,
+    rarity: 'commun',
+    colors: {
+      primary: '#2C8BC9',
+      primarySoft: '#E0F1FB',
+      text: '#0F2A3D',
+      muted: '#5D7A8F',
+      border: '#D2E6F2',
+      background: '#F2F8FC',
+      surface: '#E3EFF7',
+      success: '#22936A',
+      danger: '#D2404D',
+      onPrimary: '#FAFDFF',
+      card: '#FDFEFF',
+      successSoft: '#DCF2E9',
+      dangerSoft: '#FBE4E6',
+    },
+  },
+  sakura: {
+    name: 'Sakura',
+    blurb: 'Rose cerisier, doux comme une dalle au printemps.',
+    dark: false,
+    rarity: 'rare',
+    colors: {
+      primary: '#D6457A',
+      primarySoft: '#FCE4EE',
+      text: '#3F1828',
+      muted: '#94657A',
+      border: '#F5D3E0',
+      background: '#FFF6F9',
+      surface: '#FBE9F0',
+      success: '#2F9461',
+      danger: '#C8323F',
+      onPrimary: '#FFFBFD',
+      card: '#FFFDFE',
+      successSoft: '#E0F3E8',
+      dangerSoft: '#FBE1E4',
+    },
+  },
+  bleau: {
+    name: 'Fontainebleau',
+    blurb: 'Grès blond et vert forêt, comme un week-end à Bleau.',
+    dark: false,
+    rarity: 'rare',
+    colors: {
+      primary: '#3F7D3A',
+      primarySoft: '#E6EFD9',
+      text: '#2B2A1F',
+      muted: '#7C7764',
+      border: '#E5DDC6',
+      background: '#F7F2E6',
+      surface: '#EEE7D3',
+      success: '#2D8A4E',
+      danger: '#B8432E',
+      onPrimary: '#FDFEF9',
+      card: '#FFFCF4',
+      successSoft: '#DFF0E2',
+      dangerSoft: '#F6E1DA',
+    },
+  },
+  coucher: {
+    name: 'Coucher de soleil',
+    blurb: 'Rose corail et pêche, la lumière du soir sur la falaise.',
+    dark: false,
+    rarity: 'rare',
+    colors: {
+      primary: '#EF5B6E',
+      primarySoft: '#FFE5E6',
+      text: '#3A1E33',
+      muted: '#8E6478',
+      border: '#F8D7DA',
+      background: '#FFF4F1',
+      surface: '#FCE6E2',
+      success: '#2E9C6A',
+      danger: '#C2304A',
+      onPrimary: '#FFFAF8',
+      card: '#FFFCFB',
+      successSoft: '#DCF3E8',
+      dangerSoft: '#FADDE3',
+    },
+  },
+  jungle: {
+    name: 'Jungle',
+    blurb: 'Vert profond et jaune banane, sous la canopée.',
+    dark: true,
+    rarity: 'rare',
+    colors: {
+      primary: '#F2C230',
+      primarySoft: '#3A3410',
+      text: '#E9F5E3',
+      muted: '#93AE8C',
+      border: '#26402A',
+      background: '#0D1A10',
+      surface: '#1A2E1D',
+      success: '#6BD66B',
+      danger: '#FF6B57',
+      onPrimary: '#1B1500',
+      card: '#132317',
+      successSoft: '#183A1C',
+      dangerSoft: '#3D1A14',
+    },
+  },
+  synthwave: {
+    name: 'Synthwave',
+    blurb: 'Violet nuit et rose néon, comme une borne d’arcade.',
+    dark: true,
+    rarity: 'epique',
+    colors: {
+      primary: '#FF3EA5',
+      primarySoft: '#3B1239',
+      text: '#F5E9FF',
+      muted: '#A98BC4',
+      border: '#3A2457',
+      background: '#120A24',
+      surface: '#211538',
+      success: '#2EF2C7',
+      danger: '#FF5470',
+      onPrimary: '#FFF7FC',
+      card: '#1A1030',
+      successSoft: '#0F3A35',
+      dangerSoft: '#3E0F1E',
+    },
+  },
+  abysses: {
+    name: 'Abysses',
+    blurb: 'Bleu des grands fonds et cyan phosphorescent.',
+    dark: true,
+    rarity: 'epique',
+    colors: {
+      primary: '#22D3EE',
+      primarySoft: '#0C3440',
+      text: '#E3F6FB',
+      muted: '#7FA5B3',
+      border: '#16334A',
+      background: '#04121F',
+      surface: '#0B2234',
+      success: '#3BE38F',
+      danger: '#FF6B81',
+      onPrimary: '#02222B',
+      card: '#081A2A',
+      successSoft: '#0B3A2A',
+      dangerSoft: '#3C1220',
+    },
+  },
+  prestige: {
+    name: 'Prestige',
+    blurb: 'Noir profond et or : la salle VIP.',
+    dark: true,
+    rarity: 'legendaire',
+    colors: {
+      primary: '#D4AF37',
+      primarySoft: '#2E2614',
+      text: '#F6F0E1',
+      muted: '#A39A86',
+      border: '#2E2A22',
+      background: '#0B0A08',
+      surface: '#1A1814',
+      success: '#7DC97D',
+      danger: '#E5684F',
+      onPrimary: '#1A1405',
+      card: '#13120F',
+      successSoft: '#1C301C',
+      dangerSoft: '#3A1A12',
+    },
+  },
+  aurore: {
+    name: 'Aurore boréale',
+    blurb: 'Ciel polaire et lueurs vertes, au-dessus du Grand Nord.',
+    dark: true,
+    rarity: 'legendaire',
+    colors: {
+      primary: '#5CF2A6',
+      primarySoft: '#103A2C',
+      text: '#E7F1FF',
+      muted: '#8FA3C0',
+      border: '#1F2D4D',
+      background: '#070C1F',
+      surface: '#111B36',
+      success: '#8BE8FF',
+      danger: '#FF6F91',
+      onPrimary: '#04210F',
+      card: '#0C1430',
+      successSoft: '#123345',
+      dangerSoft: '#3A1426',
+    },
+  },
 } satisfies Record<string, Theme>;
 
 export type ThemeId = keyof typeof THEMES;
+/** Un thème avec tous ses champs (y compris la rareté, absente des thèmes de base). */
+export const themeOf = (id: ThemeId): Theme => THEMES[id];
 
 /* ---------- Polices ---------- */
 
@@ -378,7 +607,8 @@ export function applyFont(id: FontId) {
 }
 
 /** Changement de thème ou de police depuis n'importe quel écran (fourni par la mise en page racine). */
-export const ThemeSwitch = createContext<{ theme: (id: ThemeId) => void; font: (id: FontId) => void }>({
+/** Change le thème ou la police : redessine toute l'app, puis rouvre `back` (par défaut, l'écran en cours). */
+export const ThemeSwitch = createContext<{ theme: (id: ThemeId, back?: string) => void; font: (id: FontId) => void }>({
   theme: () => {},
   font: () => {},
 });

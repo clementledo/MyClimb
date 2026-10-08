@@ -1,8 +1,10 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { Button, Chip, IconButton, Sheet } from '@/components/ui';
 import { FEEL_LABELS, type Feel } from '@/lib/climbing';
+import { syncFromJournal } from '@/lib/collection';
 import { insertTrainingLog, type TrainingLog } from '@/lib/db';
 import { todayIso } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
@@ -34,6 +36,14 @@ export function TrainingDone({
     insertTrainingLog({ ...entry, minutes, feel, date: todayIso() });
     reset();
     onSaved();
+    // Trois jours d'entraînement dans la semaine : un pack.
+    const added = syncFromJournal();
+    if (added.length) {
+      Alert.alert(added.length > 1 ? `${added.length} packs de cartes gagnés !` : 'Pack de cartes gagné !', added.map((p) => p.reason).join('\n'), [
+        { text: 'Plus tard', style: 'cancel' },
+        { text: 'Ouvrir', onPress: () => router.push('/collection/packs') },
+      ]);
+    }
   };
 
   return (
