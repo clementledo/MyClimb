@@ -3,6 +3,7 @@ import type { AndroidSymbol } from 'expo-symbols';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Polyline } from 'react-native-svg';
 
 import { Climb3D, type Progress } from '@/components/Climb3D';
 import { Badge, Button, Chip, Icon, IconButton, Segmented, Sheet } from '@/components/ui';
@@ -228,6 +229,28 @@ function HoldsEditor({
       <Pressable onPress={(e) => tap(e.nativeEvent.locationX, e.nativeEvent.locationY)}>
         <View style={{ width: w, height: h }}>
           <Image source={{ uri: route.photo }} style={[s.photo, { width: w, height: h }]} contentFit="cover" />
+          {route.hands.length > 1 && (
+            // Le trajet des mains, dans l'ordre : on voit d'un coup d'œil la ligne de la voie.
+            <Svg pointerEvents="none" width={w} height={h} style={s.path}>
+              <Polyline
+                points={route.hands.map((p) => `${p.x * w},${p.y * h}`).join(' ')}
+                fill="none"
+                stroke="rgba(0,0,0,0.3)"
+                strokeWidth={5}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <Polyline
+                points={route.hands.map((p) => `${p.x * w},${p.y * h}`).join(' ')}
+                fill="none"
+                stroke="#fff"
+                strokeWidth={2.5}
+                strokeDasharray="2 7"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            </Svg>
+          )}
           {route.feet.map((p, i) => (
             <View
               key={`f${i}`}
@@ -264,7 +287,7 @@ function HoldsEditor({
           onPress={() => onChange({ hands: [], feet: [] })}
         />
       </View>
-      <Button label="Voir la méthode en 3D" disabled={route.hands.length < 2} onPress={onPlay} />
+      <Button label="Voir la méthode en 3D" icon="view_in_ar" disabled={route.hands.length < 2} onPress={onPlay} />
       <Pressable onPress={onRemove} hitSlop={8}>
         <Text style={s.remove}>Supprimer cette voie</Text>
       </Pressable>
@@ -734,6 +757,7 @@ const s = themedStyles({
   editor: { padding: space.lg, gap: space.md, paddingBottom: 40 },
   hint: { color: colors.muted, fontSize: 13, fontWeight: '400', lineHeight: 19 },
   photo: { borderRadius: radius.lg },
+  path: { position: 'absolute', left: 0, top: 0 },
   hand: {
     position: 'absolute',
     width: 28,
@@ -744,6 +768,7 @@ const s = themedStyles({
     borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 3,
   },
   handTop: { backgroundColor: colors.success },
   handText: { color: colors.onPrimary, fontWeight: '800', fontSize: 12 },
@@ -757,6 +782,7 @@ const s = themedStyles({
     backgroundColor: '#1C7ED6',
     borderWidth: 2,
     borderColor: '#fff',
+    elevation: 2,
   },
   footText: { color: '#fff', fontWeight: '800', fontSize: 10 },
   typeBadge: {
