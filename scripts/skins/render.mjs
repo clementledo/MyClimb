@@ -2,6 +2,8 @@
 // Il faut esbuild, playwright-core, un Chromium et ImageMagick :
 //   npm i --no-save esbuild playwright-core
 //   CHROMIUM=/chemin/vers/chrome node scripts/skins/render.mjs
+// Pour ne redessiner que certains costumes, les nommer à la suite :
+//   CHROMIUM=/chemin/vers/chrome node scripts/skins/render.mjs bucheron cowboy
 /* eslint-disable import/no-unresolved -- outils installés à part, pas dans l'application */
 import { Buffer } from 'node:buffer';
 import { execFileSync } from 'node:child_process';
@@ -19,7 +21,41 @@ const work = mkdtempSync(join(tmpdir(), 'skins-'));
 await build({ entryPoints: [join(here, 'portrait.ts')], bundle: true, outfile: join(work, 'portrait.js'), logLevel: 'warning' });
 writeFileSync(join(work, 'index.html'), '<!doctype html><body style="margin:0"><canvas id="c"></canvas><script src="portrait.js"></script>');
 
-const SKINS = ['classique', 'competition', 'retro', 'astronaute', 'dino', 'banane', 'heros', 'ninja', 'pirate', 'robot', 'noel', 'licorne'];
+const ALL = [
+  'classique',
+  'competition',
+  'retro',
+  'astronaute',
+  'dino',
+  'banane',
+  'heros',
+  'ninja',
+  'pirate',
+  'robot',
+  'noel',
+  'licorne',
+  'bucheron',
+  'cowboy',
+  'pompier',
+  'abeille',
+  'chat',
+  'momie',
+  'viking',
+  'requin',
+  'panda',
+  'sorcier',
+  'chevalier',
+  'yeti',
+  'samourai',
+  'dragon',
+  'golem',
+  'cosmique',
+];
+// Costumes nommés sur la ligne de commande, sinon tous.
+const asked = process.argv.slice(2);
+const unknown = asked.filter((s) => !ALL.includes(s));
+if (unknown.length) throw new Error(`Costumes inconnus : ${unknown.join(', ')}`);
+const SKINS = asked.length ? asked : ALL;
 const SHOTS = [
   { suffix: '', query: 'w=300&h=500&dist=5.9&ty=0.98' },
   { suffix: '_carte', query: 'w=480&h=480&dist=2.3&ty=1.47&pose=cross' },

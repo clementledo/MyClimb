@@ -6,7 +6,9 @@
  */
 import * as THREE from 'three';
 
+import { createCelebrations, freeHand, type Mood } from './celebrations';
 import { createClimber, type Body3 } from './climber';
+import type { CelebrationId } from './cosmetics';
 import { WALL_ANGLES, type Plan } from './planner';
 import { contactsAt, skeleton, type P3 } from './simulation';
 import { DEFAULT_SKIN, type SkinId } from './skins';
@@ -139,6 +141,7 @@ export function createClimbScene(
   theme: SceneTheme,
   getPlan: () => Plan,
   skin: SkinId = DEFAULT_SKIN,
+  celebration: CelebrationId | null = null,
 ) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // Rendu plus doux des couleurs (sans brûler l'orange du t-shirt).
@@ -155,7 +158,8 @@ export function createClimbScene(
 
   // Lumières : ambiance de salle (plafonniers), une lumière principale qui projette l'ombre
   // du grimpeur sur le mur, et un contre-jour qui détache sa silhouette.
-  scene.add(new THREE.HemisphereLight('#ffffff', '#b9b2a6', 2.0));
+  const hemi = new THREE.HemisphereLight('#ffffff', '#b9b2a6', 2.0);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight('#fff6ea', 1.6);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -389,6 +393,34 @@ export function createClimbScene(
   climber.setSkin(skin);
   tilt.add(climber.group);
 
+  // Célébration au top : elle part à la première arrivée en haut (`since`, en ms) et repart si on
+  // redescend. La main libre (`free`) est choisie à l'arrivée.
+  const party = createCelebrations(scene);
+  party.set(celebration);
+  let since: number | null = null;
+  let free: 0 | 1 = 1;
+  /** Verticale et caméra (image précédente) dans le repère du mur, pour le geste et le regard. */
+  const wallUp = new THREE.Vector3(0, 1, 0);
+  const camLocal = new THREE.Vector3();
+  // Lumières de départ, pour l'ambiance de la fête (salle dans le noir, éclairs) et le retour à la normale.
+  const lights = { hemi: hemi.intensity, sun: sun.intensity, rim: rim.intensity, sunColor: sun.color.clone() };
+  let moody = false;
+  const applyMood = (m: Mood | null) => {
+    if (!m && !moody) return;
+    moody = !!m;
+    const night = m?.night ?? 0;
+    const flash = m?.flash ?? 0;
+    hemi.intensity = lights.hemi * (1 - 0.75 * night) + 2.4 * flash;
+    sun.intensity = lights.sun * (1 - 0.6 * night) + 1.2 * flash;
+    rim.intensity = lights.rim * (1 - 0.3 * night) + 0.8 * flash;
+    hemi.color.set('#ffffff');
+    sun.color.copy(lights.sunColor);
+    if (m) {
+      hemi.color.lerp(m.tint, night).lerp(m.flashColor, Math.min(1, flash));
+      sun.color.lerp(m.tint, night * 0.5);
+    }
+  };
+
   // Repères des prises : anneau fin et pastille translucide ; repère animé et trajet pour le mouvement en cours.
   const holds = new THREE.Group();
   tilt.add(holds);
@@ -475,7 +507,7 @@ export function createClimbScene(
     arms: s.arms.map((a) => ({ shoulder: toWorld(a.shoulder), elbow: toWorld(a.elbow), hand: toWorld(a.hand), grip: toWorld(a.grip) })),
     legs: s.legs.map((l) => ({ hip: toWorld(l.hip), knee: toWorld(l.knee), foot: toWorld(l.foot), toe: toWorld(l.toe) })),
   });
-  const pose = (t: number, look: THREE.Vector3 | null, now: number) => {
+  const pose = (t: number, look: THREE.Vector3 | null, now: number, age: number) => {
     const p = getPlan();
     const f = contactsAt(p.start, p.startTypes, p.moves, t);
     const sk = skeleton(f.c, p.height, f.moving, f.lift, f.types, f.crouch, {
@@ -485,7 +517,17 @@ export function createClimbScene(
       angle: WALL_ANGLES[p.angle].deg,
     });
     const b = toBody(sk);
-    climber.update(b, { height: p.height, types: f.types, moving: f.moving, chalk: f.chalk, look, now });
+    // Pendant la célébration, la main libre lâche la prise pour faire le geste.
+    const g = party.pose(age, b, free, p.height, f.types, wallUp, camLocal);
+    climber.update(b, {
+      height: p.height,
+      types: g?.types ?? f.types,
+      moving: f.moving,
+      chalk: f.chalk,
+      look: g?.look ?? look,
+      now,
+      fists: g?.fists,
+    });
     // Magnésie : la main qui vient d'attraper sa prise, ou qui plonge dans le sac.
     const done = p.moves[f.index - 1];
     if (f.index === lastIndex + 1 && done && !done.rest && (done.limb === 'lh' || done.limb === 'rh')) {
@@ -495,7 +537,7 @@ export function createClimbScene(
     lastIndex = f.index;
     lastChalk = f.chalk;
     drawPuffs(now, p.height);
-    return b.pelvis;
+    return b;
   };
 
   const focus = new THREE.Vector3(0, getPlan().H / 2, 0);
@@ -512,6 +554,7 @@ export function createClimbScene(
     wall.position.set(0, H / 2, -WALL_D / 2);
     tilt.rotation.x = (deg * Math.PI) / 180;
     tilt.updateMatrixWorld(true);
+    wallUp.set(0, Math.cos(tilt.rotation.x), -Math.sin(tilt.rotation.x));
     buildRoom(W, H, deg);
     const X = W / 2 + Math.max(3, W * 1.1);
     Object.assign(bounds, { x: X + 7.5, y: Math.max(H + 0.5, 4.2) + 1.1, z: 29 });
@@ -529,9 +572,20 @@ export function createClimbScene(
     const p = getPlan();
     const total = p.moves.length;
     const index = Math.max(0, Math.min(total, Math.floor(t)));
+    // Célébration : part à la première arrivée au top, repart si on redescend (relance, retour en arrière).
+    if (total > 0 && t >= total) {
+      if (since === null) {
+        since = now;
+        const end = contactsAt(p.start, p.startTypes, p.moves, total);
+        free = freeHand(end.c, p.hands[p.hands.length - 1] ?? end.c.lh, cam.yaw);
+      }
+    } else since = null;
+    const age = since === null ? -1 : now - since;
+    tilt.worldToLocal(camLocal.copy(camera.position));
     // Prise visée : anneau qui respire et halo, orange pour une main, bleu pour un pied.
     const move = t < total ? p.moves[index] : undefined;
-    const pelvis = tilt.localToWorld(pose(Math.max(0, t), move && !move.rest ? toWorld({ x: move.to.x, y: move.to.y, z: 0 }) : null, now).clone());
+    const body = pose(Math.max(0, t), move && !move.rest ? toWorld({ x: move.to.x, y: move.to.y, z: 0 }) : null, now, age);
+    const pelvis = tilt.localToWorld(body.pelvis.clone());
     // Pas de prise visée pendant un repos.
     const next = move && !move.rest ? move : undefined;
 
@@ -578,6 +632,8 @@ export function createClimbScene(
       Math.min(bounds.z, focus.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * dist),
     );
     camera.lookAt(focus);
+    // Effets de la fête (après la caméra : les particules lui font face) et ambiance de la salle.
+    applyMood(party.frame(age, body, free, p.height, tilt, camera));
     renderer.render(scene, camera);
   };
 
@@ -590,5 +646,11 @@ export function createClimbScene(
   /** Change le costume du grimpeur. */
   const setSkin = (id: SkinId) => climber.setSkin(id);
 
-  return { rebuild, frame, setWallTexture, setSkin };
+  /** Change la célébration au top (null : aucune) ; si le grimpeur y est déjà, la nouvelle se joue. */
+  const setCelebration = (id: CelebrationId | null) => {
+    party.set(id);
+    since = null;
+  };
+
+  return { rebuild, frame, setWallTexture, setSkin, setCelebration };
 }

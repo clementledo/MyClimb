@@ -7,6 +7,7 @@ import * as THREE from 'three';
 
 import type { SimRoute } from '@/lib/simRoutes';
 import { createClimbScene, type Cam } from '@/lib/climbScene';
+import type { CelebrationId } from '@/lib/cosmetics';
 import type { Plan } from '@/lib/planner';
 import type { SkinId } from '@/lib/skins';
 import { colors, isDark, themedStyles } from '@/lib/theme';
@@ -47,6 +48,8 @@ type Props = {
   plan: Plan;
   /** Costume du grimpeur. */
   skin: SkinId;
+  /** Célébration jouée en 3D à l'arrivée au top (null : aucune). */
+  celebration: CelebrationId | null;
   playing: boolean;
   speed: number;
   /** Change pour relancer la grimpe depuis le début. */
@@ -93,11 +96,24 @@ function orbitGestures(cam: Cam) {
   });
 }
 
-export function Climb3D({ route, plan, skin, playing, speed, restartKey, viewKey, seek, step, onProgress, onEnd }: Props) {
+export function Climb3D({ route, plan, skin, celebration, playing, speed, restartKey, viewKey, seek, step, onProgress, onEnd }: Props) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   // Erreur du moteur 3D : affichée au lieu de faire planter l'app.
   const [failure, setFailure] = useState<string | null>(null);
-  const live = useRef({ playing, speed, onProgress, onEnd, plan, skin, t: -0.6, dirty: true, skinDirty: false, stopAt: null as number | null });
+  const live = useRef({
+    playing,
+    speed,
+    onProgress,
+    onEnd,
+    plan,
+    skin,
+    celebration,
+    t: -0.6,
+    dirty: true,
+    skinDirty: false,
+    celebrationDirty: false,
+    stopAt: null as number | null,
+  });
   // Caméra : objet modifié par les gestes et lu par la boucle de rendu.
   const [cam] = useState(() => ({ ...DEFAULT_CAM }));
   const [pan] = useState(() => orbitGestures(cam));
@@ -111,6 +127,9 @@ export function Climb3D({ route, plan, skin, playing, speed, restartKey, viewKey
   useEffect(() => {
     if (live.current.skin !== skin) Object.assign(live.current, { skin, skinDirty: true });
   }, [skin]);
+  useEffect(() => {
+    if (live.current.celebration !== celebration) Object.assign(live.current, { celebration, celebrationDirty: true });
+  }, [celebration]);
   useEffect(() => {
     if (seek.n > 0) Object.assign(live.current, { t: seek.t, stopAt: null });
   }, [seek]);
@@ -175,6 +194,7 @@ export function Climb3D({ route, plan, skin, playing, speed, restartKey, viewKey
       { background: colors.background, primary: colors.primary, success: colors.success, dark: isDark() },
       () => live.current.plan,
       live.current.skin,
+      live.current.celebration,
     );
 
     let last = Date.now();
@@ -205,6 +225,10 @@ export function Climb3D({ route, plan, skin, playing, speed, restartKey, viewKey
       if (L.skinDirty) {
         L.skinDirty = false;
         world.setSkin(L.skin);
+      }
+      if (L.celebrationDirty) {
+        L.celebrationDirty = false;
+        world.setCelebration(L.celebration);
       }
       const total = L.plan.moves.length;
       if (L.playing || L.stopAt !== null) L.t += dt * MOVES_PER_S * L.speed;
