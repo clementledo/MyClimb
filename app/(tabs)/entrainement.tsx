@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { Badge, Button, Card, Chip, Empty, Icon, IconButton, ListRow, Section, Segmented, Sheet } from '@/components/ui';
@@ -49,6 +49,7 @@ const shortDate = (iso: string) => {
 export default function TrainingScreen() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('routines');
+  const scroll = useRef<ScrollView>(null);
   const [equipment, setEquipment] = useState<Equipment[]>(myEquipment);
   const [sheet, setSheet] = useState(false);
   const [focus, setFocus] = useState<Focus | null>(null);
@@ -130,10 +131,14 @@ export default function TrainingScreen() {
             { value: 'exercises', label: 'Renforcement' },
           ]}
           value={mode}
-          onChange={setMode}
+          onChange={(m) => {
+            // Chaque onglet s'ouvre en haut (filtres et matériel visibles), pas au milieu de la liste précédente.
+            setMode(m);
+            scroll.current?.scrollTo({ y: 0, animated: false });
+          }}
         />
       </View>
-      <ScrollView contentContainerStyle={s.content}>
+      <ScrollView ref={scroll} contentContainerStyle={s.content}>
         <Pressable style={s.summary} onPress={() => setSheet(true)} accessibilityLabel="Matériel">
           <Icon name="tune" size={18} color={colors.primary} />
           <Text style={s.summaryText} numberOfLines={1}>
