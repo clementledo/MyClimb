@@ -52,8 +52,8 @@ hidekb() {
 # Remonte tout en haut de l'écran en cours.
 scrolltop() {
   read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
-  # Sur le bord gauche : au milieu, le geste ferait tourner la 3D au lieu de faire défiler.
-  for _ in 1 2 3 4 5 6; do adb shell input swipe $((W * 3 / 100)) $((H * 30 / 100)) $((W * 3 / 100)) $((H * 85 / 100)) 300; sleep 1; done
+  # Sur le bord gauche (au milieu, le geste ferait tourner la 3D), en partant sous les en-têtes fixes.
+  for _ in 1 2 3 4 5 6; do adb shell input swipe $((W * 3 / 100)) $((H * 45 / 100)) $((W * 3 / 100)) $((H * 90 / 100)) 300; sleep 1; done
 }
 
 adb install -r app.apk
