@@ -106,7 +106,7 @@ export function PlayerSection({ blocks, logs }: { blocks: Block[]; logs: Trainin
         )}
       </Card>
 
-      <Sheet visible={edit} onClose={() => setEdit(false)} title="Ma carte" footer={<View style={s.footer}><Button label="OK" onPress={() => setEdit(false)} /></View>}>
+      <Sheet visible={edit} onClose={() => setEdit(false)} title="Ma carte" footer={<Button label="OK" onPress={() => setEdit(false)} />}>
         <Text style={s.label}>Nom sur la carte</Text>
         <TextInput
           value={name}
@@ -148,5 +148,4 @@ const s = themedStyles({
   helpName: { fontWeight: '700', color: colors.text },
   helpMuted: { ...type.caption, lineHeight: 18 },
   label: { ...type.callout },
-  footer: { paddingHorizontal: space.lg, paddingTop: space.sm },
 });
