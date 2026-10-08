@@ -52,7 +52,7 @@ hidekb() {
 # Remonte tout en haut de l'écran en cours.
 scrolltop() {
   read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
-  for _ in 1 2 3; do adb shell input swipe $((W / 2)) $((H * 40 / 100)) $((W / 2)) $((H * 80 / 100)) 300; sleep 1; done
+  for _ in 1 2 3 4 5 6; do adb shell input swipe $((W / 2)) $((H * 30 / 100)) $((W / 2)) $((H * 85 / 100)) 300; sleep 1; done
 }
 
 adb install -r app.apk
@@ -87,13 +87,15 @@ tap "Marquer comme faite" ; sleep 2 ; tap "Plus" ; sleep 1 ; tap "Juste" ; sleep
 tap "Enregistrer" ; sleep 2 ; shot 1j-enregistre
 adb shell input keyevent 4 ; sleep 3 ; shot 1k-historique
 tap "Renforcement" ; sleep 2 ; shot 1l-renforcement
-tap "Gainage" ; sleep 2 ; shot 1m-gainage
+tap "Doigts" ; sleep 2 ; shot 1m-doigts
 tap "Tous" ; sleep 1 ; tap "Tractions" ; sleep 3 ; shot 1n-exercice
 adb shell input keyevent 4 ; sleep 2
 tap "Planche" ; sleep 3 ; tap "Minuteur" ; sleep 7 ; shot 1n2-minuteur
-tap "Passer" ; sleep 2 ; shot 1n3-minuteur-suite ; tap "Fermer" ; sleep 2
-adb shell input keyevent 4 ; sleep 2
-tap "Matériel" ; sleep 2 ; tap "Poutre" ; sleep 1 ; shot 1o-materiel
+# Le minuteur se rafraîchit sans arrêt : uiautomator ne peut pas lire l'écran, on touche « Passer » par sa position.
+read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+adb shell input tap $((W * 3 / 4)) $((H * 91 / 100)) ; sleep 2 ; shot 1n3-minuteur-suite
+adb shell input keyevent 4 ; sleep 2 ; adb shell input keyevent 4 ; sleep 2
+scrolltop ; tap "Matériel" ; sleep 2 ; tap "Poutre" ; sleep 1 ; shot 1o-materiel
 tap "Poutre" ; sleep 1 ; tap "Fermer" ; sleep 2
 tap "Progression" ; sleep 3 ; shot 1d-progression
 tap "Voir mes entraînements" ; sleep 1 ; shot 1d2-progression-entrainement
