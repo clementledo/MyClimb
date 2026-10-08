@@ -9,7 +9,8 @@ import Svg, { Polyline } from 'react-native-svg';
 import { Climb3D, type Progress } from '@/components/Climb3D';
 import { SkinPicker } from '@/components/SkinPicker';
 import { Badge, Button, Chip, Icon, IconButton, Segmented, Sheet } from '@/components/ui';
-import { ownsSkin } from '@/lib/collection';
+import { equipped, ownsSkin } from '@/lib/collection';
+import type { CelebrationId } from '@/lib/cosmetics';
 import { getSetting, setSetting } from '@/lib/db';
 import {
   DEFAULT_WALL,
@@ -455,7 +456,13 @@ function PlayerView({
   const [full, setFull] = useState(false);
   const [skin, setSkin] = useState(readSkin);
   // Le costume peut aussi changer depuis la carte joueur (Progression).
-  useFocusEffect(useCallback(() => setSkin(readSkin()), []));
+  const [celebration, setCelebration] = useState(() => equipped('celebration') as CelebrationId | null);
+  useFocusEffect(
+    useCallback(() => {
+      setSkin(readSkin());
+      setCelebration(equipped('celebration') as CelebrationId | null);
+    }, []),
+  );
   const insets = useSafeAreaInsets();
   // La 3D prend toute la place laissée par les commandes (mesurées une fois).
   const [box, setBox] = useState(0);
@@ -623,6 +630,7 @@ function PlayerView({
               route={route}
               plan={plan}
               skin={skin}
+              celebration={celebration}
               playing={playing}
               speed={speed}
               restartKey={restartKey}
@@ -680,6 +688,7 @@ function PlayerView({
               route={route}
               plan={plan}
               skin={skin}
+              celebration={celebration}
               playing={playing}
               speed={speed}
               restartKey={restartKey}

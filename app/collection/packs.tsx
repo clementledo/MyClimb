@@ -6,7 +6,7 @@
  */
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { memo, useContext, useEffect, useRef, useState } from 'react';
+import { memo, useContext, useEffect, useState } from 'react';
 import { Animated, Easing, Pressable, Text, useWindowDimensions, Vibration, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
@@ -138,13 +138,13 @@ export default function PacksScreen() {
   const [player] = useState(readPlayer);
 
   // Animations du pack.
-  const float = useRef(new Animated.Value(0)).current;
-  const shake = useRef(new Animated.Value(0)).current;
-  const charge = useRef(new Animated.Value(0)).current;
-  const burst = useRef(new Animated.Value(0)).current;
-  const spin = useRef(new Animated.Value(0)).current;
-  const cardsIn = useRef([0, 1, 2, 3, 4].map(() => new Animated.Value(0))).current;
-  const flips = useRef([0, 1, 2, 3, 4].map(() => new Animated.Value(0))).current;
+  const float = useState(() => new Animated.Value(0))[0];
+  const shake = useState(() => new Animated.Value(0))[0];
+  const charge = useState(() => new Animated.Value(0))[0];
+  const burst = useState(() => new Animated.Value(0))[0];
+  const spin = useState(() => new Animated.Value(0))[0];
+  const cardsIn = useState(() => [0, 1, 2, 3, 4].map(() => new Animated.Value(0)))[0];
+  const flips = useState(() => [0, 1, 2, 3, 4].map(() => new Animated.Value(0)))[0];
 
   useEffect(() => {
     const loops = [
@@ -209,16 +209,18 @@ export default function PacksScreen() {
 
   // « Tout révéler » : les cartes se retournent l'une après l'autre (la meilleure en dernier),
   // en s'arrêtant le temps d'une entrée de Légendaire.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!auto || !opened || walkout !== null) return;
     const next = revealed.findIndex((x) => !x);
     if (next < 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAuto(false);
       return;
     }
     const t = setTimeout(() => reveal(next), 380);
     return () => clearTimeout(t);
-  }); // eslint-disable-line react-hooks/exhaustive-deps
+  });
 
   const nextPack = () => {
     [shake, charge, burst, ...cardsIn, ...flips].forEach((v) => v.setValue(0));
@@ -511,8 +513,8 @@ function Walkout({
   onClose: () => void;
   onEquip: (c: PulledCard) => void;
 }) {
-  const appear = useRef(new Animated.Value(0)).current;
-  const spin = useRef(new Animated.Value(0)).current;
+  const appear = useState(() => new Animated.Value(0))[0];
+  const spin = useState(() => new Animated.Value(0))[0];
   const t = useTicker(true, 30);
   const r = rarityOf(card.item.rarity);
   const big = Math.min(width * 0.6, 250);

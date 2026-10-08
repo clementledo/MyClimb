@@ -6,7 +6,7 @@ import { collectionSummary, onCollectionChange } from './collection';
 export function useCollectionSummary() {
   const [summary, setSummary] = useState(collectionSummary);
   useEffect(() => {
-    setSummary(collectionSummary());
+    setSummary(collectionSummary()); // eslint-disable-line react-hooks/set-state-in-effect
     return onCollectionChange(() => setSummary(collectionSummary()));
   }, []);
   return summary;

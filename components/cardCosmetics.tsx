@@ -1,3 +1,4 @@
+/* eslint-disable react/display-name -- les dessins sont des petites fonctions de rendu anonymes. */
 /**
  * Contours et fonds de la carte joueur, dessinés en SVG dans le repère de la carte (100 × 142).
  * Les contours suivent le bord du bouclier ; les fonds passent derrière le grimpeur et s'effacent
