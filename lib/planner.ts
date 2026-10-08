@@ -136,6 +136,9 @@ const ANGLE: Record<WallAngle, Weights> = {
   fort: { bras: 1.5, recul: 2.5, equilibre: 0.3, adherence: Infinity, crochet: 0.4, vide: 0.3, jete: 0.6 },
 };
 
+/** Coût d'un départ replié (jambes très pliées, bassin reculé). */
+const START = 6;
+
 /** Coût d'une position impossible pour ce gabarit, utilisée seulement pour finir la voie. */
 const IMPOSSIBLE = 30;
 
@@ -395,7 +398,9 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
         const e = evaluate(a, b, f, gg);
         if (!e) continue;
         const k = keyOf(a, b, f, gg);
-        const cost = e.cost + extra + 0.1 * (a + b);
+        // Un vrai départ se prend pieds bas, corps allongé : sans ce coût, le moteur partirait
+        // pieds déjà hauts, tout replié, pour s'économiser des mouvements de pied.
+        const cost = e.cost + extra + 0.1 * (a + b) + START * (e.pose.legBend ** 2 + e.pose.lean ** 2);
         if (cost < (g.get(k) ?? Infinity)) {
           g.set(k, cost);
           heap.push(cost + remaining(a, b), k);

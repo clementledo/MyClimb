@@ -130,8 +130,9 @@ export function solvePose(c: Contacts, height: number, types: HandTypes = {}, cr
     }
   }
 
-  // Buste et jambes entre les épaules et les pieds : les jambes plient d'abord, puis le bassin
-  // recule, puis les bras plient (les épaules remontent vers les mains).
+  // Buste et jambes entre les épaules et les pieds, comme un vrai grimpeur : les jambes plient,
+  // le buste se redresse un peu (bras légèrement pliés), puis les genoux s'ouvrent (grenouille)
+  // pour garder le bassin près du mur, puis seulement le bassin recule, et enfin les bras plient.
   let tp = t;
   let l = lMax;
   let down = dir;
@@ -145,10 +146,17 @@ export function solvePose(c: Contacts, height: number, types: HandTypes = {}, cr
       excess -= d;
       return cur - d;
     };
+    const rise = (max: number) => {
+      const d = Math.min(excess, max);
+      shoulders = add(shoulders, mul(down, -d));
+      excess -= d;
+    };
     if (excess > 0) l = take(l, leg * 0.55);
-    if (excess > 0) tp = take(tp, t * 0.55);
-    if (excess > 0) l = take(l, leg * 0.3);
-    if (excess > 0) tp = take(tp, t * 0.25);
+    if (excess > 0) rise(0.2 * aMax);
+    if (excess > 0) l = take(l, leg * 0.32);
+    if (excess > 0) tp = take(tp, t * 0.7);
+    if (excess > 0) l = take(l, leg * 0.22);
+    if (excess > 0) tp = take(tp, t * 0.4);
     if (excess > 0) shoulders = add(shoulders, mul(down, -excess));
   }
   let hips = add(shoulders, mul(down, tp));
@@ -174,9 +182,10 @@ export function solvePose(c: Contacts, height: number, types: HandTypes = {}, cr
 
   const legBend = hanging ? 0 : clamp(1 - l / lMax, 0, 1);
   const lean = clamp(1 - tp / t, 0, 1);
-  const dArm = Math.max(dist(shoulders, c.lh), dist(shoulders, c.rh));
-  const zS = clamp(Math.sqrt(Math.max(0, (arm * 0.97) ** 2 - dArm ** 2)), 0.07 * height, 0.2 * height);
-  const zH = clamp(zS * 0.75 + Math.sqrt(Math.max(0, t * t - tp * tp)), 0.08 * height, 0.45 * height);
+  // Épaules à une dizaine de centimètres du mur : bras pliés, ce sont les coudes qui plient,
+  // le buste ne recule pas. Seule une inversée (prise tenue sous la poitrine) écarte le buste.
+  const zS = (under ? 0.13 : 0.08) * height;
+  const zH = clamp(zS * 0.9 + Math.sqrt(Math.max(0, t * t - tp * tp)), 0.08 * height, 0.4 * height);
 
   // Centre de gravité (surtout le bassin) au-dessus des pieds d'appui.
   let offBalance = 0;
@@ -306,14 +315,17 @@ export function skeleton(
       style === 'vide' && moving !== l
         ? add3(hip, { x: side * 0.06 * height, y: 0.45 * height, z: -0.05 * height })
         : contact(l);
-    // Genoux ouverts vers l'extérieur (grenouille) ; talon : genou vers le haut et dehors ;
-    // pointe : jambe presque tendue, genou vers le haut.
+    // Genoux ouverts vers l'extérieur (grenouille), qui montent quand le pied est haut (pied
+    // à hauteur de hanche : genou vers le haut, pas à l'horizontale) ; talon : genou vers le haut
+    // et dehors ; pointe : jambe presque tendue, genou vers le haut.
+    const below = (target.y - hip.y) / (b.thigh + b.shin);
+    const high = clamp((0.45 - below) / 0.35, 0, 1);
     const pole =
       style === 'talon'
         ? { x: side * 0.6, y: -0.7, z: 0.4 }
         : style === 'pointe'
           ? { x: 0, y: -1, z: 0.3 }
-          : { x: side * 0.55, y: -0.15, z: 0.8 };
+          : { x: side * (0.85 - 0.4 * high), y: -0.25 - 0.6 * high, z: 0.45 + 0.1 * high };
     const r = joint3(hip, target, b.thigh, b.shin, pole);
     return { hip, knee: r.joint, foot: r.end };
   });

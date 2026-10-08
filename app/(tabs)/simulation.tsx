@@ -29,7 +29,10 @@ type Kind = 'hands' | 'feet';
 const SPEEDS = [0.5, 1, 2, 4];
 
 export default function SimulationScreen() {
-  const [routes, setRoutes] = useState<SimRoute[]>(() => listSimRoutes());
+  const [routes, setRoutes] = useState<SimRoute[]>(() => {
+    resetAnglesOnce();
+    return listSimRoutes();
+  });
   const [currentId, setCurrentId] = useState<string | null>(() => routes[0]?.id ?? null);
   const [mode, setMode] = useState<Mode>('holds');
   const route = routes.find((r) => r.id === currentId) ?? routes[0] ?? null;
@@ -330,6 +333,16 @@ const ANGLE_KEY = 'wallAngle';
 const readAngle = (): WallAngle => {
   const v = getSetting(ANGLE_KEY);
   return v && v in WALL_ANGLES ? (v as WallAngle) : 'vertical';
+};
+/**
+ * Une seule fois : les voies déjà créées repassent en mur vertical (l'inclinaison avait souvent
+ * été changée en essayant le réglage). Le choix reste possible dans Réglages.
+ */
+const resetAnglesOnce = () => {
+  if (getSetting('anglesReset') === '1') return;
+  setSetting(ANGLE_KEY, 'vertical');
+  saveSimRoutes(listSimRoutes().map((r) => ({ ...r, angle: undefined })));
+  setSetting('anglesReset', '1');
 };
 const WEIGHTS_KEY = 'plannerWeights';
 const LEARNED_KEY = 'plannerLearned';
