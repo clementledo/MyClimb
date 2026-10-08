@@ -2,6 +2,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, Vibration, View } from 'react-native';
 
+import { ExerciseAnim } from '@/components/ExerciseAnim';
 import { Button, Sheet } from '@/components/ui';
 import { colors, radius, space, themedStyles } from '@/lib/theme';
 import { formatSeconds, type Dose, type Exercise } from '@/lib/training';
@@ -110,6 +111,8 @@ export function HoldTimer({ exercise, onClose, onDone }: { exercise: Exercise; o
         </View>
       ) : (
         <View style={s.center}>
+          {/* Le mouvement à faire, qui ne bouge que pendant l'effort. */}
+          <ExerciseAnim id={exercise.id} size={140} playing={pausedAt === null && phase.kind === 'work'} />
           <Text style={[s.phase, { color: tint }]}>{LABEL[phase.kind].toUpperCase()}</Text>
           <Text style={[s.big, { color: tint }]}>{left >= 60 ? formatSeconds(Math.ceil(left)) : Math.ceil(left)}</Text>
           <View style={s.track}>

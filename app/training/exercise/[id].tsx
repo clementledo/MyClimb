@@ -3,10 +3,12 @@ import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ExerciseAnim } from '@/components/ExerciseAnim';
 import { HoldTimer, hasTimer } from '@/components/HoldTimer';
 import { TrainingDone } from '@/components/TrainingDone';
 import { Badge, Banner, Button, Card, Empty, Icon, Section } from '@/components/ui';
 import { listTrainingLogs } from '@/lib/db';
+import { HAS_ANIMATION } from '@/lib/exercisePoses';
 import { todayIso } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 import { EQUIPMENT, exerciseById, exerciseMinutes, exerciseSeconds, FOCUS, formatSeconds, LEVELS } from '@/lib/training';
@@ -30,9 +32,15 @@ export default function ExerciseScreen() {
       <Stack.Screen options={{ title: x.name }} />
       <ScrollView contentContainerStyle={s.content}>
         <View style={s.head}>
-          <View style={s.icon}>
-            <Icon name={FOCUS[x.focus].icon} size={30} color={colors.primary} />
-          </View>
+          {HAS_ANIMATION(x.id) ? (
+            <View style={s.anim} accessibilityLabel={`Animation : ${x.name}`}>
+              <ExerciseAnim id={x.id} size={210} />
+            </View>
+          ) : (
+            <View style={s.icon}>
+              <Icon name={FOCUS[x.focus].icon} size={30} color={colors.primary} />
+            </View>
+          )}
           <Text style={s.title}>{x.name}</Text>
           <Text style={s.goal}>{x.goal}</Text>
           <View style={s.badges}>
@@ -105,6 +113,15 @@ const s = themedStyles({
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl },
   head: { gap: space.sm },
   icon: { width: 60, height: 60, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft, marginBottom: space.xs },
+  anim: {
+    alignItems: 'center',
+    paddingVertical: space.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: space.xs,
+  },
   title: { ...type.title },
   goal: { ...type.body, color: colors.muted },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: space.xs },
