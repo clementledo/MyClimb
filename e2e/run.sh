@@ -10,7 +10,7 @@ shot() { adb exec-out screencap -p > "$OUT/$1.png"; }
 
 # Touche l'élément dont le texte (ou la description) correspond exactement.
 tap() {
-  for i in 1 2 3 4 5 6 7 8; do
+  for i in 1 2 3 4 5 6 7 8 9 10; do
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
     adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
     xy=$(python3 - "$1" "$OUT/ui.xml" <<'PY'
@@ -31,9 +31,9 @@ PY
       echo "Touché « $1 » en $xy" | tee -a "$OUT/taps.txt"
       return 0
     fi
-    # Pas visible : faire défiler vers le bas (3 fois), puis vers le haut.
+    # Pas visible : faire défiler vers le bas (5 fois), puis vers le haut.
     read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
-    if [ "$i" -le 3 ]; then
+    if [ "$i" -le 5 ]; then
       adb shell input swipe $((W / 2)) $((H * 70 / 100)) $((W / 2)) $((H * 45 / 100)) 400
     else
       adb shell input swipe $((W / 2)) $((H * 45 / 100)) $((W / 2)) $((H * 70 / 100)) 400
@@ -42,6 +42,17 @@ PY
   done
   echo "Introuvable : « $1 »" | tee -a "$OUT/taps.txt"
   return 1
+}
+
+# Ferme le clavier s'il est ouvert (sinon le bouton retour fermerait l'écran).
+hidekb() {
+  if adb shell dumpsys input_method | grep -q "mInputShown=true"; then adb shell input keyevent 4; sleep 1; fi
+}
+
+# Remonte tout en haut de l'écran en cours.
+scrolltop() {
+  read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+  for _ in 1 2 3; do adb shell input swipe $((W / 2)) $((H * 40 / 100)) $((W / 2)) $((H * 80 / 100)) 300; sleep 1; done
 }
 
 adb install -r app.apk
@@ -66,7 +77,9 @@ tap "Marquer comme faite" ; sleep 2 ; tap "Enregistrer" ; sleep 2 ; shot 1g3-rou
 adb shell input keyevent 4 ; sleep 3 ; shot 1g4-semaine
 tap "Rappel quotidien" ; sleep 2 ; shot 1g5-rappel ; tap "Fermer" ; sleep 2
 tap "Créer ma routine" ; sleep 3 ; tap "Ajouter des exercices" ; sleep 2
-tap "Planche" ; sleep 1 ; tap "Pigeon" ; sleep 1 ; shot 1g6-choix ; tap "Terminé (2)" ; sleep 2 ; shot 1g7-ma-routine
+tap "Chercher un exercice" ; sleep 1 ; adb shell input text "planche" ; sleep 2 ; tap "Planche" ; sleep 1
+tap "Effacer la recherche" ; sleep 1 ; tap "Chercher un exercice" ; sleep 1 ; adb shell input text "pigeon" ; sleep 2
+tap "Pigeon" ; sleep 1 ; shot 1g6-choix ; hidekb ; tap "Terminé (2)" ; sleep 2 ; shot 1g7-ma-routine
 tap "Enregistrer la routine" ; sleep 3 ; shot 1g8-mes-routines
 tap "Séances" ; sleep 2
 tap "Voir la séance" ; sleep 3 ; shot 1h-seance
@@ -99,7 +112,7 @@ tap "Vitesse" ; sleep 1 ; tap "Vitesse" ; sleep 1
 tap "Lecture" ; sleep 8 ; shot 8-3d-fin
 tap "Réglages" ; sleep 2 ; tap "Dévers" ; sleep 2 ; tap "Fermer" ; sleep 5
 tap "Recommencer" ; sleep 2 ; tap "Lecture" ; sleep 3 ; shot 9-devers
-tap "Plein écran" ; sleep 6 ; shot 9b-plein-ecran
+scrolltop ; tap "Plein écran" ; sleep 6 ; shot 9b-plein-ecran
 tap "Lecture" ; sleep 4 ; shot 9c-plein-ecran-jeu
 tap "Quitter le plein écran" ; sleep 3
 tap "Paramètres" ; sleep 4 ; shot 10-parametres

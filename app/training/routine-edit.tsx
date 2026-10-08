@@ -8,6 +8,14 @@ import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 import { EXERCISES, exerciseById, FOCUS, ROUTINE_KINDS, type Focus, type RoutineKind } from '@/lib/training';
 import { customRoutines, deleteCustomRoutine, routineMinutes, saveCustomRoutine } from '@/lib/trainingPlan';
 
+/** Pour chercher sans tenir compte des accents ni des majuscules. */
+const plain = (t: string) =>
+  t
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
 /** Créer ou modifier une routine perso : un nom, un type, et des exercices dans l'ordre. */
 export default function RoutineEditScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -19,6 +27,7 @@ export default function RoutineEditScreen() {
   const [items, setItems] = useState<string[]>(existing?.items ?? []);
   const [picker, setPicker] = useState(false);
   const [focus, setFocus] = useState<Focus | null>(null);
+  const [query, setQuery] = useState('');
 
   const move = (i: number, d: number) => {
     const j = i + d;
@@ -57,7 +66,8 @@ export default function RoutineEditScreen() {
       },
     ]);
 
-  const pickable = EXERCISES.filter((x) => !focus || x.focus === focus);
+  const q = plain(query);
+  const pickable = EXERCISES.filter((x) => (!focus || x.focus === focus) && (!q || plain(x.name).includes(q)));
 
   return (
     <View style={s.container}>
@@ -119,14 +129,32 @@ export default function RoutineEditScreen() {
         {existing && <Button label="Supprimer la routine" variant="ghost" onPress={remove} />}
       </View>
 
-      <Sheet visible={picker} onClose={() => setPicker(false)} title="Ajouter des exercices">
+      <Sheet
+        visible={picker}
+        onClose={() => setPicker(false)}
+        title="Ajouter des exercices"
+        footer={<Button label={`Terminé (${items.length})`} onPress={() => setPicker(false)} />}>
+        <View style={s.search}>
+          <Icon name="search" size={20} color={colors.muted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Chercher un exercice"
+            placeholderTextColor={colors.muted}
+            accessibilityLabel="Chercher un exercice"
+            style={s.searchInput}
+            autoCorrect={false}
+          />
+          {query ? <IconButton icon="close" label="Effacer la recherche" onPress={() => setQuery('')} /> : null}
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.focusRow}>
           <Chip label="Tous" selected={!focus} onPress={() => setFocus(null)} />
           {(Object.keys(FOCUS) as Focus[]).map((f) => (
             <Chip key={f} label={FOCUS[f].label} selected={focus === f} onPress={() => setFocus(f)} />
           ))}
         </ScrollView>
-        <View style={s.listCard}>
+        {pickable.length === 0 && <Text style={s.none}>Aucun exercice ne correspond.</Text>}
+        <View style={pickable.length ? s.listCard : undefined}>
           {pickable.map((x, i, arr) => {
             const on = items.includes(x.id);
             return (
@@ -142,7 +170,6 @@ export default function RoutineEditScreen() {
             );
           })}
         </View>
-        <Button label={`Terminé (${items.length})`} onPress={() => setPicker(false)} />
       </Sheet>
     </View>
   );
@@ -155,6 +182,18 @@ const s = themedStyles({
   label: { ...type.callout },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   focusRow: { flexDirection: 'row', gap: space.sm },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 48,
+    paddingLeft: space.md,
+    paddingRight: 4,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  searchInput: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: space.sm },
+  none: { ...type.subhead, color: colors.muted, textAlign: 'center' },
   listCard: { borderRadius: radius.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', marginBottom: space.md },
   num: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
   numText: { fontSize: 14, fontWeight: '800', color: colors.primary },

@@ -380,11 +380,14 @@ export function Sheet({
   onClose,
   title,
   children,
+  footer,
 }: {
   visible: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** Toujours visible sous le contenu, même quand il défile (bouton de validation d'une longue liste). */
+  footer?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -396,9 +399,14 @@ export function Sheet({
           <Text style={styles.sheetTitle}>{title}</Text>
           <IconButton icon="close" label="Fermer" onPress={onClose} />
         </View>
-        <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetContent} bounces={false}>
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={styles.sheetContent}
+          bounces={false}
+          keyboardShouldPersistTaps="handled">
           {children}
         </ScrollView>
+        {footer}
       </View>
     </Modal>
   );
@@ -536,7 +544,7 @@ export const styles = themedStyles({
     gap: space.lg,
     maxHeight: '88%',
   },
-  sheetScroll: { flexGrow: 0 },
+  sheetScroll: { flexGrow: 0, flexShrink: 1 },
   sheetContent: { gap: space.lg, paddingBottom: space.xs },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
