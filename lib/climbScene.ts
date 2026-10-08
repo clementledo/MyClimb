@@ -79,6 +79,13 @@ function wallTexture() {
   return tex;
 }
 
+/** Dégradé d'ombre (opaque en bas, transparent en haut) : ombre de contact au pied du mur. */
+function shadeTexture() {
+  const tex = dataTexture(32, (_, y) => [0, 0, 0, Math.round((1 - y / 31) ** 2 * 255)]);
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
+}
+
 /** Béton du sol : gris tacheté. */
 function concreteTexture() {
   const rand = seeded(5);
@@ -194,12 +201,13 @@ export function createClimbScene(renderer: THREE.WebGLRenderer, w: number, h: nu
   const concrete = concreteTexture();
   const floorMat = new THREE.MeshLambertMaterial({ color: '#d2d0cb', map: concrete });
   const matTop = new THREE.MeshStandardMaterial({ color: '#2d4b80', roughness: 0.75 });
-  const matSeam = new THREE.MeshStandardMaterial({ color: '#1c2f52', roughness: 0.9 });
+  const matSeam = new THREE.MeshStandardMaterial({ color: '#284473', roughness: 0.9 });
   const darkMat = new THREE.MeshStandardMaterial({ color: '#25282d', roughness: 0.8 });
   const ceilingMat = new THREE.MeshLambertMaterial({ color: '#33363c' });
   const lightMat = new THREE.MeshBasicMaterial({ color: '#fffdf4' });
   lightMat.toneMapped = false;
   const sideMat = new THREE.MeshLambertMaterial({ color: '#d9d8d4' });
+  const shadeMat = new THREE.MeshBasicMaterial({ color: '#000000', map: shadeTexture(), transparent: true, opacity: 0.32, depthWrite: false });
   const holdGeo = new THREE.IcosahedronGeometry(1, 1);
   const volumeGeo = new THREE.CylinderGeometry(1, 1, 1, 3);
   const decorHoldMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.6 });
@@ -346,11 +354,16 @@ export function createClimbScene(renderer: THREE.WebGLRenderer, w: number, h: nu
       // Bande de liaison entre deux tapis.
       if (i > 0) {
         const seam = new THREE.Mesh(box, matSeam);
-        seam.scale.set(0.09, 0.006, depth);
-        seam.position.set(-span / 2 + each * i, 0.322, back + 0.02 + depth / 2);
+        seam.scale.set(0.14, 0.01, depth + 0.06);
+        seam.position.set(-span / 2 + each * i, 0.325, back + 0.02 + depth / 2);
         room.add(seam);
       }
     }
+
+    // Ombre douce là où les tapis touchent le mur.
+    const shade = new THREE.Mesh(new THREE.PlaneGeometry(2 * X, 0.6), shadeMat);
+    shade.position.set(0, 0.32 + 0.3, 0.004);
+    room.add(shade);
 
     // Murs de la salle, plafond sombre, poutres et plafonniers.
     const RX = X + 8;
