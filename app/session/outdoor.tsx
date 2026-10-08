@@ -69,6 +69,7 @@ export default function OutdoorSessionScreen() {
         onChangeText={setSite}
         placeholder="Nom du spot ou du secteur"
         placeholderTextColor={colors.muted}
+        accessibilityLabel="Nom du spot"
       />
       {spots.length > 0 && (
         <Section title="Mes spots">

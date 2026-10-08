@@ -11,9 +11,20 @@ import {
 } from './climbing';
 import type { Block } from './db';
 
-export type Period = '30' | '90' | '365' | 'all';
+export type Period = '7' | '30' | '90' | '365' | 'all';
+
+/** Une séance compte (statistiques, carte joueur, packs) à partir de ce nombre de grimpes dans la journée. */
+export const MIN_SESSION_CLIMBS = 5;
+
+/** Les jours de séance validée : au moins `MIN_SESSION_CLIMBS` grimpes notées, réussies ou non. */
+export function validatedDays(blocks: Block[]): Set<string> {
+  const perDay = new Map<string, number>();
+  blocks.forEach((b) => perDay.set(b.date, (perDay.get(b.date) ?? 0) + 1));
+  return new Set([...perDay].filter(([, n]) => n >= MIN_SESSION_CLIMBS).map(([day]) => day));
+}
 
 const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+const WEEKDAYS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 
 const utc = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -31,30 +42,33 @@ export function periodStart(period: Period, blocks: Block[]): string {
   return blocks.reduce((m, b) => (b.date < m ? b.date : m), todayIso());
 }
 
-type Unit = 'week' | 'month';
+type Unit = 'day' | 'week' | 'month';
 
 function bucketOf(date: string, unit: Unit) {
+  if (unit === 'day') return date;
   if (unit === 'month') return `${date.slice(0, 7)}-01`;
   const d = utc(date);
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   return iso(d);
 }
 
-/** Périodes successives (semaines ou mois) de `from` à aujourd'hui. */
+/** Périodes successives (jours, semaines ou mois) de `from` à aujourd'hui. */
 export function buckets(from: string) {
   const days = (utc(todayIso()).getTime() - utc(from).getTime()) / 86_400_000;
-  const unit: Unit = days <= 120 ? 'week' : 'month';
+  const unit: Unit = days < 14 ? 'day' : days <= 120 ? 'week' : 'month';
   const keys: string[] = [];
   const d = utc(bucketOf(from, unit));
   const end = bucketOf(todayIso(), unit);
   while (iso(d) <= end && keys.length < 120) {
     keys.push(iso(d));
-    if (unit === 'week') d.setUTCDate(d.getUTCDate() + 7);
+    if (unit === 'day') d.setUTCDate(d.getUTCDate() + 1);
+    else if (unit === 'week') d.setUTCDate(d.getUTCDate() + 7);
     else d.setUTCMonth(d.getUTCMonth() + 1);
   }
   const multiYear = keys.length > 0 && keys[0].slice(0, 4) !== keys[keys.length - 1].slice(0, 4);
   const label = (k: string) => {
     const dt = utc(k);
+    if (unit === 'day') return WEEKDAYS[dt.getUTCDay()];
     if (unit === 'week') return `${k.slice(8, 10)}/${k.slice(5, 7)}`;
     const m = MONTHS[dt.getUTCMonth()];
     return multiYear ? `${m.replace('.', '')} ${k.slice(2, 4)}` : m;
@@ -86,7 +100,11 @@ function rates(list: Block[], names: string[], pick: (b: Block) => string[]) {
   };
 }
 
-export function computeStats(list: Block[], system: GradeSystem, from: string) {
+/**
+ * Statistiques des grimpes `list` depuis `from`. Seules les séances de `valid` comptent comme séances
+ * (sans `valid`, chaque jour de grimpe en est une).
+ */
+export function computeStats(list: Block[], system: GradeSystem, from: string, valid?: Set<string>) {
   const ladder = GRADES[system];
   const graded = list.filter((b) => b.gradeSystem === system);
   const idx = (b: Block) => ladder.indexOf(b.grade);
@@ -96,7 +114,8 @@ export function computeStats(list: Block[], system: GradeSystem, from: string) {
   const avgSent = sentGraded.length ? sentGraded.reduce((a, b) => a + idx(b), 0) / sentGraded.length : null;
   const firstTry = list.filter((b) => isFirstTry(b.result)).length;
   const afterTries = sent.filter((b) => !isFirstTry(b.result));
-  const sessions = new Set(list.map((b) => b.date)).size;
+  const counts = (b: Block) => !valid || valid.has(b.date);
+  const sessions = new Set(list.filter(counts).map((b) => b.date)).size;
 
   // Évolution par semaine ou par mois.
   const bk = buckets(from);
@@ -113,7 +132,7 @@ export function computeStats(list: Block[], system: GradeSystem, from: string) {
     return { max: Math.max(...s), avg: top.reduce((a, b) => a + b, 0) / top.length };
   });
   const volume = bk.keys.map((k) => split(byBucket.get(k) ?? []));
-  const sessionsPerBucket = bk.keys.map((k) => new Set((byBucket.get(k) ?? []).map((b) => b.date)).size);
+  const sessionsPerBucket = bk.keys.map((k) => new Set((byBucket.get(k) ?? []).filter(counts).map((b) => b.date)).size);
 
   // Pyramide : de la cotation la plus dure à la plus facile essayée.
   const usedIdx = graded.map(idx).filter((i) => i >= 0);
@@ -154,7 +173,7 @@ export function computeStats(list: Block[], system: GradeSystem, from: string) {
     firstTryRate: list.length ? firstTry / list.length : 0,
     firstTry,
     sessions,
-    perSession: sessions ? list.length / sessions : 0,
+    perSession: sessions ? list.filter(counts).length / sessions : 0,
     avgAttempts: afterTries.length ? afterTries.reduce((a, b) => a + b.attempts, 0) / afterTries.length : null,
     best: best >= 0 ? ladder[best] : null,
     avgGrade: avgSent === null ? null : ladder[Math.round(avgSent)],

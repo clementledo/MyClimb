@@ -17,12 +17,17 @@ tap() {
 import re, sys
 want, path = sys.argv[1], sys.argv[2]
 xml = open(path, encoding='utf-8').read()
+nodes = []
 for node in re.findall(r'<node [^>]*>', xml):
     text = re.search(r' text="([^"]*)"', node).group(1)
     desc = re.search(r' content-desc="([^"]*)"', node).group(1)
-    if want in (text, desc):
-        b = list(map(int, re.findall(r'\d+', re.search(r'bounds="([^"]*)"', node).group(1))))
-        print((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
+    b = list(map(int, re.findall(r'\d+', re.search(r'bounds="([^"]*)"', node).group(1))))
+    nodes.append((text, desc, b))
+# Texte exact d'abord, puis sans tenir compte des majuscules (boutons des alertes Android).
+for same in (lambda a: a == want, lambda a: a.casefold() == want.casefold()):
+    hit = next((b for text, desc, b in nodes if same(text) or same(desc)), None)
+    if hit:
+        print((hit[0] + hit[2]) // 2, (hit[1] + hit[3]) // 2)
         break
 PY
 )
@@ -124,6 +129,12 @@ shot 1-lancement
 tap "Filtres" ; sleep 2 ; shot 1b-filtres
 adb shell input keyevent 4 ; sleep 2
 tap "Extérieur" ; sleep 3 ; shot 1c-exterieur
+# Séance dehors sans grimpe : elle n'est pas validée (il en faut 5), l'app le dit avant de la terminer.
+tap "Démarrer une séance ici" ; sleep 8
+tap "Nom du spot" ; sleep 1 ; adb shell input text "Test" ; sleep 1 ; hidekb
+tap "Démarrer la séance" ; sleep 3 ; shot 1c2-seance
+tap "Terminer la séance" ; sleep 2 ; shot 1c3-terminer
+tap "Terminer quand même" ; sleep 3
 tap "En salle" ; sleep 1
 tap "Entraînement" ; sleep 3 ; shot 1g-entrainement
 tap "Commencer" ; sleep 3 ; shot 1g2-routine

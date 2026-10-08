@@ -7,6 +7,7 @@ import { Button, Empty, Icon } from '@/components/ui';
 import { isFirstTry, isSent } from '@/lib/climbing';
 import { getGym, listBlocksAddedSince, type Block } from '@/lib/db';
 import { endSession, getSession, type Session } from '@/lib/session';
+import { MIN_SESSION_CLIMBS } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 
 function elapsed(since: number) {
@@ -31,17 +32,23 @@ export default function SessionScreen() {
   const place = session.gymId ? (getGym(session.gymId)?.name ?? 'Salle') : (session.site ?? 'Extérieur');
   const sent = blocks.filter((b) => isSent(b.result)).length;
   const firstTry = blocks.filter((b) => isFirstTry(b.result)).length;
+  // Une séance ne compte (statistiques, carte joueur) qu'à partir de quelques grimpes.
+  const left = Math.max(0, MIN_SESSION_CLIMBS - blocks.length);
 
-  const finish = () =>
-    Alert.alert(
-      'Terminer la séance ?',
+  const finish = () => {
+    const done =
       blocks.length === 0
         ? 'Aucune grimpe ajoutée.'
-        : `${blocks.length} grimpe${blocks.length > 1 ? 's' : ''}, ${sent} réussie${sent > 1 ? 's' : ''} en ${elapsed(session.startedAt)}.`,
+        : `${blocks.length} grimpe${blocks.length > 1 ? 's' : ''}, ${sent} réussie${sent > 1 ? 's' : ''} en ${elapsed(session.startedAt)}.`;
+    Alert.alert(
+      left > 0 ? 'Séance pas encore validée' : 'Terminer la séance ?',
+      left > 0
+        ? `${done}\n\nIl faut au moins ${MIN_SESSION_CLIMBS} grimpes pour qu’une séance compte. Tes grimpes restent enregistrées.`
+        : done,
       [
         { text: 'Continuer', style: 'cancel' },
         {
-          text: 'Terminer',
+          text: left > 0 ? 'Terminer quand même' : 'Terminer',
           onPress: () => {
             endSession();
             router.back();
@@ -49,6 +56,7 @@ export default function SessionScreen() {
         },
       ],
     );
+  };
 
   return (
     <View style={s.container}>
@@ -74,6 +82,23 @@ export default function SessionScreen() {
                 <Stat label="Réussies" value={sent} />
                 <View style={s.sep} />
                 <Stat label="Du 1er coup" value={firstTry} />
+              </View>
+            </View>
+            <View style={s.goal}>
+              <Icon name={left > 0 ? 'flag' : 'verified'} size={20} color={left > 0 ? colors.primary : colors.success} />
+              <View style={s.goalBody}>
+                <Text style={s.goalText}>
+                  {left > 0 ? `Encore ${left} grimpe${left > 1 ? 's' : ''} pour valider la séance` : 'Séance validée'}
+                </Text>
+                <View style={s.goalTrack}>
+                  <View
+                    style={[
+                      s.goalBar,
+                      { width: `${(100 * Math.min(blocks.length, MIN_SESSION_CLIMBS)) / MIN_SESSION_CLIMBS}%` },
+                      left === 0 && s.goalBarDone,
+                    ]}
+                  />
+                </View>
               </View>
             </View>
             <Button label="Ajouter une grimpe" icon="add" onPress={() => router.push('/block/new')} />
@@ -113,6 +138,19 @@ const s = themedStyles({
   statValue: { fontSize: 22, fontWeight: '800', color: colors.onPrimary },
   statLabel: { fontSize: 12, fontWeight: '600', color: colors.onPrimary, opacity: 0.85 },
   sep: { width: 1, height: 32, backgroundColor: colors.onPrimary, opacity: 0.3, marginHorizontal: space.md },
+  goal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    padding: space.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  goalBody: { flex: 1, gap: 6 },
+  goalText: { fontSize: 14, fontWeight: '700', color: colors.text },
+  goalTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.border, overflow: 'hidden' },
+  goalBar: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.primary },
+  goalBarDone: { backgroundColor: colors.success },
   listTitle: { ...type.overline, paddingHorizontal: 4 },
   finish: { marginTop: space.lg },
 });

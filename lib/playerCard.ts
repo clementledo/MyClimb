@@ -10,6 +10,7 @@
  */
 import { GRADES, isFirstTry, isSent, type GradeSystem } from './climbing';
 import type { Block, TrainingLog } from './db';
+import { validatedDays } from './stats';
 import { exerciseById, sessionById, type Focus } from './training';
 import { findRoutine } from './trainingPlan';
 
@@ -207,10 +208,13 @@ export function playerCard(allBlocks: Block[], allLogs: TrainingLog[], on: strin
     const f = fade(date);
     for (const id of IDS) practice[id] += (w[id] ?? 0) * f;
   };
-  blocks.forEach((b) => add(climbWork(b, level), b.date));
+  // Seules les séances validées (5 grimpes ou plus) font progresser ; les réussites comptent toujours dans le niveau.
+  const valid = validatedDays(blocks);
+  const counted = blocks.filter((b) => valid.has(b.date));
+  counted.forEach((b) => add(climbWork(b, level), b.date));
   // Chaque séance : venir grimper (mental), et beaucoup de grimpes d'affilée (endurance).
   const perDay = new Map<string, number>();
-  blocks.forEach((b) => perDay.set(b.date, (perDay.get(b.date) ?? 0) + 1));
+  counted.forEach((b) => perDay.set(b.date, (perDay.get(b.date) ?? 0) + 1));
   perDay.forEach((n, date) => add({ mental: 0.15, endurance: 0.12 * Math.max(0, n - 4) }, date));
   logs.forEach((l) => add(trainingWork(l), l.date));
 
@@ -244,8 +248,8 @@ export function playerCard(allBlocks: Block[], allLogs: TrainingLog[], on: strin
   };
 }
 
-/** La carte d'aujourd'hui et celle d'il y a `span` jours, pour montrer ce qui a bougé. */
-export function cardTrend(blocks: Block[], logs: TrainingLog[], today: string, span = 30) {
-  const before = new Date(Date.parse(`${today}T00:00:00Z`) - span * DAY).toISOString().slice(0, 10);
-  return { card: playerCard(blocks, logs, today), before: playerCard(blocks, logs, before) };
+/** La carte d'aujourd'hui, et celles d'il y a 7 et 30 jours pour montrer ce qui a bougé. */
+export function cardTrend(blocks: Block[], logs: TrainingLog[], today: string) {
+  const ago = (n: number) => new Date(Date.parse(`${today}T00:00:00Z`) - n * DAY).toISOString().slice(0, 10);
+  return { card: playerCard(blocks, logs, today), week: playerCard(blocks, logs, ago(7)), month: playerCard(blocks, logs, ago(30)) };
 }

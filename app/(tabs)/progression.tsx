@@ -15,7 +15,7 @@ import {
   type GradeSystem,
 } from '@/lib/climbing';
 import { listBlocks, listTrainingLogs, type Block, type TrainingLog } from '@/lib/db';
-import { computeStats, periodStart, type Period } from '@/lib/stats';
+import { computeStats, periodStart, validatedDays, type Period } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 
 type Where = 'all' | 'in' | 'out';
@@ -75,7 +75,8 @@ function StatsView() {
   const mostUsed = [...systemsUsed].sort((a, b) => count(b) - count(a))[0] ?? DISCIPLINE_SYSTEMS[current][0];
   const system = systemChoice && systemsUsed.includes(systemChoice) ? systemChoice : mostUsed;
 
-  const st = computeStats(list, system, from);
+  // Une séance ne compte qu'à partir de 5 grimpes dans la journée (toutes disciplines confondues).
+  const st = computeStats(list, system, from, validatedDays(blocks));
 
   const training = <TrainingCard logs={logs} from={period === 'all' ? '' : from} />;
   const player = <PlayerSection blocks={blocks} logs={logs} />;
@@ -95,7 +96,7 @@ function StatsView() {
   }
 
   const kind = current === 'bloc' ? 'blocs' : 'voies';
-  const unit = st.bucketUnit === 'week' ? 'semaine' : 'mois';
+  const unit = st.bucketUnit === 'day' ? 'jour' : st.bucketUnit === 'week' ? 'semaine' : 'mois';
   const hasOutdoor = ofDiscipline.some((b) => b.outdoor);
   const resultLegend = [
     { label: current === 'bloc' ? 'Flash' : 'À vue ou flash', color: resultColors()[0] },
@@ -121,6 +122,7 @@ function StatsView() {
         </Pressable>
         <Segmented
           options={[
+            { value: '7', label: '1 sem.' },
             { value: '30', label: '1 mois' },
             { value: '90', label: '3 mois' },
             { value: '365', label: '1 an' },

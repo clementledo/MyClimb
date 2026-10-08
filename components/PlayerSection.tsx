@@ -23,7 +23,7 @@ const signed = (v: number) => {
   return r > 0 ? `+${t}` : r < 0 ? `−${t}` : '=';
 };
 
-/** Carte joueur en haut des statistiques, avec la progression de chaque stat sur 30 jours. */
+/** Carte joueur en haut des statistiques, avec la progression de chaque stat sur 7 et 30 jours. */
 export function PlayerSection({ blocks, logs }: { blocks: Block[]; logs: TrainingLog[] }) {
   const { width } = useWindowDimensions();
   const [name, setName] = useState(readName);
@@ -33,10 +33,10 @@ export function PlayerSection({ blocks, logs }: { blocks: Block[]; logs: Trainin
   // Le costume peut aussi changer dans les réglages de la simulation.
   useFocusEffect(useCallback(() => setSkin(readSkin()), []));
   const today = todayIso();
-  const { card, before } = useMemo(() => cardTrend(blocks, logs, today), [blocks, logs, today]);
+  const { card, week, month } = useMemo(() => cardTrend(blocks, logs, today), [blocks, logs, today]);
 
   const changes = {} as Record<StatId, number>;
-  for (const st of STATS) changes[st.id] = Math.floor(card.stats[st.id]) - Math.floor(before.stats[st.id]);
+  for (const st of STATS) changes[st.id] = Math.floor(card.stats[st.id]) - Math.floor(month.stats[st.id]);
   const cardW = Math.min(width - 2 * space.lg - 2 * space.xl, 320);
 
   const changeName = (v: string) => {
@@ -59,13 +59,16 @@ export function PlayerSection({ blocks, logs }: { blocks: Block[]; logs: Trainin
       </View>
 
       <Card style={s.panel}>
-        <View style={s.head}>
+        <View style={s.row}>
           <Text style={s.title}>Mes stats</Text>
-          <Text style={s.caption}>en 30 jours</Text>
+          <Text style={s.colHead}>7 j</Text>
+          <Text style={s.colHead}>30 j</Text>
         </View>
         {STATS.map((st) => {
           const v = card.stats[st.id];
-          const d = v - before.stats[st.id];
+          const change = (d: number) => (
+            <Text style={[s.rowChange, d >= 0.05 ? s.up : d <= -0.05 ? s.down : null]}>{signed(d)}</Text>
+          );
           return (
             <View key={st.id} style={s.row}>
               <Text style={s.rowName}>{st.name}</Text>
@@ -74,7 +77,8 @@ export function PlayerSection({ blocks, logs }: { blocks: Block[]; logs: Trainin
               <View style={s.track}>
                 <View style={[s.bar, { width: `${Math.round((v - Math.floor(v)) * 100)}%` }]} />
               </View>
-              <Text style={[s.rowChange, d >= 0.05 ? s.up : d <= -0.05 ? s.down : null]}>{signed(d)}</Text>
+              {change(v - week.stats[st.id])}
+              {change(v - month.stats[st.id])}
             </View>
           );
         })}
@@ -100,7 +104,7 @@ export function PlayerSection({ blocks, logs }: { blocks: Block[]; logs: Trainin
             ))}
             <Text style={s.helpMuted}>
               Les cotations réussies comptent le plus, puis tout ce que tu grimpes et travailles : plus c’est dur pour
-              toi, plus ça compte. Sans séance, les stats baissent doucement.
+              toi, plus ça compte. Une séance compte à partir de 5 grimpes. Sans séance, les stats baissent doucement.
             </Text>
           </View>
         )}
@@ -128,15 +132,14 @@ export function PlayerSection({ blocks, logs }: { blocks: Block[]; logs: Trainin
 const s = themedStyles({
   cardWrap: { alignItems: 'center', paddingVertical: space.sm, gap: space.md },
   panel: { gap: space.md },
-  head: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  title: { ...type.headline },
-  caption: { ...type.caption },
+  title: { ...type.headline, flex: 1 },
+  colHead: { ...type.caption, width: 38, textAlign: 'right' },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  rowName: { width: 84, fontSize: 14, fontWeight: '600', color: colors.text },
+  rowName: { width: 80, fontSize: 14, fontWeight: '600', color: colors.text },
   rowValue: { width: 26, fontSize: 15, fontWeight: '800', color: colors.text, textAlign: 'right' },
   track: { flex: 1, height: 8, borderRadius: radius.pill, backgroundColor: colors.surface, overflow: 'hidden' },
   bar: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.primary },
-  rowChange: { width: 40, fontSize: 13, fontWeight: '700', color: colors.muted, textAlign: 'right' },
+  rowChange: { width: 38, fontSize: 13, fontWeight: '700', color: colors.muted, textAlign: 'right' },
   up: { color: colors.success },
   down: { color: colors.danger },
   next: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md, borderRadius: radius.md, backgroundColor: colors.primarySoft },
