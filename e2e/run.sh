@@ -10,7 +10,7 @@ shot() { adb exec-out screencap -p > "$OUT/$1.png"; }
 
 # Touche l'élément dont le texte (ou la description) correspond exactement.
 tap() {
-  for i in 1 2 3 4 5 6 7 8 9 10; do
+  for i in $(seq 1 18); do
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
     adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
     xy=$(python3 - "$1" "$OUT/ui.xml" <<'PY'
@@ -31,9 +31,9 @@ PY
       echo "Touché « $1 » en $xy" | tee -a "$OUT/taps.txt"
       return 0
     fi
-    # Pas visible : faire défiler vers le bas (5 fois), puis vers le haut.
+    # Pas visible : faire défiler vers le bas (9 fois), puis vers le haut.
     read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
-    if [ "$i" -le 5 ]; then
+    if [ "$i" -le 9 ]; then
       adb shell input swipe $((W / 2)) $((H * 70 / 100)) $((W / 2)) $((H * 45 / 100)) 400
     else
       adb shell input swipe $((W / 2)) $((H * 45 / 100)) $((W / 2)) $((H * 70 / 100)) 400
@@ -49,29 +49,34 @@ hidekb() {
   if adb shell dumpsys input_method | grep -q "mInputShown=true"; then adb shell input keyevent 4; sleep 1; fi
 }
 
-# Touche la vignette d'un costume, en faisant défiler leur rangée vers la gauche jusqu'à la voir.
+# Touche la vignette d'un costume, en faisant défiler leur rangée jusqu'à la voir en entier.
 tapcostume() {
-  for _ in 1 2 3 4 5 6 7 8; do
+  local dir=1 seen=""
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
     adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
     res=$(python3 - "Costume $1" "$OUT/ui.xml" <<'PY'
 import re, sys
 want, path = sys.argv[1], sys.argv[2]
 xml = open(path, encoding='utf-8').read()
-row = None
+items = []
 for node in re.findall(r'<node [^>]*>', xml):
     desc = re.search(r' content-desc="([^"]*)"', node).group(1)
-    b = list(map(int, re.findall(r'\d+', re.search(r'bounds="([^"]*)"', node).group(1))))
-    if desc == want and b[2] - b[0] > 100:
-        print('tap', (b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
-        sys.exit()
-    if desc.startswith('Costume ') and row is None:
-        row = (b[1] + b[3]) // 2
-if row is not None:
-    print('row', row, 0)
+    if desc.startswith('Costume '):
+        b = list(map(int, re.findall(r'\d+', re.search(r'bounds="([^"]*)"', node).group(1))))
+        items.append((desc, b))
+if items:
+    # Vignette coupée par le bord : plus étroite que les autres.
+    full = max(b[2] - b[0] for _, b in items)
+    for desc, b in items:
+        if desc == want and b[2] - b[0] >= full * 0.9:
+            print('tap', (b[0] + b[2]) // 2, (b[1] + b[3]) // 2, '-')
+            sys.exit()
+    b = items[0][1]
+    print('row', (b[1] + b[3]) // 2, 0, ','.join(d[8:].replace(' ', '_') for d, _ in items))
 PY
 )
-    read -r what a b <<< "$res"
+    read -r what a b names <<< "$res"
     if [ "$what" = tap ]; then
       adb shell input tap "$a" "$b"
       echo "Touché « Costume $1 » en $a $b" | tee -a "$OUT/taps.txt"
@@ -79,7 +84,15 @@ PY
     fi
     read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
     if [ "$what" = row ]; then
-      adb shell input swipe $((W * 80 / 100)) "$a" $((W * 30 / 100)) "$a" 600
+      # Bout de la rangée atteint (rien n'a bougé) : on repart dans l'autre sens.
+      [ "$names" = "$seen" ] && dir=$((-dir))
+      seen=$names
+      # Glissé lent, sans élan : la rangée ne saute aucun costume.
+      if [ "$dir" = 1 ]; then
+        adb shell input swipe $((W * 70 / 100)) "$a" $((W * 30 / 100)) "$a" 2500
+      else
+        adb shell input swipe $((W * 30 / 100)) "$a" $((W * 70 / 100)) "$a" 2500
+      fi
     else
       adb shell input swipe $((W / 2)) $((H * 70 / 100)) $((W / 2)) $((H * 45 / 100)) 400
     fi
@@ -143,6 +156,7 @@ tap "Costume et nom" ; sleep 2 ; shot 1d1-ma-carte
 tapcostume "Pirate" ; sleep 1 ; shot 1d1b-pirate
 tap "OK" ; sleep 2 ; scrolltop ; shot 1d1c-carte-pirate
 tap "Comment faire monter mes stats" ; sleep 1 ; shot 1d1d-aide
+tap "Comment faire monter mes stats" ; sleep 1
 tap "Voir mes entraînements" ; sleep 1 ; shot 1d2-progression-entrainement
 tap "Progression" ; sleep 2
 tap "Mes grimpes" ; sleep 2 ; shot 1e-mes-grimpes
