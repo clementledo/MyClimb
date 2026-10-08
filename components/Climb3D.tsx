@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { SimRoute } from '@/lib/simRoutes';
 import { createClimbScene, type Cam } from '@/lib/climbScene';
 import type { Plan } from '@/lib/planner';
+import type { SkinId } from '@/lib/skins';
 import { colors, isDark, themedStyles } from '@/lib/theme';
 
 /** Mouvements par seconde à la vitesse normale. */
@@ -44,6 +45,8 @@ async function loadWallTexture(route: SimRoute) {
 type Props = {
   route: SimRoute;
   plan: Plan;
+  /** Costume du grimpeur. */
+  skin: SkinId;
   playing: boolean;
   speed: number;
   /** Change pour relancer la grimpe depuis le début. */
@@ -90,11 +93,11 @@ function orbitGestures(cam: Cam) {
   });
 }
 
-export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek, step, onProgress, onEnd }: Props) {
+export function Climb3D({ route, plan, skin, playing, speed, restartKey, viewKey, seek, step, onProgress, onEnd }: Props) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   // Erreur du moteur 3D : affichée au lieu de faire planter l'app.
   const [failure, setFailure] = useState<string | null>(null);
-  const live = useRef({ playing, speed, onProgress, onEnd, plan, t: -0.6, dirty: true, stopAt: null as number | null });
+  const live = useRef({ playing, speed, onProgress, onEnd, plan, skin, t: -0.6, dirty: true, skinDirty: false, stopAt: null as number | null });
   // Caméra : objet modifié par les gestes et lu par la boucle de rendu.
   const [cam] = useState(() => ({ ...DEFAULT_CAM }));
   const [pan] = useState(() => orbitGestures(cam));
@@ -105,6 +108,9 @@ export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek
   useEffect(() => {
     Object.assign(live.current, { plan, dirty: true });
   }, [plan]);
+  useEffect(() => {
+    if (live.current.skin !== skin) Object.assign(live.current, { skin, skinDirty: true });
+  }, [skin]);
   useEffect(() => {
     if (seek.n > 0) Object.assign(live.current, { t: seek.t, stopAt: null });
   }, [seek]);
@@ -168,6 +174,7 @@ export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek
       h,
       { background: colors.background, primary: colors.primary, success: colors.success, dark: isDark() },
       () => live.current.plan,
+      live.current.skin,
     );
 
     let last = Date.now();
@@ -194,6 +201,10 @@ export function Climb3D({ route, plan, playing, speed, restartKey, viewKey, seek
       if (L.dirty) {
         L.dirty = false;
         world.rebuild();
+      }
+      if (L.skinDirty) {
+        L.skinDirty = false;
+        world.setSkin(L.skin);
       }
       const total = L.plan.moves.length;
       if (L.playing || L.stopAt !== null) L.t += dt * MOVES_PER_S * L.speed;

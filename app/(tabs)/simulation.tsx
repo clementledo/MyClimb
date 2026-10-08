@@ -1,11 +1,13 @@
 import { Image } from 'expo-image';
+import { useFocusEffect } from 'expo-router';
 import type { AndroidSymbol } from 'expo-symbols';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Polyline } from 'react-native-svg';
 
 import { Climb3D, type Progress } from '@/components/Climb3D';
+import { SkinPicker } from '@/components/SkinPicker';
 import { Badge, Button, Chip, Icon, IconButton, Segmented, Sheet } from '@/components/ui';
 import { getSetting, setSetting } from '@/lib/db';
 import {
@@ -21,12 +23,15 @@ import {
 } from '@/lib/planner';
 import { demoRoute, listSimRoutes, pickRoutePhotos, removeSimRoute, saveSimRoutes, type SimRoute } from '@/lib/simRoutes';
 import type { HoldType, Pt } from '@/lib/simulation';
+import { DEFAULT_SKIN, isSkin, SKIN_KEY, SKINS, type SkinId } from '@/lib/skins';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 
 type Mode = 'holds' | '3d';
 type Kind = 'hands' | 'feet';
 
 const SPEEDS = [0.5, 1, 2, 4];
+/** Étapes de repos (magnésie, bras secoué) dans la barre des mouvements. */
+const REST_COLOR = '#228BE6';
 
 export default function SimulationScreen() {
   const [routes, setRoutes] = useState<SimRoute[]>(() => {
@@ -353,6 +358,10 @@ const readWeights = (): Weights => {
     return {};
   }
 };
+const readSkin = (): SkinId => {
+  const v = getSetting(SKIN_KEY);
+  return isSkin(v) ? v : DEFAULT_SKIN;
+};
 const readHeight = () => {
   const v = Number(getSetting(HEIGHT_KEY));
   // 1,75 était l'ancienne valeur par défaut : Clement mesure 1,80 m.
@@ -443,6 +452,9 @@ function PlayerView({
   const [progress, setProgress] = useState<Progress>({ index: 0, total: 0 });
   const [settings, setSettings] = useState(false);
   const [full, setFull] = useState(false);
+  const [skin, setSkin] = useState(readSkin);
+  // Le costume peut aussi changer depuis la carte joueur (Progression).
+  useFocusEffect(useCallback(() => setSkin(readSkin()), []));
   const insets = useSafeAreaInsets();
   // La 3D prend toute la place laissée par les commandes (mesurées une fois).
   const [box, setBox] = useState(0);
@@ -458,6 +470,10 @@ function PlayerView({
     const v = Math.round(Math.min(2.2, Math.max(1.2, height + d)) * 100) / 100;
     setHeight(v);
     setSetting(HEIGHT_KEY, String(v));
+  };
+  const changeSkin = (id: SkinId) => {
+    setSkin(id);
+    setSetting(SKIN_KEY, id);
   };
   const changeAngle = (angle: WallAngle) => {
     onChange({ angle });
@@ -503,8 +519,9 @@ function PlayerView({
   };
 
   const fmt = (v: number, d: number) => v.toFixed(d).replace('.', ',');
+  const climbed = plan.moves.filter((m) => !m.rest).length;
   const title = finished ? 'Top !' : index === 0 && progress.total === 0 ? 'Départ' : (move?.title ?? '');
-  const level = !finished && move ? LEVELS[move.level] : null;
+  const level = !finished && move ? (move.rest ? { label: 'Repos', color: REST_COLOR } : LEVELS[move.level]) : null;
 
   const strip = (
     <View style={s.strip}>
@@ -515,7 +532,7 @@ function PlayerView({
           hitSlop={{ top: 10, bottom: 10 }}
           style={[
             s.seg,
-            { backgroundColor: LEVELS[m.level].color, opacity: i < index ? 0.3 : 1 },
+            { backgroundColor: m.rest ? REST_COLOR : LEVELS[m.level].color, opacity: i < index ? 0.3 : 1 },
             i === index && !finished && s.segActive,
           ]}>
           {m.crux && <View style={s.cruxDot} />}
@@ -536,7 +553,7 @@ function PlayerView({
       </View>
       <View style={s.tags}>
         {finished ? (
-          <Text style={s.tagMuted}>Voie enchaînée en {total} mouvements</Text>
+          <Text style={s.tagMuted}>Voie enchaînée en {climbed} mouvements</Text>
         ) : (
           <>
             {level && <Text style={[s.tag, { color: level.color }]}>{level.label}</Text>}
@@ -604,6 +621,7 @@ function PlayerView({
               key={glHeight}
               route={route}
               plan={plan}
+              skin={skin}
               playing={playing}
               speed={speed}
               restartKey={restartKey}
@@ -646,7 +664,8 @@ function PlayerView({
           <Pressable style={s.summary} onPress={() => setSettings(true)} accessibilityLabel="Réglages">
             <Icon name="tune" size={18} color={colors.primary} />
             <Text style={s.summaryText} numberOfLines={1}>
-              {fmt(height, 2)} m · mur {fmt(plan.H, 1)} m · {WALL_ANGLES[plan.angle].label}
+              {fmt(height, 2)} m · mur {fmt(plan.H, 1)} m · {WALL_ANGLES[plan.angle].label} ·{' '}
+              {SKINS.find((k) => k.id === skin)?.name}
             </Text>
             <Icon name="expand_more" size={18} color={colors.muted} />
           </Pressable>
@@ -659,6 +678,7 @@ function PlayerView({
             <Climb3D
               route={route}
               plan={plan}
+              skin={skin}
               playing={playing}
               speed={speed}
               restartKey={restartKey}
@@ -683,6 +703,8 @@ function PlayerView({
       </Modal>
 
       <Sheet visible={settings} onClose={() => setSettings(false)} title="Réglages">
+        <Text style={s.sheetLabel}>Costume</Text>
+        <SkinPicker value={skin} onChange={changeSkin} />
         <Stepper label="Ta taille" value={`${fmt(height, 2)} m`} onMinus={() => changeHeight(-0.05)} onPlus={() => changeHeight(0.05)} />
         <Stepper label="Hauteur du mur" value={`${fmt(plan.H, 1)} m`} onMinus={() => changeWall(-0.5)} onPlus={() => changeWall(0.5)} />
         <Text style={s.sheetLabel}>Inclinaison</Text>

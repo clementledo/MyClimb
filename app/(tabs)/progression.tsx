@@ -3,6 +3,7 @@ import { useCallback, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { ClimbList } from '@/components/ClimbList';
+import { PlayerSection } from '@/components/PlayerSection';
 import { Legend, LineChart, mix, RateBars, resultColors, StackedBars, StackedColumns } from '@/components/charts';
 import { Card, Chip, Empty, Icon, Segmented, Sheet, Stat } from '@/components/ui';
 import {
@@ -77,10 +78,12 @@ function StatsView() {
   const st = computeStats(list, system, from);
 
   const training = <TrainingCard logs={logs} from={period === 'all' ? '' : from} />;
+  const player = <PlayerSection blocks={blocks} logs={logs} />;
 
   if (blocks.length === 0) {
     return (
       <ScrollView style={s.container} contentContainerStyle={s.content}>
+        {player}
         <Empty
           icon="insights"
           title="Pas encore de statistiques"
@@ -107,6 +110,7 @@ function StatsView() {
 
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
+      {player}
       <View style={s.filters}>
         <Pressable style={s.summary} onPress={() => setSheet(true)} accessibilityLabel="Filtres">
           <Icon name="tune" size={18} color={colors.primary} />

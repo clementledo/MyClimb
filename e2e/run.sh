@@ -49,6 +49,46 @@ hidekb() {
   if adb shell dumpsys input_method | grep -q "mInputShown=true"; then adb shell input keyevent 4; sleep 1; fi
 }
 
+# Touche la vignette d'un costume, en faisant défiler leur rangée vers la gauche jusqu'à la voir.
+tapcostume() {
+  for _ in 1 2 3 4 5 6 7 8; do
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+    adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
+    res=$(python3 - "Costume $1" "$OUT/ui.xml" <<'PY'
+import re, sys
+want, path = sys.argv[1], sys.argv[2]
+xml = open(path, encoding='utf-8').read()
+row = None
+for node in re.findall(r'<node [^>]*>', xml):
+    desc = re.search(r' content-desc="([^"]*)"', node).group(1)
+    b = list(map(int, re.findall(r'\d+', re.search(r'bounds="([^"]*)"', node).group(1))))
+    if desc == want and b[2] - b[0] > 100:
+        print('tap', (b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
+        sys.exit()
+    if desc.startswith('Costume ') and row is None:
+        row = (b[1] + b[3]) // 2
+if row is not None:
+    print('row', row, 0)
+PY
+)
+    read -r what a b <<< "$res"
+    if [ "$what" = tap ]; then
+      adb shell input tap "$a" "$b"
+      echo "Touché « Costume $1 » en $a $b" | tee -a "$OUT/taps.txt"
+      return 0
+    fi
+    read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+    if [ "$what" = row ]; then
+      adb shell input swipe $((W * 80 / 100)) "$a" $((W * 30 / 100)) "$a" 600
+    else
+      adb shell input swipe $((W / 2)) $((H * 70 / 100)) $((W / 2)) $((H * 45 / 100)) 400
+    fi
+    sleep 1
+  done
+  echo "Introuvable : « Costume $1 »" | tee -a "$OUT/taps.txt"
+  return 1
+}
+
 # Remonte tout en haut de l'écran en cours.
 scrolltop() {
   read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
@@ -99,6 +139,10 @@ adb shell input keyevent 4 ; sleep 2 ; adb shell input keyevent 4 ; sleep 2
 scrolltop ; tap "Matériel" ; sleep 2 ; tap "Poutre" ; sleep 1 ; shot 1o-materiel
 tap "Poutre" ; sleep 1 ; tap "Fermer" ; sleep 2
 tap "Progression" ; sleep 3 ; shot 1d-progression
+tap "Costume et nom" ; sleep 2 ; shot 1d1-ma-carte
+tapcostume "Pirate" ; sleep 1 ; shot 1d1b-pirate
+tap "OK" ; sleep 2 ; scrolltop ; shot 1d1c-carte-pirate
+tap "Comment faire monter mes stats" ; sleep 1 ; shot 1d1d-aide
 tap "Voir mes entraînements" ; sleep 1 ; shot 1d2-progression-entrainement
 tap "Progression" ; sleep 2
 tap "Mes grimpes" ; sleep 2 ; shot 1e-mes-grimpes
@@ -113,7 +157,9 @@ tap "Réglages" ; sleep 2 ; shot 7b-reglages
 tap "Annuler mes corrections" ; sleep 3
 tap "Vitesse" ; sleep 1 ; tap "Vitesse" ; sleep 1
 tap "Lecture" ; sleep 8 ; shot 8-3d-fin
-tap "Réglages" ; sleep 2 ; tap "Dévers" ; sleep 2 ; tap "Fermer" ; sleep 5
+tap "Réglages" ; sleep 2 ; shot 7c-costumes
+tapcostume "Banane" ; sleep 2
+tap "Dévers" ; sleep 2 ; tap "Fermer" ; sleep 5
 tap "Recommencer" ; sleep 2 ; tap "Lecture" ; sleep 3 ; shot 9-devers
 scrolltop ; tap "Plein écran" ; sleep 6 ; shot 9b-plein-ecran
 tap "Lecture" ; sleep 4 ; shot 9c-plein-ecran-jeu

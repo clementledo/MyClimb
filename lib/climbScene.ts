@@ -6,8 +6,10 @@
  */
 import * as THREE from 'three';
 
+import { createClimber, type Body3 } from './climber';
 import { WALL_ANGLES, type Plan } from './planner';
 import { contactsAt, skeleton, type P3 } from './simulation';
+import { DEFAULT_SKIN, type SkinId } from './skins';
 
 export type SceneTheme = { background: string; primary: string; success: string; dark: boolean };
 export type Cam = { yaw: number; pitch: number; zoom: number };
@@ -130,34 +132,14 @@ function matGeometry(len: number, depth: number, height: number) {
   return g;
 }
 
-/** Silhouette du buste (rayon selon la hauteur, du bassin aux épaules) : taille marquée, poitrine large. */
-function torsoGeometry() {
-  const profile: [number, number][] = [
-    [0.0, -0.5],
-    [0.8, -0.5],
-    [0.88, -0.4],
-    [0.84, -0.22],
-    [0.78, -0.08],
-    [0.86, 0.1],
-    [0.98, 0.26],
-    [1.0, 0.36],
-    [0.9, 0.46],
-    [0.58, 0.5],
-    [0.0, 0.5],
-  ];
-  return new THREE.LatheGeometry(
-    profile.map(([r, y]) => new THREE.Vector2(r, y)),
-    32,
-  );
-}
-
-/** Membre galbé : rayon le long de l'os (de -0,5 à l'attache à 0,5 au bout), extrémités fermées. */
-function limbGeometry(profile: [number, number][]) {
-  const pts = [new THREE.Vector2(0, -0.5), ...profile.map(([y, r]) => new THREE.Vector2(r, y)), new THREE.Vector2(0, 0.5)];
-  return new THREE.LatheGeometry(pts, 20);
-}
-
-export function createClimbScene(renderer: THREE.WebGLRenderer, w: number, h: number, theme: SceneTheme, getPlan: () => Plan) {
+export function createClimbScene(
+  renderer: THREE.WebGLRenderer,
+  w: number,
+  h: number,
+  theme: SceneTheme,
+  getPlan: () => Plan,
+  skin: SkinId = DEFAULT_SKIN,
+) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // Rendu plus doux des couleurs (sans brûler l'orange du t-shirt).
   renderer.toneMapping = THREE.NeutralToneMapping;
@@ -401,105 +383,11 @@ export function createClimbScene(renderer: THREE.WebGLRenderer, w: number, h: nu
     }
   };
 
-  // Grimpeur : buste galbé, membres musclés et articulations de même diamètre, mains et chaussons détaillés.
-  const sphere = new THREE.SphereGeometry(1, 24, 16);
-  const cylGeo = new THREE.CylinderGeometry(1, 1, 1, 20);
-  const sleeveGeo = new THREE.CylinderGeometry(0.88, 1, 1, 20, 1, true);
-  const torsoGeo = torsoGeometry();
-  const upperGeo = limbGeometry([
-    [-0.47, 0.8],
-    [-0.34, 0.98],
-    [-0.1, 1],
-    [0.16, 0.9],
-    [0.38, 0.74],
-    [0.47, 0.64],
-  ]);
-  const foreGeo = limbGeometry([
-    [-0.47, 0.84],
-    [-0.3, 1],
-    [-0.05, 0.92],
-    [0.25, 0.72],
-    [0.47, 0.56],
-  ]);
-  const thighGeo = limbGeometry([
-    [-0.47, 0.96],
-    [-0.3, 1],
-    [0, 0.94],
-    [0.3, 0.8],
-    [0.47, 0.68],
-  ]);
-  const shinGeo = limbGeometry([
-    [-0.47, 0.74],
-    [-0.3, 0.95],
-    [-0.12, 1],
-    [0.18, 0.74],
-    [0.4, 0.5],
-    [0.47, 0.46],
-  ]);
-  const mat = (color: string, roughness = 0.7) => new THREE.MeshStandardMaterial({ color, roughness });
-  const skin = mat('#DDA683', 0.5);
-  const shirt = mat(theme.primary, 0.85);
-  const pants = mat('#2f405e', 0.9);
-  const hair = mat('#3a2a20', 0.95);
-  const band = mat('#f4f4f4', 0.7);
-  const bagMat = mat('#24272c', 0.9);
-  const rubber = mat('#1b1c1f', 0.75);
-  // Une main et un chausson par membre, pour éclairer celui qui bouge.
-  const handMats = [mat('#E3B596', 0.6), mat('#E3B596', 0.6)];
-  const shoeMats = [mat('#F0B429', 0.55), mat('#F0B429', 0.55)];
-  const glow = new THREE.Color(theme.primary);
-
-  const climber = new THREE.Group();
-  const part = (geo: THREE.BufferGeometry, m: THREE.Material) => {
-    const mesh = new THREE.Mesh(geo, m);
-    mesh.castShadow = true;
-    climber.add(mesh);
-    return mesh;
-  };
-  const torso = part(torsoGeo, shirt);
-  const hem = part(cylGeo, shirt);
-  const belt = part(cylGeo, bagMat);
-  const seat = part(sphere, pants);
-  const bag = part(cylGeo, bagMat);
-  const bagTop = part(cylGeo, band);
-  const neck = part(cylGeo, skin);
-  // Tête dans son propre repère, qui regarde la prise visée (avant = +z local).
-  const headGroup = new THREE.Group();
-  climber.add(headGroup);
-  const headPart = (m: THREE.Material) => {
-    const mesh = new THREE.Mesh(sphere, m);
-    mesh.castShadow = true;
-    headGroup.add(mesh);
-    return mesh;
-  };
-  const head = headPart(skin);
-  const cap = headPart(hair);
-  const nose = headPart(skin);
-  const ears = [headPart(skin), headPart(skin)];
-  const arms = [0, 1].map((i) => ({
-    shoulder: part(sphere, shirt),
-    sleeve: part(sleeveGeo, shirt),
-    upper: part(upperGeo, skin),
-    elbow: part(sphere, skin),
-    fore: part(foreGeo, skin),
-    wrist: part(sphere, skin),
-    palm: part(sphere, handMats[i]),
-    fingers: part(sphere, handMats[i]),
-    thumb: part(sphere, handMats[i]),
-  }));
-  const legs = [0, 1].map((i) => ({
-    hip: part(sphere, pants),
-    thigh: part(thighGeo, pants),
-    knee: part(sphere, pants),
-    shin: part(shinGeo, pants),
-    cuff: part(cylGeo, pants),
-    shoe: part(sphere, shoeMats[i]),
-    toe: part(sphere, rubber),
-    heel: part(sphere, rubber),
-    sole: part(sphere, rubber),
-    strap: part(cylGeo, band),
-  }));
-  tilt.add(climber);
+  // Grimpeur, dans le costume choisi (t-shirt du costume classique aux couleurs du thème).
+  const climber = createClimber();
+  climber.setGlow(theme.primary);
+  climber.setSkin(skin);
+  tilt.add(climber.group);
 
   // Repères des prises : anneau fin et pastille translucide ; repère animé et trajet pour le mouvement en cours.
   const holds = new THREE.Group();
@@ -548,139 +436,66 @@ export function createClimbScene(renderer: THREE.WebGLRenderer, w: number, h: nu
     return m;
   });
 
-  const Y = new THREE.Vector3(0, 1, 0);
-  const between = (mesh: THREE.Mesh, a: THREE.Vector3, b: THREE.Vector3, r: number) => {
-    const d = b.clone().sub(a);
-    mesh.position.copy(a).add(b).multiplyScalar(0.5);
-    mesh.scale.set(r, d.length(), r);
-    mesh.quaternion.setFromUnitVectors(Y, d.normalize());
+  // Nuages de magnésie : quand une main attrape une prise ou plonge dans le sac.
+  const PUFFS = 14;
+  const puffMat = new THREE.SpriteMaterial({ map: glowMap, color: '#ffffff', transparent: true, depthWrite: false });
+  const puffs = Array.from({ length: PUFFS }, () => {
+    const sp = new THREE.Sprite(puffMat.clone());
+    sp.visible = false;
+    tilt.add(sp);
+    return { sp, born: -1e9, from: new THREE.Vector3(), dir: new THREE.Vector3() };
+  });
+  let nextPuff = 0;
+  const puff = (at: THREE.Vector3, now: number, n: number) => {
+    for (let i = 0; i < n; i++) {
+      const p = puffs[nextPuff++ % PUFFS];
+      p.born = now;
+      p.from.copy(at);
+      p.dir.set(Math.sin(i * 2.4) * 0.6, 0.4 + ((i * 37) % 10) / 20, 0.5 + ((i * 53) % 10) / 25);
+    }
   };
-  const ball = (mesh: THREE.Mesh, at: THREE.Vector3, r: number) => {
-    mesh.position.copy(at);
-    mesh.scale.setScalar(r);
+  const drawPuffs = (now: number, hgt: number) => {
+    for (const p of puffs) {
+      const age = (now - p.born) / 900;
+      p.sp.visible = age >= 0 && age < 1;
+      if (!p.sp.visible) continue;
+      p.sp.position.copy(p.from).addScaledVector(p.dir, hgt * 0.09 * Math.sqrt(age));
+      p.sp.scale.setScalar(hgt * (0.03 + 0.07 * age));
+      (p.sp.material as THREE.SpriteMaterial).opacity = 0.55 * (1 - age) ** 2;
+    }
   };
-  /** Ellipsoïde orienté selon une direction (mains, chaussons). */
-  const oval = (mesh: THREE.Mesh, at: THREE.Vector3, dir: THREE.Vector3, rx: number, len: number, rz: number) => {
-    mesh.position.copy(at);
-    mesh.quaternion.setFromUnitVectors(Y, dir.clone().normalize());
-    mesh.scale.set(rx, len, rz);
-  };
-  const basis = new THREE.Matrix4();
-  const limbs = ['lh', 'rh', 'lf', 'rf'] as const;
 
-  const lookAt = new THREE.Vector3();
-  const pose = (t: number, look: THREE.Vector3 | null) => {
+  let lastIndex = -1;
+  let lastChalk = 0;
+  const toBody = (s: ReturnType<typeof skeleton>): Body3 => ({
+    head: toWorld(s.head),
+    neck: toWorld(s.neck),
+    chest: toWorld(s.chest),
+    pelvis: toWorld(s.pelvis),
+    arms: s.arms.map((a) => ({ shoulder: toWorld(a.shoulder), elbow: toWorld(a.elbow), hand: toWorld(a.hand), grip: toWorld(a.grip) })),
+    legs: s.legs.map((l) => ({ hip: toWorld(l.hip), knee: toWorld(l.knee), foot: toWorld(l.foot), toe: toWorld(l.toe) })),
+  });
+  const pose = (t: number, look: THREE.Vector3 | null, now: number) => {
     const p = getPlan();
-    const hgt = p.height;
-    const { c, types, moving, lift, crouch } = contactsAt(p.start, p.startTypes, p.moves, t);
-    const s = skeleton(c, hgt, moving, lift, types, crouch);
-    const chest = toWorld(s.chest);
-    const pelvis = toWorld(s.pelvis);
-    const neckP = toWorld(s.neck);
-
-    // Buste aplati, face au mur.
-    const yAx = chest.clone().sub(pelvis).normalize();
-    const zAx = new THREE.Vector3(0, 0, 1).addScaledVector(yAx, -yAx.z).normalize();
-    const xAx = new THREE.Vector3().crossVectors(yAx, zAx);
-    basis.makeBasis(xAx, yAx, zAx);
-    const top = chest.clone().addScaledVector(yAx, hgt * 0.035);
-    const bottom = pelvis.clone().addScaledVector(yAx, -hgt * 0.005);
-    torso.position.copy(top).add(bottom).multiplyScalar(0.5);
-    torso.quaternion.setFromRotationMatrix(basis);
-    torso.scale.set(hgt * 0.1, top.distanceTo(bottom), hgt * 0.058);
-    // Bas du t-shirt, ceinture et fesses dans le pantalon.
-    hem.position.copy(pelvis).addScaledVector(yAx, hgt * 0.04);
-    hem.quaternion.copy(torso.quaternion);
-    hem.scale.set(hgt * 0.088, hgt * 0.03, hgt * 0.058);
-    belt.position.copy(pelvis).addScaledVector(yAx, hgt * 0.018);
-    belt.quaternion.copy(torso.quaternion);
-    belt.scale.set(hgt * 0.085, hgt * 0.014, hgt * 0.055);
-    seat.position.copy(pelvis).addScaledVector(yAx, -hgt * 0.012).addScaledVector(zAx, hgt * 0.006);
-    seat.quaternion.copy(torso.quaternion);
-    seat.scale.set(hgt * 0.09, hgt * 0.06, hgt * 0.058);
-    // Sac à magnésie dans le dos, à la ceinture.
-    const bagP = pelvis.clone().addScaledVector(zAx, hgt * 0.072).addScaledVector(yAx, hgt * 0.01);
-    bag.position.copy(bagP);
-    bag.quaternion.copy(torso.quaternion);
-    bag.scale.set(hgt * 0.026, hgt * 0.062, hgt * 0.026);
-    bagTop.position.copy(bagP).addScaledVector(yAx, hgt * 0.033);
-    bagTop.quaternion.copy(torso.quaternion);
-    bagTop.scale.set(hgt * 0.028, hgt * 0.008, hgt * 0.028);
-    between(neck, chest, neckP, hgt * 0.024);
-    // Tête un peu ovale qui regarde la prise visée (sinon le mur), cheveux sur le dessus et
-    // l'arrière (on la voit surtout de dos), oreilles et nez.
-    const headP = toWorld(s.head);
-    headGroup.position.copy(headP);
-    headGroup.up.copy(yAx);
-    // Le visage reste tourné vers le mur et pivote seulement en partie vers la prise visée,
-    // comme le permet le cou.
-    const gaze = new THREE.Vector3(0, 0, -1);
-    if (look) gaze.multiplyScalar(0.7).addScaledVector(look.clone().sub(headP).normalize(), 0.45);
-    lookAt.copy(headP).add(gaze.normalize());
-    headGroup.lookAt(tilt.localToWorld(lookAt.clone()));
-    head.scale.set(hgt * 0.054, hgt * 0.064, hgt * 0.058);
-    cap.position.set(0, hgt * 0.013, -hgt * 0.012);
-    cap.scale.set(hgt * 0.058, hgt * 0.06, hgt * 0.058);
-    nose.position.set(0, -hgt * 0.004, hgt * 0.056);
-    nose.scale.set(hgt * 0.008, hgt * 0.013, hgt * 0.01);
-    ears.forEach((ear, i) => {
-      ear.position.set((i ? 1 : -1) * hgt * 0.053, -hgt * 0.002, -hgt * 0.004);
-      ear.scale.set(hgt * 0.008, hgt * 0.016, hgt * 0.012);
+    const f = contactsAt(p.start, p.startTypes, p.moves, t);
+    const sk = skeleton(f.c, p.height, f.moving, f.lift, f.types, f.crouch, {
+      body: f.body,
+      shift: f.shift,
+      chalk: f.chalk,
+      angle: WALL_ANGLES[p.angle].deg,
     });
-
-    s.arms.forEach((a, i) => {
-      const sh = toWorld(a.shoulder);
-      const el = toWorld(a.elbow);
-      const ha = toWorld(a.hand);
-      const arm = arms[i];
-      ball(arm.shoulder, sh, hgt * 0.036);
-      // Manche courte sur le haut du bras, peau en dessous.
-      between(arm.sleeve, sh, sh.clone().lerp(el, 0.45), hgt * 0.036);
-      between(arm.upper, sh, el, hgt * 0.03);
-      ball(arm.elbow, el, hgt * 0.022);
-      between(arm.fore, el, ha, hgt * 0.027);
-      // Main sur la prise : paume, doigts repliés sur la prise, pouce sur le côté.
-      const dir = ha.clone().sub(el).normalize();
-      const wrist = ha.clone().addScaledVector(dir, -hgt * 0.018);
-      ball(arm.wrist, wrist, hgt * 0.015);
-      oval(arm.palm, ha, dir, hgt * 0.022, hgt * 0.026, hgt * 0.012);
-      const tip = ha.clone().addScaledVector(dir, hgt * 0.022).add(new THREE.Vector3(0, 0, -hgt * 0.006));
-      oval(arm.fingers, tip, dir.clone().add(new THREE.Vector3(0, 0, -0.8)), hgt * 0.021, hgt * 0.016, hgt * 0.011);
-      const side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 0, 1)).normalize();
-      const thumb = ha.clone().addScaledVector(side, (i ? -1 : 1) * hgt * 0.02).addScaledVector(dir, hgt * 0.004);
-      oval(arm.thumb, thumb, dir, hgt * 0.007, hgt * 0.015, hgt * 0.007);
-    });
-    s.legs.forEach((l, i) => {
-      const hi = toWorld(l.hip);
-      const kn = toWorld(l.knee);
-      const fo = toWorld(l.foot);
-      const leg = legs[i];
-      ball(leg.hip, hi, hgt * 0.05);
-      between(leg.thigh, hi, kn, hgt * 0.052);
-      ball(leg.knee, kn, hgt * 0.037);
-      between(leg.shin, kn, fo, hgt * 0.04);
-      // Bas du pantalon resserré à la cheville.
-      const ankle = fo.clone().lerp(kn, 0.1);
-      between(leg.cuff, ankle, fo.clone().lerp(kn, 0.02), hgt * 0.026);
-      // Chausson d'escalade : pointe vers le mur, gomme noire à la pointe, au talon et dessous, scratch blanc.
-      const toeDir = new THREE.Vector3(0, -0.2, -1).normalize();
-      const shoeP = fo.clone().add(new THREE.Vector3(0, hgt * 0.004, hgt * 0.024));
-      oval(leg.shoe, shoeP, toeDir, hgt * 0.03, hgt * 0.062, hgt * 0.027);
-      oval(leg.toe, shoeP.clone().addScaledVector(toeDir, hgt * 0.036).add(new THREE.Vector3(0, -hgt * 0.004, 0)), toeDir, hgt * 0.027, hgt * 0.03, hgt * 0.022);
-      oval(leg.heel, shoeP.clone().addScaledVector(toeDir, -hgt * 0.04), toeDir, hgt * 0.024, hgt * 0.02, hgt * 0.023);
-      oval(leg.sole, shoeP.clone().add(new THREE.Vector3(0, -hgt * 0.014, 0)), toeDir, hgt * 0.028, hgt * 0.06, hgt * 0.012);
-      const strapP = shoeP.clone().addScaledVector(toeDir, -hgt * 0.004).add(new THREE.Vector3(0, hgt * 0.02, 0));
-      leg.strap.position.copy(strapP);
-      leg.strap.quaternion.setFromUnitVectors(Y, new THREE.Vector3(1, 0, 0));
-      leg.strap.scale.set(hgt * 0.009, hgt * 0.05, hgt * 0.022);
-    });
-
-    // Le membre qui bouge s'allume légèrement.
-    [...handMats, ...shoeMats].forEach((m, i) => {
-      m.emissive.copy(glow);
-      m.emissiveIntensity = moving === limbs[i] ? 0.5 : 0;
-    });
-    return pelvis;
+    const b = toBody(sk);
+    climber.update(b, { height: p.height, types: f.types, moving: f.moving, chalk: f.chalk, look, now });
+    // Magnésie : la main qui vient d'attraper sa prise, ou qui plonge dans le sac.
+    const done = p.moves[f.index - 1];
+    if (f.index === lastIndex + 1 && done && !done.rest && (done.limb === 'lh' || done.limb === 'rh')) {
+      puff(b.arms[done.limb === 'lh' ? 0 : 1].grip, now, 5);
+    }
+    if (f.chalk >= 0.3 && lastChalk < 0.3 && f.moving) puff(b.arms[f.moving === 'lh' ? 0 : 1].grip, now, 4);
+    lastIndex = f.index;
+    lastChalk = f.chalk;
+    drawPuffs(now, p.height);
+    return b.pelvis;
   };
 
   const focus = new THREE.Vector3(0, getPlan().H / 2, 0);
@@ -715,8 +530,10 @@ export function createClimbScene(renderer: THREE.WebGLRenderer, w: number, h: nu
     const total = p.moves.length;
     const index = Math.max(0, Math.min(total, Math.floor(t)));
     // Prise visée : anneau qui respire et halo, orange pour une main, bleu pour un pied.
-    const next = t < total ? p.moves[index] : undefined;
-    const pelvis = tilt.localToWorld(pose(Math.max(0, t), next ? toWorld({ x: next.to.x, y: next.to.y, z: 0 }) : null).clone());
+    const move = t < total ? p.moves[index] : undefined;
+    const pelvis = tilt.localToWorld(pose(Math.max(0, t), move && !move.rest ? toWorld({ x: move.to.x, y: move.to.y, z: 0 }) : null, now).clone());
+    // Pas de prise visée pendant un repos.
+    const next = move && !move.rest ? move : undefined;
 
     target.visible = !!next;
     dots.forEach((d) => (d.visible = !!next));
@@ -770,5 +587,8 @@ export function createClimbScene(renderer: THREE.WebGLRenderer, w: number, h: nu
     wallMat.needsUpdate = true;
   };
 
-  return { rebuild, frame, setWallTexture };
+  /** Change le costume du grimpeur. */
+  const setSkin = (id: SkinId) => climber.setSkin(id);
+
+  return { rebuild, frame, setWallTexture, setSkin };
 }

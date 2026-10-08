@@ -9,6 +9,8 @@
 import {
   add,
   dist,
+  flagSpot,
+  legFold,
   mid,
   solvePose,
   type Contacts,
@@ -89,6 +91,17 @@ const GRIP_DIFFICULTY: Record<HoldType, number> = {
   lat_d: 0.5,
 };
 
+/** Ce que chaque type de prise fatigue les avant-bras quand on la tient (sans type : prise moyenne). */
+const GRIP_EFFORT: Record<HoldType, number> = {
+  bac: 0,
+  reglette: 0.55,
+  plat: 0.45,
+  pince: 0.4,
+  inversee: 0.3,
+  lat_g: 0.25,
+  lat_d: 0.25,
+};
+
 /** Ce que le moteur compte le long d'une méthode. Chaque critère a un poids, ajusté par les corrections. */
 export const FEATURES = [
   'mains',
@@ -96,11 +109,13 @@ export const FEATURES = [
   'allonge',
   'bras',
   'jambes',
+  'plie',
   'recul',
   'equilibre',
   'adherence',
   'crochet',
   'vide',
+  'drapeau',
   'croise',
   'jete',
   'descente',
@@ -117,11 +132,13 @@ const BASE: Features = {
   allonge: 1.6,
   bras: 1.4,
   jambes: 0.35,
+  plie: 0.5,
   recul: 0.7,
   equilibre: 6,
   adherence: 0.8,
   crochet: 0.5,
   vide: 3,
+  drapeau: 0.7,
   croise: 1.5,
   jete: 3,
   descente: 2,
@@ -132,8 +149,8 @@ const BASE: Features = {
 const ANGLE: Record<WallAngle, Weights> = {
   dalle: { bras: 0.6, equilibre: 1.8, adherence: 0.4, recul: 0.6, jete: 1.6, crochet: Infinity, vide: Infinity },
   vertical: {},
-  devers: { bras: 1.3, recul: 1.8, equilibre: 0.6, adherence: 2, crochet: 0.6, vide: 0.6, jete: 0.8 },
-  fort: { bras: 1.5, recul: 2.5, equilibre: 0.3, adherence: Infinity, crochet: 0.4, vide: 0.3, jete: 0.6 },
+  devers: { bras: 1.3, recul: 1.8, equilibre: 0.6, adherence: 2, crochet: 0.6, vide: 0.6, jete: 0.8, drapeau: 0.8 },
+  fort: { bras: 1.5, recul: 2.5, equilibre: 0.3, adherence: Infinity, crochet: 0.4, vide: 0.3, jete: 0.6, drapeau: 0.7 },
 };
 
 /** Coût d'un départ replié (jambes très pliées, bassin reculé). */
@@ -169,8 +186,11 @@ export function photoHeight(route: RouteInput) {
   return route.wallHeight && route.wallHeight > 0 ? route.wallHeight : DEFAULT_WALL;
 }
 
-/** Une place pour un pied : prise de pied, prise de main, point d'adhérence, ou dans le vide. */
-type Spot = { pt: Pt; label: string | null; kind: 'pied' | 'prise' | 'adh' | 'vide'; hand?: number };
+/**
+ * Une place pour un pied : prise de pied, prise de main, point d'adhérence, dans le vide,
+ * ou en drapeau (sa place dépend du corps : calculée pour chaque position).
+ */
+type Spot = { pt: Pt; label: string | null; kind: 'pied' | 'prise' | 'adh' | 'vide' | 'drapeau'; hand?: number };
 
 type Eval = {
   cost: number;
@@ -233,7 +253,7 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
   const offset = 0.025 * h;
   const fixHands = route.fix?.hands ?? {};
   const fixFeet = route.fix?.feet ?? {};
-  const leg = 0.5 * h;
+  const leg = 0.52 * h;
   const w = zero();
   for (const f of FEATURES) {
     const k = Math.min(4, Math.max(0.25, learned[f] ?? 1));
@@ -262,9 +282,10 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
       }
     }
   }
-  const VIDE = spots.length;
   spots.push({ pt: { x: 0, y: 0 }, label: null, kind: 'vide' });
+  spots.push({ pt: { x: 0, y: 0 }, label: null, kind: 'drapeau' });
   const NS = spots.length;
+  const computed = (i: number) => spots[i].kind === 'vide' || spots[i].kind === 'drapeau';
 
   const handPt = (limb: 'lh' | 'rh', idx: number, other: number) =>
     idx === other ? add(hands[idx], { x: limb === 'lh' ? -offset : offset, y: 0 }) : hands[idx];
@@ -276,8 +297,9 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
 
   const footStyle = (s: Spot, limb: 'lf' | 'rf', lh: Pt, rh: Pt, a: number, b: number): FootStyle | undefined | null => {
     if (s.kind === 'vide') return Number.isFinite(w.vide) ? 'vide' : null;
+    if (s.kind === 'drapeau') return Number.isFinite(w.drapeau) ? 'drapeau' : null;
     const hm = mid(lh, rh);
-    const high = Math.min(lh.y, rh.y) + 0.35 * h;
+    const high = Math.min(lh.y, rh.y) + 0.42 * h;
     if (s.pt.y >= high) {
       // Debout sur la prise ; pas sur une prise tenue par une main.
       if (s.hand !== undefined && (s.hand === a || s.hand === b)) return null;
@@ -303,24 +325,34 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
       const sl = footStyle(spots[f], 'lf', lh, rh, a, b);
       const sr = footStyle(spots[g], 'rf', lh, rh, a, b);
       if (sl === null || sr === null) break compute;
+      // Drapeau : seulement si l'autre pied est posé et pousse.
+      if ((sl === 'drapeau' && sr !== undefined) || (sr === 'drapeau' && sl !== undefined)) break compute;
       const hm = mid(lh, rh);
       const place = (i: number, side: number, other: number) => {
-        if (spots[i].kind === 'vide') return add(hm, { x: side * 0.12 * h, y: 1.05 * h });
+        if (spots[i].kind === 'vide' || spots[i].kind === 'drapeau') return add(hm, { x: side * 0.12 * h, y: 1.05 * h });
         // Deux pieds sur la même prise : côte à côte.
         return i === other ? add(spots[i].pt, { x: side * offset, y: 0 }) : spots[i].pt;
       };
       const c: Contacts = { lh, rh, lf: place(f, -1, g), rf: place(g, 1, f) };
       const types: HandTypes = { lh: hands[a].type, rh: hands[b].type, lf: sl, rf: sr };
+      for (const limb of ['lf', 'rf'] as const) {
+        if (types[limb] !== 'drapeau') continue;
+        const at = flagSpot(c, h, types, limb);
+        c[limb] = { x: Math.min(W - 0.05, Math.max(0.05, at.x)), y: Math.min(H - 0.05, at.y) };
+      }
       const pose = solvePose(c, h, types);
       const feat: Partial<Features> = {};
       const under = types.lh === 'inversee' || types.rh === 'inversee';
       feat.bras = pose.armBend ** 2 * (under ? 0.3 : 1) * 3;
       feat.jambes = pose.legBend ** 2;
+      // Pied d'appui très haut, contre la hanche : la jambe pousse mal.
+      feat.plie = (sl ? 0 : legFold(pose, c.lf, -1, h) ** 2) + (sr ? 0 : legFold(pose, c.rf, 1, h) ** 2);
       feat.recul = pose.lean ** 2;
       feat.equilibre = pose.offBalance / h;
       feat.adherence = (spots[f].kind === 'adh' ? 1 : 0) + (spots[g].kind === 'adh' ? 1 : 0);
-      feat.crochet = (sl && sl !== 'vide' ? 1 : 0) + (sr && sr !== 'vide' ? 1 : 0);
+      feat.crochet = (sl === 'talon' || sl === 'pointe' ? 1 : 0) + (sr === 'talon' || sr === 'pointe' ? 1 : 0);
       feat.vide = (sl === 'vide' ? 1 : 0) + (sr === 'vide' ? 1 : 0);
+      feat.drapeau = (sl === 'drapeau' ? 1 : 0) + (sr === 'drapeau' ? 1 : 0);
       let cross = 0;
       if (!sl && !sr && c.lf.x > c.rf.x + 0.05 * h) cross += 1;
       if (lh.x > rh.x + 0.08 * h) cross += 2;
@@ -339,6 +371,7 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
       let cost =
         w.bras * feat.bras +
         w.jambes * feat.jambes +
+        w.plie * feat.plie +
         w.recul * feat.recul +
         w.equilibre * feat.equilibre +
         w.croise * cross +
@@ -346,6 +379,7 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
       if (feat.adherence) cost += w.adherence * feat.adherence;
       if (feat.crochet) cost += w.crochet * feat.crochet;
       if (feat.vide) cost += w.vide * feat.vide;
+      if (feat.drapeau) cost += w.drapeau * feat.drapeau;
       if (!Number.isFinite(cost)) break compute;
       // Corrections : pied imposé sur une prise.
       for (const [i, limb] of [[f, 'lf'], [g, 'rf']] as const) {
@@ -391,7 +425,7 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
     }
     const hm = mid(hands[a], hands[b]);
     const near = [...Array(NS).keys()].filter(
-      (i) => spots[i].kind === 'vide' || (spots[i].pt.y > hm.y + 0.3 * h && dist(spots[i].pt, hm) < 1.25 * h),
+      (i) => spots[i].kind === 'vide' || (!computed(i) && spots[i].pt.y > hm.y + 0.3 * h && dist(spots[i].pt, hm) < 1.25 * h),
     );
     for (const f of near) {
       for (const gg of near) {
@@ -400,7 +434,7 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
         const k = keyOf(a, b, f, gg);
         // Un vrai départ se prend pieds bas, corps allongé : sans ce coût, le moteur partirait
         // pieds déjà hauts, tout replié, pour s'économiser des mouvements de pied.
-        const cost = e.cost + extra + 0.1 * (a + b) + START * (e.pose.legBend ** 2 + e.pose.lean ** 2);
+        const cost = e.cost + extra + 0.1 * (a + b) + START * (e.pose.legBend ** 2 + e.pose.lean ** 2 + (e.feat.plie ?? 0));
         if (cost < (g.get(k) ?? Infinity)) {
           g.set(k, cost);
           heap.push(cost + remaining(a, b), k);
@@ -416,7 +450,7 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
     if (feetMemo.has(mk)) return feetMemo.get(mk)!;
     const hm = mid(hands[na], hands[nb]);
     const near = [...Array(NS).keys()].filter(
-      (i) => spots[i].kind === 'vide' || (spots[i].pt.y > hm.y + 0.3 * h && dist(spots[i].pt, hm) < 1.2 * h),
+      (i) => computed(i) || (spots[i].pt.y > hm.y + 0.3 * h && dist(spots[i].pt, hm) < 1.2 * h),
     );
     let bestFeet: [number, number, number] | null = null;
     for (const nf of near) {
@@ -474,8 +508,9 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
       const feat: Partial<Features> = { mains: 1, allonge: (d / h) ** 2 };
       // Main qui passe de l'autre côté de l'autre main.
       if ((limb === 'lh' && target.x > other.x + 0.08 * h) || (limb === 'rh' && target.x < other.x - 0.08 * h)) feat.croise = 1;
-      // Pendant le mouvement, le corps tient sur l'autre main et les pieds : sinon il pivote (porte de grange).
-      const standing = (['lf', 'rf'] as const).filter((l) => !here.types[l]);
+      // Pendant le mouvement, le corps tient sur l'autre main et les pieds (posés, en crochet ou
+      // en drapeau) : sinon il pivote (porte de grange).
+      const standing = (['lf', 'rf'] as const).filter((l) => here.types[l] !== 'vide');
       if (standing.length) {
         const xs = [...standing.map((l) => here.c[l].x), other.x];
         const lo = Math.min(...xs);
@@ -496,8 +531,10 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
       if (arrival) relax(na, nb, f, gf, extra, { kind: 'hand', limb, feat });
       // Sinon jeté : la main part et les pieds se replacent à l'arrivée.
       if (d > 1.05 * h) continue;
-      const dynoFeat = { ...feat, jete: 1 };
-      const dynoExtra = extra + w.jete;
+      // Un jeté se rattrape mal sur une petite prise, et encore moins de côté.
+      const jete = 1 + 0.6 * (target.type ? Math.max(0, GRIP_DIFFICULTY[target.type]) : 0.3) + (0.5 * Math.abs(target.x - from.x)) / Math.max(d, 1e-6);
+      const dynoFeat = { ...feat, jete };
+      const dynoExtra = extra + w.jete * jete;
       if (!Number.isFinite(dynoExtra)) continue;
       const bestFeet = feetFor(na, nb);
       if (bestFeet) relax(na, nb, bestFeet[0], bestFeet[1], dynoExtra + w.pieds * 2, { kind: 'dyno', limb, feat: { ...dynoFeat, pieds: 2 } });
@@ -511,10 +548,10 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
         if (i === cur) continue;
         const s = spots[i];
         const feat: Partial<Features> = { pieds: 1 };
-        if (s.kind !== 'vide') {
+        if (!computed(i)) {
           if (Math.abs(s.pt.x - here.pose.hips.x) > leg || Math.abs(s.pt.y - here.pose.hips.y) > leg) continue;
           if (dist(here.pose.hips, s.pt) > leg) continue;
-          if (here.types[limb] !== 'vide') {
+          if (here.types[limb] !== 'vide' && here.types[limb] !== 'drapeau') {
             // Un pied ne redescend presque jamais.
             const down = s.pt.y - curPt.y;
             if (down > 0.25 * h) continue;
@@ -553,6 +590,7 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
   const spotText = (i: number, style?: FootStyle) => {
     const s = spots[i];
     if (s.kind === 'vide') return 'dans le vide';
+    if (s.kind === 'drapeau') return 'en drapeau';
     if (style === 'talon' || style === 'pointe') return `en crochet de ${style} sur ${s.label}`;
     return s.label ? `sur ${s.label}` : 'en adhérence';
   };
@@ -564,17 +602,39 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
 
   const moves: Move[] = [];
   const scores: number[] = [];
+  /** Fatigue des avant-bras apportée par chaque étape. */
+  const efforts: number[] = [];
   const level = (score: number): Level => (score < 1.6 ? 1 : score < 3 ? 2 : 3);
+  const effortOf = (e: Eval, kind: Step['kind']) => {
+    const grip = (['lh', 'rh'] as const).reduce((sum, l) => sum + (e.types[l] ? GRIP_EFFORT[e.types[l]!] : 0.15), 0) / 2;
+    const feet = (['lf', 'rf'] as const).filter((l) => !e.types[l]).length;
+    return 0.25 + 1.1 * e.pose.armBend + grip + (feet === 0 ? 0.7 : feet === 1 ? 0.15 : 0) + (kind === 'dyno' ? 0.8 : 0) + (kind === 'foot' ? 0 : 0.2);
+  };
+  /** Positions où l'on peut lâcher une main pour la magnésie : bras tendus, deux pieds posés, l'autre main sur une bonne prise. */
+  const restSpots: { at: number; limb: 'lh' | 'rh'; c: Contacts; quality: number }[] = [];
+  const restFrom = (e: Eval, next: Step) => {
+    if (e.bad || e.pose.armBend > 0.3 || e.pose.offBalance > 0.02 * h || e.types.lf || e.types.rf) return null;
+    const good = (t?: HoldType) => !t || t === 'bac';
+    const order: ('lh' | 'rh')[] = next.limb === 'rh' ? ['rh', 'lh'] : ['lh', 'rh'];
+    for (const limb of order) {
+      const other = limb === 'lh' ? 'rh' : 'lh';
+      if (good(e.types[other])) return { limb, quality: 1 - e.pose.armBend + (e.types[other] === 'bac' ? 0.4 : 0) };
+    }
+    return null;
+  };
 
   for (let i = 1; i < states.length; i++) {
     const prev = states[i - 1];
     const cur = states[i];
     const step = path[i].step!;
+    if (i >= 2) {
+      const r = restFrom(prev.e, step);
+      if (r) restSpots.push({ at: moves.length, c: prev.e.c, ...r });
+    }
     addFeat(step.feat);
     const limb = step.limb;
     const tips: string[] = [];
     const alerts: string[] = [];
-    const pose = cur.e.pose;
 
     if (limb === 'lh' || limb === 'rh') {
       const idx = limb === 'lh' ? cur.a : cur.b;
@@ -620,6 +680,7 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
       }
       const forced = fixHands[idx];
       scores.push(score);
+      efforts.push(effortOf(cur.e, step.kind));
       moves.push({
         limb,
         from: prev.e.c[limb],
@@ -640,13 +701,18 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
           const now = fl === 'lf' ? cur.f : cur.g;
           if (was === now) continue;
           scores.push(0.5);
+          efforts.push(0);
           moves.push({
             limb: fl,
             from: prev.e.c[fl],
             to: cur.e.c[fl],
             hook: cur.e.types[fl],
             title: `${LIMB_NAMES[fl]} ${spotText(now, cur.e.types[fl])}`,
-            tips: ['Récupère les pieds après le jeté pour arrêter le balancement.'],
+            tips: [
+              cur.e.types[fl] === 'drapeau'
+                ? 'Après le jeté, tends cette jambe sur le côté contre le mur (drapeau) pour arrêter le balancement.'
+                : 'Récupère les pieds après le jeté pour arrêter le balancement.',
+            ],
             alerts: [],
             level: 1,
             fix: spots[now].label ? { kind: 'foot', label: spots[now].label! } : undefined,
@@ -676,10 +742,21 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
       alerts.push('Pied décollé');
       tips.push('Rien d’utile pour ce pied : gainage, bras tendus, et ramène-le dès qu’une prise est à portée.');
       score += 1.2;
+    } else if (style === 'drapeau') {
+      alerts.push('Drapeau');
+      tips.push(
+        `Pas de bonne prise de ce côté : tends la jambe ${limb === 'lf' ? 'gauche' : 'droite'} sur le côté, chausson contre le mur, pour faire contrepoids pendant le mouvement suivant.`,
+      );
+      score += 0.7;
     } else if (s.label && s.label === spots[otherWas].label) {
-      alerts.push('Changement de pied');
-      tips.push('Pose ce pied juste au-dessus de l’autre, puis retire l’autre au dernier moment en gardant le poids sur la prise.');
-      score += 0.8;
+      if (next && next.kind === 'foot' && next.limb !== limb) {
+        alerts.push('Changement de pied');
+        tips.push('Pose ce pied juste au-dessus de l’autre, puis retire l’autre au dernier moment en gardant le poids sur la prise.');
+        score += 0.8;
+      } else {
+        tips.push('Pose ce pied à côté de l’autre sur la même prise, chaussons serrés, chacun sur sa moitié.');
+        score += 0.3;
+      }
     } else if (s.kind === 'adh') {
       tips.push('Pas de prise de pied ici : chausson à plat sur le mur, talon bas, et pousse.');
       score += 0.3;
@@ -695,6 +772,7 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
     }
     const forced = s.label ? fixFeet[s.label] : undefined;
     scores.push(score);
+    efforts.push(effortOf(cur.e, step.kind));
     moves.push({
       limb,
       from: prev.e.c[limb],
@@ -705,7 +783,9 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
           ? `${LIMB_NAMES[limb]} remonte en adhérence`
           : style === 'vide'
             ? `${LIMB_NAMES[limb]} décolle`
-            : `${LIMB_NAMES[limb]} ${spotText(fi, style)}`,
+            : style === 'drapeau'
+              ? `${LIMB_NAMES[limb]} en drapeau`
+              : `${LIMB_NAMES[limb]} ${spotText(fi, style)}`,
       tips,
       alerts,
       level: level(score),
@@ -713,6 +793,52 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
       corrected: forced === limb,
     });
   }
+
+  /* ---------- Fatigue, repos et crux ---------- */
+
+  // Fatigue des avant-bras avant chaque étape : elle monte à chaque position tenue et redescend
+  // un peu à chaque repos. Plus on est fatigué, plus une étape est dure.
+  const pumpBefore = (rests: Set<number>) => {
+    const out: number[] = [];
+    let pump = 0;
+    efforts.forEach((e, k) => {
+      if (rests.has(k)) pump *= 0.45;
+      out.push(pump);
+      pump = pump * 0.9 + e * 0.3;
+    });
+    return out;
+  };
+  const tired = (pump: number) => 0.35 * Math.max(0, pump - 0.8);
+  // Repos : avant le crux, et quand les bras chauffent sur une longue voie (deux au plus).
+  const chosen = new Set<number>();
+  const pick = (from: number, to: number) => {
+    const ok = restSpots.filter(
+      (r) => r.at >= Math.max(2, from) && r.at <= to && r.at < moves.length && [...chosen].every((c) => Math.abs(c - r.at) >= 4),
+    );
+    if (!ok.length) return;
+    const best = ok.reduce((a, b) => (b.quality + 0.15 * b.at > a.quality + 0.15 * a.at ? b : a));
+    chosen.add(best.at);
+  };
+  if (moves.length >= 8) {
+    const pump0 = pumpBefore(new Set());
+    let crux0 = 0;
+    scores.forEach((sc, k) => {
+      if (sc + tired(pump0[k]) > scores[crux0] + tired(pump0[crux0])) crux0 = k;
+    });
+    if (scores[crux0] + tired(pump0[crux0]) >= 2.4) pick(crux0 - 4, crux0);
+    const pumped = pump0.findIndex((pp, k) => pp > 1.6 && [...chosen].every((c) => k < c || k - c > 5));
+    if (pumped >= 0) pick(pumped - 4, pumped);
+  }
+  const pump = pumpBefore(chosen);
+  moves.forEach((m, k) => {
+    if (m.limb === 'lf' || m.limb === 'rf' || m.title.endsWith('(match)')) return;
+    scores[k] += tired(pump[k]);
+    m.level = level(scores[k]);
+    if (pump[k] > 1.8 && m.level > 1) {
+      m.alerts.push('Bras fatigués');
+      m.tips.push('Tes avant-bras chauffent à ce stade : enchaîne sans traîner et relâche la prise dès que l’autre main tient.');
+    }
+  });
 
   // Crux : l'étape la plus dure, si elle n'est pas facile.
   let crux = -1;
@@ -722,6 +848,25 @@ export function planRoute(route: RouteInput, climber: number, learned: Weights =
   if (crux >= 0 && moves[crux].level > 1) {
     moves[crux].crux = true;
     moves[crux].tips.push('C’est le crux : secoue les bras sur la position d’avant et visualise le mouvement avant de le lancer.');
+  }
+
+  // Étapes de repos, de la dernière à la première pour garder les positions.
+  for (const at of [...chosen].sort((a, b) => b - a)) {
+    const r = restSpots.find((x) => x.at === at)!;
+    const beforeCrux = crux >= at && crux - at <= 4;
+    moves.splice(at, 0, {
+      limb: r.limb,
+      from: r.c[r.limb],
+      to: r.c[r.limb],
+      rest: true,
+      title: `Repos · magnésie ${r.limb === 'lh' ? 'main gauche' : 'main droite'}`,
+      tips: [
+        'Position reposante : bras tendus et poids sur les pieds. Mets de la magnésie et secoue le bras quelques secondes en respirant.',
+        ...(beforeCrux ? ['Le crux arrive : visualise le passage avant de repartir.'] : []),
+      ],
+      alerts: [],
+      level: 1,
+    });
   }
 
   return {
