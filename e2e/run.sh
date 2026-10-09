@@ -11,7 +11,7 @@ shot() { adb exec-out screencap -p > "$OUT/$1.png"; }
 # Touche l'élément dont le texte (ou la description) correspond exactement.
 tap() {
   for i in $(seq 1 18); do
-    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+    timeout 30 adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
     adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
     xy=$(python3 - "$1" "$OUT/ui.xml" <<'PY'
 import re, sys
@@ -64,7 +64,7 @@ hidekb() {
 tapcostume() {
   local dir=1 seen=""
   for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
-    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+    timeout 30 adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
     adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
     res=$(python3 - "Costume $1" "$OUT/ui.xml" <<'PY'
 import re, sys
@@ -159,7 +159,7 @@ tap "Lancer la compétition" ; sleep 3 ; shot 1m8-direct
 # Mini-jeu de jauge éventuel (écran 3D animé : touché par position, puis « Continuer »).
 for k in 1 2 3 4 5 6; do
   sleep 4 ; pct 50 40 ; sleep 1 ; [ "$k" = 1 ] && shot 1m8b-jauge ; sleep 5
-  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 ; adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
+  timeout 30 adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 ; adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
   grep -q 'text="Continuer"' "$OUT/ui.xml" && tap "Continuer"
   grep -q 'text="Retour au club"' "$OUT/ui.xml" && break
 done
