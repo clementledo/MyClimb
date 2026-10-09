@@ -8,8 +8,13 @@ import { Crest, G, GameBackground, GameHeader, GButton, GTabs, HelpTip, Panel } 
 import { Icon } from '@/components/ui';
 import {
   canClaimDaily,
+  chooseContract,
   claimDaily,
   competitionPreview,
+  contractText,
+  CUP_AFTER,
+  CUP_STAGES,
+  cupStatus,
   createClub,
   energyLeft,
   LEAGUES,
@@ -26,7 +31,7 @@ import {
   type Club,
   type Item,
 } from '@/lib/manager';
-import { CLUB_COLORS } from '@/lib/managerData';
+import { CLUB_COLORS, LEGENDS } from '@/lib/managerData';
 import { themedStyles } from '@/lib/theme';
 
 const KIND_LABEL: Record<Item['kind'], string> = { materiel: 'Matériel', boost: 'Boosts', coach: 'Coachs', sponsor: 'Sponsors', competence: 'Stages de compétence' };
@@ -70,6 +75,11 @@ export default function ManagerHome() {
   const next = competitionPreview(club);
   const energy = energyLeft(club);
   const cardW = Math.floor((width - 32 - 12) / 2);
+  const cup = cupStatus(club);
+  const offers = club.season.offers;
+  const contract = club.season.contract;
+  const play = (mode: 'ligue' | 'coupe') =>
+    energy > 0 ? router.push(mode === 'coupe' ? '/manager/compet?mode=coupe' : '/manager/compet') : Alert.alert('Plus d’énergie', 'Tu as joué tes 10 compétitions du jour. Reviens demain, tes grimpeurs en profiteront pour récupérer !');
 
   const daily = () => {
     const r = claimDaily(club);
@@ -101,7 +111,7 @@ export default function ManagerHome() {
         </View>
 
         <Pressable
-          onPress={() => (energy > 0 ? router.push('/manager/compet') : Alert.alert('Plus d’énergie', 'Tu as joué tes 10 compétitions du jour. Reviens demain, tes grimpeurs en profiteront pour récupérer !'))}
+          onPress={() => play('ligue')}
           accessibilityRole="button"
           accessibilityLabel="Jouer la compétition"
           style={({ pressed }) => [s.play, pressed && { transform: [{ scale: 0.98 }] }]}>
@@ -134,6 +144,83 @@ export default function ManagerHome() {
             {canClaimDaily(club) && <View style={s.dot} />}
           </Pressable>
         </View>
+        <View style={s.row}>
+          <Pressable
+            onPress={() => (cup.available ? play('coupe') : Alert.alert('La Coupe', cup.text))}
+            accessibilityRole="button"
+            accessibilityLabel="Coupe"
+            style={({ pressed }) => [s.tile, cup.available && { borderColor: G.gold, borderWidth: 2 }, pressed && s.pressed]}>
+            <Icon name="military_tech" size={26} color={G.gold} />
+            <Text style={s.tileTitle}>Coupe</Text>
+            <Text style={s.tileText} numberOfLines={2}>
+              {cup.available ? `${cup.stage} : à jouer !` : cup.text}
+            </Text>
+            {cup.available && <View style={s.dot} />}
+          </Pressable>
+          <Pressable onPress={() => router.push('/manager/legendes')} accessibilityRole="button" accessibilityLabel="Légendes" style={({ pressed }) => [s.tile, pressed && s.pressed]}>
+            <Icon name="auto_awesome" size={26} color="#C77DFF" />
+            <Text style={s.tileTitle}>Légendes</Text>
+            <Text style={s.tileText}>
+              {club.legends?.length ?? 0}/{LEGENDS.length} débloquées
+            </Text>
+          </Pressable>
+        </View>
+
+        {offers && (
+          <Panel>
+            <View style={s.titleLine}>
+              <Text style={[s.panelTitle, { flex: 1 }]}>Choisis ton sponsor de la saison</Text>
+              <HelpTip topic="sponsor" />
+            </View>
+            {offers.map((o, i) => (
+              <Pressable
+                key={o.sponsor}
+                onPress={() => {
+                  chooseContract(club, i);
+                  setClub({ ...club });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Sponsor ${o.sponsor}`}
+                style={({ pressed }) => [s.offer, pressed && s.pressed]}>
+                <Icon name="handshake" size={22} color={G.gold} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.itemName}>{o.sponsor}</Text>
+                  <Text style={s.muted}>{contractText(o, club)}</Text>
+                </View>
+                <Text style={s.reward}>+{o.reward}</Text>
+              </Pressable>
+            ))}
+          </Panel>
+        )}
+        {contract && (
+          <Panel>
+            <View style={s.titleLine}>
+              <Icon name="handshake" size={20} color={contract.done ? G.green : G.gold} />
+              <Text style={[s.panelTitle, { flex: 1 }]}>{contract.sponsor}</Text>
+              <Text style={s.reward}>{contract.done ? 'Rempli !' : `+${contract.reward}`}</Text>
+              <HelpTip topic="sponsor" />
+            </View>
+            <Text style={s.muted}>{contractText(contract, club)}</Text>
+            <View style={s.progress}>
+              <View style={[s.progressFill, { width: `${Math.min(1, contract.progress / contract.target) * 100}%`, backgroundColor: contract.done ? G.green : G.gold }]} />
+            </View>
+            <Text style={s.muted}>
+              {Math.min(contract.progress, contract.target)}/{contract.target}
+            </Text>
+          </Panel>
+        )}
+
+        {!!club.news?.length && (
+          <Panel>
+            <Text style={s.panelTitle}>Actus du championnat</Text>
+            {club.news.slice(0, 3).map((n) => (
+              <View key={n.t + n.text} style={s.newsRow}>
+                <Icon name={n.icon} size={18} color={G.gold} />
+                <Text style={s.newsText}>{n.text}</Text>
+              </View>
+            ))}
+          </Panel>
+        )}
 
         <GTabs
           options={[
@@ -227,11 +314,47 @@ export default function ManagerHome() {
                 <Text style={[s.teamName, r.mine && { color: G.gold }]} numberOfLines={1}>
                   {r.name}
                 </Text>
+                {r.nemesis && (
+                  <View style={s.nemesis}>
+                    <Icon name="local_fire_department" size={12} color="#fff" />
+                    <Text style={s.nemesisText}>Némésis</Text>
+                  </View>
+                )}
                 <Text style={s.strength}>{Math.round(r.strength)}</Text>
                 <Text style={s.points}>{r.points}</Text>
               </View>
             ))}
             <Text style={s.muted}>Vert : montée · Rouge : descente · Le chiffre gris est la note moyenne de l’équipe.</Text>
+            <View style={s.titleLine}>
+              <Text style={[s.muted, { flex: 1 }]}>Le némésis te suit de ligue en ligue.</Text>
+              <HelpTip topic="nemesis" />
+            </View>
+          </Panel>
+        )}
+        {tab === 'ligue' && club.season.cup && (
+          <Panel>
+            <View style={s.titleLine}>
+              <Text style={[s.panelTitle, { flex: 1 }]}>Coupe · saison {club.season.n}</Text>
+              <HelpTip topic="coupe" />
+            </View>
+            {CUP_STAGES.map((st, i) => {
+              const c = club.season.cup!;
+              const opp = c.opps[i];
+              const state = c.won || i < c.round ? 'gagné' : c.out && i === c.round ? 'perdu' : i === c.round ? (cup.available ? 'à jouer' : `après la manche ${CUP_AFTER[i]}`) : 'à venir';
+              const color = state === 'gagné' ? G.green : state === 'perdu' ? G.red : state === 'à jouer' ? G.gold : G.muted;
+              return (
+                <View key={st} style={s.cupRow}>
+                  <Icon name={state === 'gagné' ? 'check_circle' : state === 'perdu' ? 'cancel' : 'radio_button_unchecked'} size={20} color={color} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.itemName}>{st}</Text>
+                    <Text style={s.muted} numberOfLines={1}>
+                      {i <= c.round ? `${opp.name} · note ${Math.round(opp.strength)}` : 'Adversaire inconnu'}
+                    </Text>
+                  </View>
+                  <Text style={[s.cupState, { color }]}>{state}</Text>
+                </View>
+              );
+            })}
           </Panel>
         )}
       </ScrollView>
@@ -280,6 +403,15 @@ function ColorRow({ value, onChange }: { value: string; onChange: (c: string) =>
 }
 
 const s = themedStyles({
+  titleLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  offer: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: G.line, backgroundColor: 'rgba(255,255,255,0.04)' },
+  reward: { color: G.gold, fontWeight: '900', fontSize: 15 },
+  newsRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', paddingVertical: 2 },
+  newsText: { flex: 1, color: G.text, fontSize: 14, lineHeight: 19 },
+  nemesis: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, height: 20, borderRadius: 10, backgroundColor: G.red },
+  nemesisText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  cupRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  cupState: { fontWeight: '800', fontSize: 13 },
   helpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: -6 },
   screen: { flex: 1, backgroundColor: G.bg },
   content: { paddingHorizontal: 16, gap: 16 },

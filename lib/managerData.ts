@@ -1,5 +1,6 @@
 /** Données fixes du jeu MyClimb Manager : stats, styles, compétences, pays et noms. */
 import type { AndroidSymbol } from 'expo-symbols';
+import type { SkinId } from './skins';
 
 export type MStat = 'force' | 'doigts' | 'technique' | 'endurance' | 'souplesse' | 'mental' | 'puissance' | 'agilite' | 'equilibre';
 
@@ -113,3 +114,14 @@ export const RIVAL_CLUBS = [
 ];
 
 export const CLUB_COLORS = ['#E8642C', '#E53935', '#D81B60', '#8E24AA', '#3949AB', '#1E88E5', '#00ACC1', '#00897B', '#43A047', '#C0CA33', '#FDD835', '#212121', '#ECEFF1'];
+
+/** Grimpeurs légendaires, débloqués par des exploits du club. */
+export type LegendCond = 'montee' | 'titre' | 'nemesis' | 'contrats' | 'coupe' | 'monde';
+export const LEGENDS: { id: string; first: string; last: string; flag: string; style: StyleId; skin: SkinId; rating: number; bio: string; cond: LegendCond; condText: string }[] = [
+  { id: 'fantome', first: 'Le Fantôme', last: 'de Bleau', flag: '🇫🇷', style: 'technicien', skin: 'ninja', rating: 86, bio: 'Personne n’a jamais vu son visage, mais tout Fontainebleau connaît ses passages.', cond: 'montee', condText: 'Monter en Ligue nationale' },
+  { id: 'ours', first: 'Grizzly', last: 'Morin', flag: '🇨🇦', style: 'puissant', skin: 'bucheron', rating: 87, bio: 'A appris à grimper sur les falaises du Saguenay. Ses dévers font trembler les murs.', cond: 'titre', condText: 'Finir 1er d’une saison' },
+  { id: 'nemesis', first: 'Yuki', last: 'Kaze', flag: '🇯🇵', style: 'aerien', skin: 'samourai', rating: 88, bio: 'Ancienne star de ton némésis. Elle a changé de camp après ta victoire.', cond: 'nemesis', condText: 'Finir une saison devant ton némésis' },
+  { id: 'sponsor', first: 'Diego', last: 'Fuerte', flag: '🇪🇸', style: 'endurant', skin: 'heros', rating: 88, bio: 'L’égérie des sponsors : il ne lâche jamais une voie.', cond: 'contrats', condText: 'Remplir 3 contrats de sponsor' },
+  { id: 'coupe', first: 'Astrid', last: 'Nord', flag: '🇳🇴', style: 'mental', skin: 'viking', rating: 90, bio: 'Triple championne de la Coupe. Rien ne l’impressionne.', cond: 'coupe', condText: 'Gagner la Coupe' },
+  { id: 'dragon', first: 'Li', last: 'Long', flag: '🇨🇳', style: 'prodige', skin: 'dragon', rating: 92, bio: 'Le plus grand grimpeur de tous les temps. Il ne rejoint que les clubs du sommet.', cond: 'monde', condText: 'Monter en Coupe du monde' },
+];

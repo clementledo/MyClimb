@@ -170,6 +170,9 @@ sleep 8 ; shot 1m8b-direct-2 ; sleep 14
 sleep 2 ; shot 1m9-resultats ; scrolldown 2 ; shot 1m9b-pourquoi ; scrolltop
 tap "Retour au club" ; sleep 3
 tap "Ligue" ; sleep 2 ; shot 1m10-ligue
+scrolldown 2 ; shot 1m10b-coupe ; scrolltop
+tap "Légendes" ; sleep 3 ; shot 1m11-legendes
+adb shell input keyevent 4 ; sleep 2
 adb shell input keyevent 4 ; sleep 3
 fi
 if want entrainement; then

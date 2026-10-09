@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, Text, Vibration, View } from 'react-native';
+import { Alert, Animated, Easing, Modal, Pressable, ScrollView, Text, Vibration, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { G, GameBackground, GameHeader, GButton, HelpTip, Panel } from '@/components/ManagerUi';
@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui';
 import {
   autoLineup,
   chanceOf,
+  cupStatus,
   energyLeft,
   EVENTS,
   eventName,
@@ -19,6 +20,7 @@ import {
   loadClub,
   nameOf,
   ratingOf,
+  resolveEvent,
   startCompetition,
   teamTotals,
   upcoming,
@@ -27,6 +29,7 @@ import {
   type CompResult,
   type Draft,
   type Lineup,
+  type Mode,
   type Moment,
 } from '@/lib/manager';
 import { BLOCKS, MSTATS } from '@/lib/managerData';
@@ -38,11 +41,12 @@ const EVENT_ICON = { bloc: 'landscape', voie: 'height' } as const;
 
 export default function CompetitionScreen() {
   const router = useRouter();
+  const mode: Mode = useLocalSearchParams<{ mode?: string }>().mode === 'coupe' ? 'coupe' : 'ligue';
   const [club, setClub] = useState<Club | null>(loadClub);
   const [boost, setBoost] = useState<string | null>(null);
   const [lineup, setLineup] = useState<Lineup>(() => {
     const c = loadClub();
-    return c ? autoLineup(c) : [];
+    return c ? autoLineup(c, 0, mode) : [];
   });
   const [draft, setDraft] = useState<Draft | null>(null);
 
@@ -58,6 +62,7 @@ export default function CompetitionScreen() {
           setBoost(null);
           setLineup(c ? autoLineup(c) : []);
           setDraft(null);
+          if (mode === 'coupe') router.setParams({ mode: 'ligue' });
         }}
         onExit={() => router.back()}
       />
@@ -65,12 +70,20 @@ export default function CompetitionScreen() {
   return (
     <Prep
       club={club}
+      mode={mode}
       lineup={lineup}
       setLineup={setLineup}
       boost={boost}
       setBoost={setBoost}
+      onEvent={(k) => {
+        const msg = resolveEvent(club, k);
+        if (msg) return Alert.alert('Impossible', msg);
+        const c = loadClub();
+        setClub(c);
+        if (c) setLineup(autoLineup(c, 0, mode));
+      }}
       onStart={() => {
-        setDraft(startCompetition(club, lineup, boost));
+        setDraft(startCompetition(club, lineup, boost, mode));
         setClub(loadClub());
       }}
     />
@@ -79,24 +92,47 @@ export default function CompetitionScreen() {
 
 /* ---------- Préparation ---------- */
 
-function Prep(p: { club: Club; lineup: Lineup; setLineup: (l: Lineup) => void; boost: string | null; setBoost: (b: string | null) => void; onStart: () => void }) {
-  const { club, lineup, setLineup, boost, setBoost } = p;
+function Prep(p: { club: Club; mode: Mode; lineup: Lineup; setLineup: (l: Lineup) => void; boost: string | null; setBoost: (b: string | null) => void; onEvent: (k: number) => void; onStart: () => void }) {
+  const { club, mode, lineup, setLineup, boost, setBoost } = p;
   const { bottom } = useSafeAreaInsets();
   const [choosing, setChoosing] = useState<number | null>(null);
-  const events = upcoming(club);
+  const events = upcoming(club, mode);
   const L = LEAGUES[club.league];
+  const cup = cupStatus(club);
+  const ev = mode === 'ligue' ? club.season.event : undefined;
+  const pending = !!ev && ev.done === undefined;
   const boosts = club.items.filter((i) => i.kind === 'boost');
   const bv = boosts.find((b) => b.id === boost)?.value ?? 0;
-  const chances = events.map((e, i) => (lineup[i] ? chanceOf(club, lineup[i]!, i, lineup, bv) : 0));
-  const ready = lineup.length === EVENTS && lineup.every(Boolean);
+  const chances = events.map((e, i) => (lineup[i] ? chanceOf(club, lineup[i]!, i, lineup, bv, mode) : 0));
+  const ready = lineup.length === EVENTS && lineup.every((id) => club.climbers.some((c) => c.id === id)) && !pending;
 
   return (
     <View style={s.screen}>
       <GameBackground colors={club.colors} />
-      <GameHeader title={`Manche ${club.season.round + 1}`} club={club} />
+      <GameHeader title={mode === 'coupe' ? (cup.stage ?? 'Coupe') : `Manche ${club.season.round + 1}`} club={club} />
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: bottom + 110 }]}>
+        {ev && (
+          <Panel style={{ borderColor: pending ? G.gold : G.line, borderWidth: pending ? 2 : 1 }}>
+            <View style={[s.titleRow, { justifyContent: 'flex-start' }]}>
+              <Icon name={ev.icon} size={24} color={G.gold} />
+              <Text style={[s.section, { flex: 1 }]}>{ev.title}</Text>
+              <HelpTip topic="evenement" />
+            </View>
+            <Text style={s.whyText}>{ev.text}</Text>
+            {pending ? (
+              <View style={s.footRow}>
+                {ev.choices.map((label, k) => (
+                  <GButton key={label} label={label} tone={k === 0 ? 'gold' : 'ghost'} onPress={() => p.onEvent(k)} style={{ flex: 1 }} />
+                ))}
+              </View>
+            ) : (
+              <Text style={[s.muted, { color: G.green }]}>Choix fait : {ev.choices[ev.done!]}</Text>
+            )}
+          </Panel>
+        )}
         <Panel>
-          <Text style={s.over}>{L.name.toUpperCase()}</Text>
+          <Text style={s.over}>{mode === 'coupe' ? `COUPE · ${(cup.stage ?? '').toUpperCase()}` : L.name.toUpperCase()}</Text>
+          {mode === 'coupe' && cup.opp && <Text style={[s.section, { textAlign: 'center' }]}>Contre {cup.opp.name} (note {Math.round(cup.opp.strength)})</Text>}
           <View style={s.titleRow}>
             <Text style={s.title}>3 blocs puis une voie</Text>
             <HelpTip topic="competition" />
@@ -160,10 +196,10 @@ function Prep(p: { club: Club; lineup: Lineup; setLineup: (l: Lineup) => void; b
             ))}
           </View>
         )}
-        <GButton label="Composition automatique" icon="auto_awesome" tone="ghost" onPress={() => setLineup(autoLineup(club, bv))} />
+        <GButton label="Composition automatique" icon="auto_awesome" tone="ghost" onPress={() => setLineup(autoLineup(club, bv, mode))} />
       </ScrollView>
       <View style={[s.footer, { paddingBottom: bottom + 12 }]}>
-        <GButton label={energyLeft(club) > 0 ? 'Lancer la compétition' : 'Plus d’énergie aujourd’hui'} icon="play_arrow" tone="accent" disabled={!ready || energyLeft(club) <= 0} onPress={p.onStart} />
+        <GButton label={energyLeft(club) <= 0 ? 'Plus d’énergie aujourd’hui' : pending ? 'Réponds à l’événement' : 'Lancer la compétition'} icon="play_arrow" tone="accent" disabled={!ready || energyLeft(club) <= 0} onPress={p.onStart} />
       </View>
 
       <Modal visible={choosing !== null} transparent animationType="slide" onRequestClose={() => setChoosing(null)}>
@@ -176,7 +212,7 @@ function Prep(p: { club: Club; lineup: Lineup; setLineup: (l: Lineup) => void; b
               {club.climbers
                 .map((c) => {
                   const next = lineup.map((x, k) => (k === choosing ? c.id : x));
-                  return { c, chance: chanceOf(club, c.id, choosing, next, bv), double: next.filter((x) => x === c.id).length > 1 };
+                  return { c, chance: chanceOf(club, c.id, choosing, next, bv, mode), double: next.filter((x) => x === c.id).length > 1 };
                 })
                 .sort((a, b) => b.chance - a.chance)
                 .map(({ c, chance, double }) => (
@@ -287,8 +323,19 @@ function Live(p: { club: Club; draft: Draft; onReplay: () => void; onExit: () =>
         {result ? (
           <View style={s.podium}>
             <Icon name="emoji_events" size={64} color={medal} />
-            <Text style={[s.rank, { color: medal }]}>{result.rank}ᵉ</Text>
-            <Text style={s.title}>{result.rank === 1 ? 'Victoire !' : result.rank <= 3 ? 'Sur le podium !' : result.rank <= 6 ? 'Pas mal, on peut faire mieux' : 'Dur dur… entraîne ton équipe'}</Text>
+            {result.cup ? (
+              <>
+                <Text style={[s.rank, { color: result.cup.win ? G.gold : G.red, fontSize: 40 }]}>{result.cup.champion ? 'Champion !' : result.cup.win ? 'Qualifié !' : 'Éliminé'}</Text>
+                <Text style={s.title}>
+                  {result.cup.stage} contre {result.cup.opp}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={[s.rank, { color: medal }]}>{result.rank}ᵉ</Text>
+                <Text style={s.title}>{result.rank === 1 ? 'Victoire !' : result.rank <= 3 ? 'Sur le podium !' : result.rank <= 6 ? 'Pas mal, on peut faire mieux' : 'Dur dur… entraîne ton équipe'}</Text>
+              </>
+            )}
             <View style={s.gains}>
               <View style={s.gain}>
                 <Icon name="paid" size={18} color={G.gold} />
@@ -363,6 +410,33 @@ function Live(p: { club: Club; draft: Draft; onReplay: () => void; onExit: () =>
           </Panel>
         )}
 
+        {result && (result.legends.length > 0 || result.contract || result.news.length > 0) && (
+          <Panel style={{ borderColor: G.gold, borderWidth: 2 }}>
+            {result.legends.map((n) => (
+              <View key={n} style={s.why}>
+                <Icon name="auto_awesome" size={20} color="#C77DFF" />
+                <Text style={s.whyText}>Légende débloquée : {n} rejoint ton club !</Text>
+              </View>
+            ))}
+            {result.contract && (
+              <View style={s.why}>
+                <Icon name="handshake" size={20} color={G.green} />
+                <Text style={s.whyText}>
+                  {result.contract.text} +{result.contract.reward} pièces
+                </Text>
+              </View>
+            )}
+            {result.news
+              .filter((n) => !n.startsWith('Légende'))
+              .map((n) => (
+                <View key={n} style={s.why}>
+                  <Icon name="campaign" size={20} color={G.gold} />
+                  <Text style={s.whyText}>{n}</Text>
+                </View>
+              ))}
+          </Panel>
+        )}
+
         {result && (
           <Panel>
             <Text style={s.section}>Pourquoi ce résultat</Text>
@@ -397,6 +471,7 @@ function Live(p: { club: Club; draft: Draft; onReplay: () => void; onExit: () =>
               <Text style={[s.teamName, t.mine && { color: G.gold }]} numberOfLines={1}>
                 {t.name}
               </Text>
+              {t.nemesis && <Icon name="local_fire_department" size={16} color={G.red} />}
               <Text style={s.points}>{t.total}</Text>
             </View>
           ))}
@@ -406,7 +481,7 @@ function Live(p: { club: Club; draft: Draft; onReplay: () => void; onExit: () =>
         {result ? (
           <View style={s.footRow}>
             <GButton label="Retour au club" tone="ghost" onPress={p.onExit} style={{ flex: 1 }} />
-            <GButton label="Manche suivante" icon="play_arrow" tone="accent" disabled={energyLeft(loadClub() ?? club) <= 0} onPress={p.onReplay} style={{ flex: 1 }} />
+            <GButton label={draft.mode === 'coupe' ? 'Manche de ligue' : 'Manche suivante'} icon="play_arrow" tone="accent" disabled={energyLeft(loadClub() ?? club) <= 0} onPress={p.onReplay} style={{ flex: 1 }} />
           </View>
         ) : (
           <GButton label="Passer" icon="fast_forward" tone="ghost" onPress={finish} />
