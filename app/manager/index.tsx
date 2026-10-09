@@ -347,7 +347,7 @@ export default function ManagerHome() {
                   <Icon name={state === 'gagné' ? 'check_circle' : state === 'perdu' ? 'cancel' : 'radio_button_unchecked'} size={20} color={color} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.itemName}>{st}</Text>
-                    <Text style={s.muted} numberOfLines={1}>
+                    <Text style={s.muted} numberOfLines={2}>
                       {i <= c.round ? `${opp.name} · note ${Math.round(opp.strength)}` : 'Adversaire inconnu'}
                     </Text>
                   </View>
