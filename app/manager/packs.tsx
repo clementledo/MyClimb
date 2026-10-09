@@ -205,7 +205,7 @@ function Summary({ club, opened, onNext, onClose }: { club: Club; opened: { kind
           ) : (
             <View key={i} style={[s.mini, { width: w, height: w * 1.42, borderColor: c.kind === 'objet' ? LEVEL_COLORS[c.item.level - 1] : G.gold }]}>
               <Icon name={c.kind === 'objet' ? ITEM_ICON[c.item.kind] : 'paid'} size={30} color={c.kind === 'objet' ? LEVEL_COLORS[c.item.level - 1] : G.gold} />
-              <Text style={s.miniText} numberOfLines={3}>
+              <Text style={s.miniText} numberOfLines={3} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {c.kind === 'objet' ? c.item.name : `+${c.coins} pièces`}
               </Text>
             </View>

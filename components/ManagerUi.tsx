@@ -55,7 +55,7 @@ export function GameHeader({ title, club, right }: { title: string; club?: Club 
       <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Retour" style={s.round}>
         <Icon name="arrow_back" size={22} color={G.text} />
       </Pressable>
-      <Text style={s.title} numberOfLines={1}>
+      <Text style={s.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
         {title}
       </Text>
       {club && (
