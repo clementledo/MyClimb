@@ -1,7 +1,7 @@
 import type { AndroidSymbol } from 'expo-symbols';
 import { useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
-import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Modal, Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
@@ -179,4 +179,52 @@ const t = themedStyles({
   on: { backgroundColor: G.gold },
   text: { color: G.muted, fontWeight: '800', fontSize: 14 },
   textOn: { color: G.bg },
+});
+
+/** Explications du jeu, affichées par les « ? ». */
+export const HELP = {
+  equipe: { title: 'Ton équipe', text: 'Touche une carte pour ouvrir la fiche du grimpeur : programme d’entraînement, matériel, compétences. La barre sous la carte montre sa fatigue : verte, il est frais ; jaune ou rouge, il grimpe moins bien.' },
+  objets: { title: 'Tes objets', text: 'Matériel : des stats en plus tant qu’un grimpeur le porte (2 au plus). Boost : un bonus pour une compétition, utilisé une fois. Coach : entraînement plus rapide dans sa stat. Sponsor : des pièces en plus à chaque compétition. Stage : apprend une compétence.' },
+  ligue: { title: 'La ligue', text: '10 manches par saison. Chaque manche rapporte des points selon ton classement. À la fin, les 3 premiers montent de ligue et on descend à partir de la 8ᵉ place. Les rivaux progressent un peu à chaque manche.' },
+  programme: { title: 'Entraînement', text: 'Il s’entraîne même app fermée : la stat choisie gagne environ +1 toutes les 3 h, plus lentement près du potentiel. Ça fatigue un peu. Au repos, la fatigue passe de 100 à 0 en 4 h ; sans programme, en 8 h.' },
+  fatigue: { title: 'Fatigue', text: 'De 0 à 100. Au-dessus de 45, il grimpe moins bien ; à 80 et plus, il ne progresse presque plus. Chaque épreuve de compétition ajoute 12. Au repos, il récupère tout en 4 h.' },
+  potentiel: { title: 'Potentiel', text: 'Le plafond de ses stats : l’entraînement ne peut pas aller au-delà. Il monte de 1 tous les 100 XP gagnés en compétition, et chaque top rapporte de l’XP en plus.' },
+  stats: { title: 'Stats', text: 'Chaque épreuve utilise certaines stats, affichées sur sa carte avant la compétition (par exemple Dévers : Force, Puissance, Doigts). La voie demande surtout de l’Endurance. Le chiffre en plus vient du matériel porté.' },
+  materiel: { title: 'Matériel', text: 'Jusqu’à 2 objets par grimpeur. Un objet n’est porté que par un grimpeur à la fois : touche-le pour l’équiper ou le retirer.' },
+  competences: { title: 'Compétences', text: 'Une compétence donne +8 sur le type de bloc qui lui correspond (par exemple Talon pour le dévers). Elles s’apprennent avec les stages trouvés dans les packs.' },
+  competition: { title: 'La compétition', text: '3 blocs puis une voie, connus à l’avance. Choisis un grimpeur par épreuve : le % est sa chance de réussir, selon ses stats utiles, sa fatigue et ton boost. Un top vaut 25 points, une zone 10, et la voie jusqu’à 25 selon la hauteur atteinte. Une compétition coûte 1 énergie (10 par jour).' },
+  boost: { title: 'Boost', text: 'Son bonus s’ajoute à tous tes grimpeurs pour cette compétition, puis il disparaît.' },
+  packs: { title: 'Les packs', text: 'Chaque pack contient 4 ou 5 cartes : grimpeurs, objets ou pièces. Plus il est cher, meilleures sont les cartes. Si ton équipe est pleine (12 grimpeurs), le grimpeur en trop est vendu automatiquement.' },
+} as const;
+
+/** Petit « ? » qui ouvre une bulle d'explication. */
+export function HelpTip({ topic }: { topic: keyof typeof HELP }) {
+  const [open, setOpen] = useState(false);
+  const h = HELP[topic];
+  return (
+    <>
+      <Pressable onPress={() => setOpen(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Aide : ${h.title}`} style={hs.q}>
+        <Text style={hs.qText}>?</Text>
+      </Pressable>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={hs.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Fermer l’aide">
+          <View style={hs.bubble}>
+            <Text style={hs.title}>{h.title}</Text>
+            <Text style={hs.text}>{h.text}</Text>
+            <Text style={hs.ok}>Compris</Text>
+          </View>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+const hs = themedStyles({
+  q: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: G.gold, alignItems: 'center', justifyContent: 'center' },
+  qText: { color: G.gold, fontWeight: '900', fontSize: 13, lineHeight: 15 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 28 },
+  bubble: { backgroundColor: G.panel, borderRadius: 20, padding: 20, gap: 10, borderWidth: 1.5, borderColor: G.gold },
+  title: { color: G.gold, fontWeight: '900', fontSize: 18 },
+  text: { color: G.text, fontSize: 15, lineHeight: 22 },
+  ok: { color: G.gold, fontWeight: '800', fontSize: 15, alignSelf: 'flex-end', marginTop: 4 },
 });

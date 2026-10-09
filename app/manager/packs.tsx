@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, G as SvgG, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { ManagerCard } from '@/components/ManagerCard';
-import { Crest, G, GameBackground, GameHeader, GButton, Panel } from '@/components/ManagerUi';
+import { Crest, G, GameBackground, GameHeader, GButton, Panel, HelpTip } from '@/components/ManagerUi';
 import { Icon } from '@/components/ui';
 import { buyPack, itemText, loadClub, openPack, PACKS, ratingOf, tierOf, type Club, type PackCard, type PackKind } from '@/lib/manager';
 import { STYLES } from '@/lib/managerData';
@@ -68,7 +68,10 @@ export default function ManagerPacks() {
             <GButton label="Ouvrir le pack" icon="redeem" onPress={open} style={{ alignSelf: 'stretch' }} />
           </Panel>
         )}
-        <Text style={s.section}>Boutique</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={s.section}>Boutique</Text>
+          <HelpTip topic="packs" />
+        </View>
         {SHOP.map((k) => (
           <Pressable key={k} onPress={() => buy(k)} accessibilityRole="button" accessibilityLabel={`Acheter ${PACKS[k].name}`} style={({ pressed }) => [s.shopRow, pressed && { transform: [{ scale: 0.98 }] }]}>
             <PackArt kind={k} width={64} />

@@ -530,3 +530,120 @@ export function skeleton(
     legs,
   };
 }
+
+/* ---------- Mouvement fluide ---------- */
+
+const perp3 = (v: P3, u: P3): P3 => sub3(v, mul3(u, dot3(v, u)));
+
+/**
+ * Lisse le squelette d'une image à l'autre : le buste suit sans à-coups, et les coudes et genoux
+ * gardent leur plan de pliage (ils ne basculent plus d'un côté à l'autre). Les mains et les pieds
+ * restent sur leurs prises. Une articulation ne passe jamais du côté du corps (pas d'angle impossible).
+ */
+export function createSmoother(height: number) {
+  const b = body(height);
+  let prev: Skeleton | null = null;
+  const sides: P3[] = [];
+  const joints: P3[] = [];
+  const axes: P3[] = [];
+  const offs: P3[] = [];
+  return (target: Skeleton, dt: number): Skeleton => {
+    // Saut net (nouvelle voie, retour en arrière) : on repart de la cible.
+    if (!prev || dist3(prev.pelvis, target.pelvis) > 0.35 * height || dt <= 0 || dt > 0.25) {
+      prev = target;
+      sides.length = 0;
+      joints.length = 0;
+      axes.length = 0;
+      offs.length = 0;
+      return target;
+    }
+    const k = 1 - Math.exp(-dt / 0.07);
+    const follow = (a: P3, c: P3) => lerp3(a, c, k);
+    const pelvis = follow(prev.pelvis, target.pelvis);
+    const chest = follow(prev.chest, target.chest);
+    const neck = follow(prev.neck, target.neck);
+    const head = follow(prev.head, target.head);
+    // Un membre : racine lissée, extrémité sur la prise, articulation par cinématique inverse
+    // dans un plan qui tourne doucement.
+    const limb = (i: number, root: P3, tJoint: P3, tEnd: P3, tTip: P3, l1: number, l2: number, outward: P3, zMin: number) => {
+      const off = (offs[i] = offs[i] ? lerp3(offs[i], sub3(tEnd, tTip), k) : sub3(tEnd, tTip));
+      let end = add3(tTip, off);
+      // Axe du membre : il rattrape sa cible à 5 radians par seconde au plus (membre très replié
+      // dont la racine passe au-dessus de l'extrémité, comme un pied monté à hauteur de hanche),
+      // sans que la main ou le pied ne glisse de plus de 3 cm sur sa prise.
+      const uT = norm3(sub3(end, root), { x: 0, y: 1, z: 0 });
+      let u = uT;
+      if (axes[i]) {
+        const lag = Math.acos(clamp(dot3(axes[i], uT), -1, 1));
+        const D = Math.max(1e-3, len3(sub3(end, root)));
+        const keep = Math.min(Math.max(0, lag - 5 * dt), Math.asin(Math.min(1, (0.03 * height) / 1.8 / D)));
+        if (keep > 1e-4) {
+          const ortho = norm3(perp3(axes[i], uT), axes[i]);
+          u = norm3(add3(mul3(uT, Math.cos(keep)), mul3(ortho, Math.sin(keep))), uT);
+        }
+      }
+      axes[i] = u;
+      // L'articulation suit sa cible sans jamais la dépasser en vitesse : quand la cible bascule
+      // de l'autre côté du membre (membre presque replié), le coude ou le genou y va en douceur.
+      const prevJoint = joints[i] ?? tJoint;
+      const gap = sub3(tJoint, prevJoint);
+      const g = len3(gap);
+      const stepLen = Math.min(g * k, 1.2 * height * dt);
+      const J = g > 1e-6 ? add3(prevJoint, mul3(gap, stepLen / g)) : prevJoint;
+      const before = sides[i] ? norm3(perp3(sides[i], u), outward) : norm3(perp3(sub3(tJoint, root), u), outward);
+      // Le coude ou le genou se place sur son cercle possible, au plus près de ce point.
+      const D0 = len3(sub3(end, root));
+      const d0 = Math.max(Math.abs(l1 - l2) + 1e-3, Math.min(D0, l1 + l2 - 1e-3));
+      const center = add3(root, mul3(u, (l1 * l1 - l2 * l2 + d0 * d0) / (2 * d0)));
+      // Pour passer de l'autre côté du membre, il fait le tour par l'extérieur et ne traverse
+      // jamais l'axe (là, le moindre écart le ferait sauter d'un bord à l'autre du cercle).
+      const radius = Math.sqrt(Math.max(0, l1 * l1 - len3(sub3(center, root)) ** 2));
+      const outDir = perp3(outward, u);
+      let pr = perp3(sub3(J, center), u);
+      if (len3(pr) < 0.6 * radius && len3(outDir) > 1e-3) pr = add3(pr, mul3(norm3(outDir, before), 0.6 * radius - len3(pr)));
+      // Membre très replié (pied à hauteur de hanche) : le genou s'ouvre sur le côté, comme en
+      // grenouille. C'est aussi là qu'il bouge le moins quand le bassin passe au-dessus du pied.
+      const fold = clamp((0.45 * (l1 + l2) - D0) / (0.25 * (l1 + l2)), 0, 1);
+      if (i >= 2 && fold > 0 && len3(outDir) > 1e-3) pr = lerp3(pr, mul3(norm3(outDir, before), radius), fold * k * 0.5);
+      let side = norm3(pr, before);
+      // Jamais vers l'intérieur du corps : on le ramène vers l'extérieur, en douceur.
+      const out = perp3(outward, u);
+      if (len3(out) > 0.2 * len3(outward)) {
+        const o = norm3(out, side);
+        const c = dot3(side, o);
+        if (c < -0.2) {
+          const ang = Math.min(Math.acos(clamp(c, -1, 1)) - Math.acos(-0.2), 4 * dt);
+          const ortho = norm3(perp3(o, side), o);
+          side = norm3(add3(mul3(side, Math.cos(ang)), mul3(ortho, Math.sin(ang))), side);
+        }
+      }
+      sides[i] = side;
+      const D = len3(sub3(end, root));
+      const d = Math.max(Math.abs(l1 - l2) + 1e-3, Math.min(D, l1 + l2 - 1e-3));
+      const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+      const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+      let joint = add3(add3(root, mul3(u, a)), mul3(side, h));
+      if (joint.z < zMin) joint = { ...joint, z: zMin };
+      joints[i] = joint;
+      end = add3(root, mul3(u, d));
+      return { joint, end, tip: sub3(end, off) };
+    };
+    const across = norm3(sub3(target.arms[1].shoulder, target.arms[0].shoulder), { x: 1, y: 0, z: 0 });
+    const arms = target.arms.map((t, i) => {
+      const s = i ? 1 : -1;
+      const shoulder = follow(prev!.arms[i].shoulder, t.shoulder);
+      const r = limb(i, shoulder, t.elbow, t.hand, t.grip, b.upperArm, b.forearm, add3(mul3(across, s), { x: 0, y: 0.3, z: 0.2 }), 0.035 * height);
+      return { shoulder, elbow: r.joint, hand: r.end, grip: r.tip };
+    });
+    const legs = target.legs.map((t, i) => {
+      const s = i ? 1 : -1;
+      const hip = follow(prev!.legs[i].hip, t.hip);
+      const r = limb(2 + i, hip, t.knee, t.foot, t.toe, b.thigh, b.shin, add3(mul3(across, s), { x: 0, y: -0.2, z: 0.3 }), 0.045 * height);
+      return { hip, knee: r.joint, foot: r.end, toe: r.tip };
+    });
+    prev = { pelvis, chest, neck, head, arms, legs };
+    return prev;
+  };
+}
+
+const dist3 = (a: P3, b: P3) => len3(sub3(a, b));

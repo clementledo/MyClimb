@@ -163,16 +163,10 @@ for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do pct 50 50 ; sleep 2; done
 shot 1m5-bilan-pack
 tap "Voir mon équipe" ; sleep 3 ; shot 1m6-club
 scrolldown 2 ; shot 1m6b-equipe ; scrolltop
-tap "Jouer la compétition" ; sleep 3 ; shot 1m7-prepa ; scrolldown 2 ; shot 1m7b-prepa-bas ; scrolltop
+tap "Jouer la compétition" ; sleep 3 ; tap "Aide : La compétition" ; sleep 1 ; shot 1m7a-aide ; tap "Fermer l’aide" ; sleep 1 ; shot 1m7-prepa ; scrolldown 2 ; shot 1m7b-prepa-bas ; scrolltop
 tap "Lancer la compétition" ; sleep 3 ; shot 1m8-direct
-# Mini-jeu de jauge éventuel (écran 3D animé : touché par position, puis « Continuer »).
-for k in 1 2 3 4 5 6; do
-  sleep 4 ; pct 50 40 ; sleep 1 ; [ "$k" = 1 ] && shot 1m8b-jauge ; sleep 5
-  timeout 30 adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 ; adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
-  # Bouton « Continuer » du mini-jeu (écran 3D illisible pour uiautomator) : touché par position.
-  pct 50 89 ; sleep 2
-  grep -q 'text="Retour au club"' "$OUT/ui.xml" && break
-done
+# Direct : 4 épreuves de quelques secondes, puis les résultats.
+sleep 8 ; shot 1m8b-direct-2 ; sleep 14
 sleep 2 ; shot 1m9-resultats ; scrolldown 2 ; shot 1m9b-pourquoi ; scrolltop
 tap "Retour au club" ; sleep 3
 tap "Ligue" ; sleep 2 ; shot 1m10-ligue

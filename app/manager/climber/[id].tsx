@@ -4,7 +4,7 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ManagerCard } from '@/components/ManagerCard';
-import { G, GameBackground, GameHeader, GButton, Panel, StatBar } from '@/components/ManagerUi';
+import { G, GameBackground, GameHeader, GButton, HelpTip, Panel, StatBar, type HELP } from '@/components/ManagerUi';
 import { Icon } from '@/components/ui';
 import { equip, itemText, loadClub, nameOf, PROGRAMS, release, sellPrice, setProgram, statWithGear, teachSkill, TEAM_SIZE, trainSpeed, unequip, type Club } from '@/lib/manager';
 import { MSTATS, SKILLS, STYLES } from '@/lib/managerData';
@@ -40,20 +40,27 @@ export default function ClimberScreen() {
             <Fact label="Compétitions" value={String(c.comps)} />
             <Fact label="Tops" value={String(c.tops)} />
           </View>
-          <Text style={s.muted}>Encore {nextPot} XP pour +1 de potentiel. Le potentiel est le plafond de ses stats.</Text>
+          <View style={s.head}>
+            <Text style={[s.muted, { flex: 1 }]}>Encore {nextPot} XP pour +1 de potentiel. Le potentiel est le plafond de ses stats.</Text>
+            <HelpTip topic="potentiel" />
+          </View>
+          <View style={s.head}>
+            <Text style={[s.muted, { flex: 1 }]}>Fatigue et récupération</Text>
+            <HelpTip topic="fatigue" />
+          </View>
           <StatBar label="Fatigue" value={c.fatigue} max={100} color={c.fatigue > 70 ? G.red : c.fatigue > 45 ? G.gold : G.green} />
           {c.fatigue > 45 && <Text style={s.warn}>Fatigué : il grimpe moins bien et progresse moins. Mets-le au repos ou fais tourner l’équipe.</Text>}
         </Panel>
 
         <Panel>
-          <Text style={s.title}>Stats</Text>
+          <Title text="Stats" topic="stats" />
           {MSTATS.map((m) => (
             <StatBar key={m.id} label={m.name} value={c.stats[m.id]} extra={statWithGear(club, c, m.id) - c.stats[m.id]} color={STYLES[c.style].strong.includes(m.id) ? G.accent : G.blue} />
           ))}
         </Panel>
 
         <Panel>
-          <Text style={s.title}>Programme d’entraînement</Text>
+          <Title text="Programme d’entraînement" topic="programme" />
           <Text style={s.muted}>Il s’entraîne même quand l’app est fermée. Plus une stat est proche du potentiel, plus elle monte lentement.</Text>
           <View style={s.chips}>
             {PROGRAMS.map((p) => {
@@ -81,7 +88,7 @@ export default function ClimberScreen() {
         </Panel>
 
         <Panel>
-          <Text style={s.title}>Matériel ({c.gear.length}/2)</Text>
+          <Title text={`Matériel (${c.gear.length}/2)`} topic="materiel" />
           {gear.length === 0 && <Text style={s.muted}>Pas encore de matériel : il se gagne dans les packs.</Text>}
           {gear.map((it) => {
             const worn = c.gear.includes(it.id);
@@ -110,7 +117,7 @@ export default function ClimberScreen() {
         </Panel>
 
         <Panel>
-          <Text style={s.title}>Compétences</Text>
+          <Title text="Compétences" topic="competences" />
           {c.skills.length === 0 && <Text style={s.muted}>Aucune pour l’instant. Les stages de compétence s’obtiennent dans les packs.</Text>}
           {c.skills.map((k) => (
             <View key={k} style={s.itemRow}>
@@ -158,6 +165,15 @@ export default function ClimberScreen() {
   );
 }
 
+function Title({ text, topic }: { text: string; topic: keyof typeof HELP }) {
+  return (
+    <View style={s.head}>
+      <Text style={[s.title, { flex: 1 }]}>{text}</Text>
+      <HelpTip topic={topic} />
+    </View>
+  );
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <View style={s.fact}>
@@ -172,6 +188,7 @@ const s = themedStyles({
   content: { paddingHorizontal: 16, gap: 16 },
   top: { alignItems: 'center', paddingVertical: 8 },
   title: { color: G.text, fontWeight: '800', fontSize: 17 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   bio: { color: G.text, opacity: 0.9, fontSize: 15, lineHeight: 21, fontStyle: 'italic' },
   muted: { color: G.muted, fontSize: 13, lineHeight: 18 },
   warn: { color: G.gold, fontSize: 13, lineHeight: 18, fontWeight: '600' },

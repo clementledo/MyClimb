@@ -10,7 +10,7 @@ import { createCelebrations, freeHand, type Mood } from './celebrations';
 import { createClimber, type Body3 } from './climber';
 import type { CelebrationId } from './cosmetics';
 import { WALL_ANGLES, type Plan } from './planner';
-import { contactsAt, skeleton, type P3 } from './simulation';
+import { contactsAt, createSmoother, skeleton, type P3 } from './simulation';
 import { DEFAULT_SKIN, type SkinId } from './skins';
 
 export type SceneTheme = { background: string; primary: string; success: string; dark: boolean };
@@ -507,6 +507,9 @@ export function createClimbScene(
     arms: s.arms.map((a) => ({ shoulder: toWorld(a.shoulder), elbow: toWorld(a.elbow), hand: toWorld(a.hand), grip: toWorld(a.grip) })),
     legs: s.legs.map((l) => ({ hip: toWorld(l.hip), knee: toWorld(l.knee), foot: toWorld(l.foot), toe: toWorld(l.toe) })),
   });
+  let smoother: ReturnType<typeof createSmoother> | null = null;
+  let smoothH = 0;
+  let lastNow: number | null = null;
   const pose = (t: number, look: THREE.Vector3 | null, now: number, age: number) => {
     const p = getPlan();
     const f = contactsAt(p.start, p.startTypes, p.moves, t);
@@ -516,7 +519,11 @@ export function createClimbScene(
       chalk: f.chalk,
       angle: WALL_ANGLES[p.angle].deg,
     });
-    const b = toBody(sk);
+    // Lissage d'une image à l'autre : plus d'à-coups ni de coude ou de genou qui bascule.
+    if (!smoother || smoothH !== p.height) [smoother, smoothH] = [createSmoother(p.height), p.height];
+    const dt = lastNow === null ? 0 : (now - lastNow) / 1000;
+    lastNow = now;
+    const b = toBody(smoother(sk, dt));
     // Pendant la célébration, la main libre lâche la prise pour faire le geste.
     const g = party.pose(age, b, free, p.height, f.types, wallUp, camLocal);
     climber.update(b, {

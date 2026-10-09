@@ -4,7 +4,7 @@ import { Alert, Pressable, ScrollView, Text, TextInput, useWindowDimensions, Vie
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ManagerCard } from '@/components/ManagerCard';
-import { Crest, G, GameBackground, GameHeader, GButton, GTabs, Panel } from '@/components/ManagerUi';
+import { Crest, G, GameBackground, GameHeader, GButton, GTabs, HelpTip, Panel } from '@/components/ManagerUi';
 import { Icon } from '@/components/ui';
 import {
   canClaimDaily,
@@ -144,6 +144,10 @@ export default function ManagerHome() {
           value={tab}
           onChange={setTab}
         />
+        <View style={s.helpRow}>
+          <Text style={s.muted}>Comment ça marche ?</Text>
+          <HelpTip topic={tab} />
+        </View>
 
         {tab === 'equipe' && (
           <View style={s.grid}>
@@ -276,6 +280,7 @@ function ColorRow({ value, onChange }: { value: string; onChange: (c: string) =>
 }
 
 const s = themedStyles({
+  helpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: -6 },
   screen: { flex: 1, backgroundColor: G.bg },
   content: { paddingHorizontal: 16, gap: 16 },
   pressed: { transform: [{ scale: 0.97 }] },

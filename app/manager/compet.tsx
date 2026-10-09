@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, Text, Vibration, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CruxGame, type Crux } from '@/components/CruxGame';
-import { G, GameBackground, GameHeader, GButton, Panel } from '@/components/ManagerUi';
+import { G, GameBackground, GameHeader, GButton, HelpTip, Panel } from '@/components/ManagerUi';
 import { Moment3D } from '@/components/Moment3D';
 import { Icon } from '@/components/ui';
 import {
@@ -98,7 +97,10 @@ function Prep(p: { club: Club; lineup: Lineup; setLineup: (l: Lineup) => void; b
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: bottom + 110 }]}>
         <Panel>
           <Text style={s.over}>{L.name.toUpperCase()}</Text>
-          <Text style={s.title}>3 blocs puis une voie</Text>
+          <View style={s.titleRow}>
+            <Text style={s.title}>3 blocs puis une voie</Text>
+            <HelpTip topic="competition" />
+          </View>
           <Text style={[s.muted, { textAlign: 'center' }]}>Choisis un grimpeur par épreuve. Le pourcentage est sa chance de réussir (top), selon ses stats utiles, sa fatigue et ton boost.</Text>
         </Panel>
 
@@ -140,7 +142,10 @@ function Prep(p: { club: Club; lineup: Lineup; setLineup: (l: Lineup) => void; b
           );
         })}
 
-        <Text style={s.section}>Boost (facultatif)</Text>
+        <View style={[s.titleRow, { justifyContent: 'flex-start' }]}>
+          <Text style={s.section}>Boost (facultatif)</Text>
+          <HelpTip topic="boost" />
+        </View>
         {boosts.length === 0 ? (
           <Text style={s.muted}>Aucun boost. Il s’en trouve dans les packs.</Text>
         ) : (
@@ -243,50 +248,33 @@ function Live(p: { club: Club; draft: Draft; onReplay: () => void; onExit: () =>
   const { club, draft } = p;
   const { bottom } = useSafeAreaInsets();
   const [cur, setCur] = useState(0);
-  const [bonus, setBonus] = useState<(number | undefined)[]>([]);
-  const [crux, setCrux] = useState<Crux | null>(null);
   const [result, setResult] = useState<CompResult | null>(null);
   const [moment, setMoment] = useState<Moment | null>(null);
   const [fade] = useState(() => new Animated.Value(0));
+  const revealed = cur < EVENTS;
 
-  const needsCrux = (i: number) => draft.cruxes.includes(i) && bonus[i] === undefined;
-  const revealed = cur < EVENTS && !needsCrux(cur);
-
-  const finish = (b: (number | undefined)[]) => {
-    const r = finishCompetition(club, draft, b.map((x) => x ?? 0));
+  const finish = () => {
+    const r = finishCompetition(club, draft);
     setResult(r);
     setCur(EVENTS);
     Vibration.vibrate(r.rank <= 3 ? [0, 60, 80, 120] : 40);
   };
 
-  // Ouvre le mini-jeu quand mon grimpeur bloque, sinon passe à l'épreuve suivante après un moment.
+  // Passe à l'épreuve suivante après un moment (en pause pendant la 3D).
   useEffect(() => {
-    if (result || cur >= EVENTS) return;
-    if (needsCrux(cur)) {
-      const mine = draft.rolls[cur].find((x) => x.mine)!;
-      const e = draft.events[cur];
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- le mini-jeu démarre avec l'épreuve.
-      setCrux({ name: mine.name, skin: mine.skin, title: eventName(e), gap: e.difficulty - mine.perf, league: club.league });
-      return;
-    }
+    if (result || cur >= EVENTS || moment) return;
     fade.setValue(0);
     Animated.timing(fade, { toValue: 1, duration: 450, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true }).start();
-    const t = setTimeout(() => (cur + 1 >= EVENTS ? finish(bonus) : setCur(cur + 1)), 4500);
+    const t = setTimeout(() => (cur + 1 >= EVENTS ? finish() : setCur(cur + 1)), 4500);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- piloté par l'épreuve en cours et les bonus.
-  }, [cur, bonus, result]);
-
-  const skip = () => {
-    const next = draft.cruxes.find((i) => i > cur && bonus[i] === undefined);
-    if (next !== undefined) setCur(next);
-    else finish(bonus);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- piloté par l'épreuve en cours.
+  }, [cur, result, moment]);
 
   const shown = Math.min(cur, EVENTS - 1);
   const e = draft.events[shown];
-  const rows = eventRows(draft, shown, bonus[shown] ?? 0);
+  const rows = eventRows(draft, shown);
   const mineRow = rows.find((r) => r.mine);
-  const table = result ? result.teams : teamTotals(club, draft, revealed ? cur + 1 : cur, bonus.map((x) => x ?? 0));
+  const table = result ? result.teams : teamTotals(club, draft, cur + 1);
   const medal = result ? (result.rank === 1 ? '#FFD43B' : result.rank === 2 ? '#CED4DA' : result.rank === 3 ? '#E8A06A' : G.muted) : G.muted;
   const label = (r: (typeof rows)[number]) => (e.kind === 'voie' ? (r.top ? 'TOP !' : `${r.height} %`) : r.top ? (r.tries === 1 ? 'FLASH' : `TOP en ${r.tries}`) : r.zone ? 'Zone' : 'Raté');
   const tone = (r: (typeof rows)[number]) => (r.top ? G.green : r.zone ? G.gold : G.red);
@@ -323,23 +311,25 @@ function Live(p: { club: Club; draft: Draft; onReplay: () => void; onExit: () =>
                 <Text style={[s.liveName, { fontSize: 17 }]} numberOfLines={1}>
                   {mineRow.flag} {mineRow.name}
                 </Text>
-                {revealed ? (
-                  <View style={[s.badge, { backgroundColor: tone(mineRow) }]}>
-                    <Text style={s.badgeText}>{label(mineRow)}</Text>
-                  </View>
-                ) : (
-                  <Text style={s.muted}>en difficulté…</Text>
-                )}
+                <View style={[s.badge, { backgroundColor: tone(mineRow) }]}>
+                  <Text style={s.badgeText}>{label(mineRow)}</Text>
+                </View>
               </View>
             )}
-            {revealed && mineRow?.top && (
-              <Pressable onPress={() => setMoment({ kind: mineRow.tries === 1 ? 'flash' : 'top', climber: mineRow.name, skin: mineRow.skin, text: `${mineRow.name} sort ${e.kind === 'voie' ? 'la voie' : `le bloc ${eventName(e)}`} !` })} accessibilityRole="button" accessibilityLabel="Voir en 3D" style={s.see3d}>
+            {mineRow && (
+              <Pressable
+                onPress={() =>
+                  setMoment(
+                    mineRow.top
+                      ? { kind: mineRow.tries === 1 ? 'flash' : 'top', climber: mineRow.name, skin: mineRow.skin, text: `${mineRow.name} sort ${e.kind === 'voie' ? 'la voie' : `le bloc ${eventName(e)}`} !` }
+                      : { kind: 'chute', climber: mineRow.name, skin: mineRow.skin, text: `${mineRow.name} tombe ${e.kind === 'voie' ? `à ${mineRow.height} % de la voie` : `sur le bloc ${eventName(e)}`}.` },
+                  )
+                } accessibilityRole="button" accessibilityLabel="Voir en 3D" style={s.see3d}>
                 <Icon name="view_in_ar" size={18} color={G.bg} />
                 <Text style={s.see3dText}>Voir en 3D</Text>
               </Pressable>
             )}
-            {revealed &&
-              rows
+            {rows
                 .filter((r) => !r.mine)
                 .slice(0, 3)
                 .map((r) => (
@@ -419,20 +409,9 @@ function Live(p: { club: Club; draft: Draft; onReplay: () => void; onExit: () =>
             <GButton label="Manche suivante" icon="play_arrow" tone="accent" disabled={energyLeft(loadClub() ?? club) <= 0} onPress={p.onReplay} style={{ flex: 1 }} />
           </View>
         ) : (
-          <GButton label="Passer" icon="fast_forward" tone="ghost" onPress={skip} />
+          <GButton label="Passer" icon="fast_forward" tone="ghost" onPress={finish} />
         )}
       </View>
-      <CruxGame
-        crux={crux}
-        onDone={(b) => {
-          setCrux(null);
-          setBonus((old) => {
-            const n = [...old];
-            n[cur] = b;
-            return n;
-          });
-        }}
-      />
       <Moment3D moment={moment} onClose={() => setMoment(null)} />
     </View>
   );
@@ -445,6 +424,7 @@ const s = themedStyles({
   title: { color: G.text, fontWeight: '900', fontSize: 20, textAlign: 'center' },
   muted: { color: G.muted, fontSize: 13, lineHeight: 18 },
   section: { color: G.text, fontWeight: '800', fontSize: 17 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   event: { padding: 14, gap: 10, borderRadius: 18, borderWidth: 1.5, borderColor: G.line, backgroundColor: 'rgba(26,34,87,0.85)' },
   eventHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   eventIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,212,59,0.12)' },
