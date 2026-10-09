@@ -120,6 +120,12 @@ scrolltop() {
   for _ in 1 2 3 4 5 6; do adb shell input swipe $((W * 3 / 100)) $((H * 45 / 100)) $((W * 3 / 100)) $((H * 90 / 100)) 300; sleep 1; done
 }
 
+# Test court : e2e/focus.txt liste les parties à tester (grimper, manager, entrainement,
+# progression, jeux, simulation, parametres). Vide ou absent : toute l'app.
+FOCUS=$(cat e2e/focus.txt 2>/dev/null || true)
+want() { [ -z "$FOCUS" ] || grep -qw "$1" <<<"$FOCUS"; }
+echo "Parties testées : ${FOCUS:-toutes}"
+
 adb install -r app.apk
 # Barre de navigation à 3 boutons (rond, carré, triangle), comme sur le téléphone de Clement.
 adb shell cmd overlay enable com.android.internal.systemui.navbar.threebutton || true
@@ -132,6 +138,7 @@ sleep 25
 shot 0-bienvenue
 tap "Commencer" ; sleep 3
 shot 1-lancement
+if want grimper; then
 tap "Filtres" ; sleep 2 ; shot 1b-filtres
 adb shell input keyevent 4 ; sleep 2
 tap "Extérieur" ; sleep 3 ; shot 1c-exterieur
@@ -142,8 +149,10 @@ tap "Démarrer la séance" ; sleep 3 ; shot 1c2-seance
 tap "Terminer la séance" ; sleep 2 ; shot 1c3-terminer
 tap "Terminer quand même" ; sleep 3
 tap "En salle" ; sleep 1
+fi
 read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
 pct() { adb shell input tap $((W * $1 / 100)) $((H * $2 / 100)); }
+if want manager; then
 # MyClimb Manager : création du club, pack de bienvenue (écran animé, touché par position), une compétition.
 tap "Jeux" ; sleep 3 ; shot 1m1-jeux-hub
 tap "MyClimb Manager" ; sleep 3 ; shot 1m2-nouveau-club
@@ -167,6 +176,8 @@ sleep 2 ; shot 1m9-resultats ; scrolldown 2 ; shot 1m9b-pourquoi ; scrolltop
 tap "Retour au club" ; sleep 3
 tap "Ligue" ; sleep 2 ; shot 1m10-ligue
 adb shell input keyevent 4 ; sleep 3
+fi
+if want entrainement; then
 tap "Entraînement" ; sleep 3 ; shot 1g-entrainement
 tap "Commencer" ; sleep 3 ; shot 1g2-routine
 tap "Marquer comme faite" ; sleep 2 ; tap "Enregistrer" ; sleep 2 ; shot 1g3-routine-faite
@@ -192,6 +203,8 @@ adb shell input tap $((W * 3 / 4)) $((H * 91 / 100)) ; sleep 2 ; shot 1n3-minute
 adb shell input keyevent 4 ; sleep 2 ; adb shell input keyevent 4 ; sleep 2
 scrolltop ; tap "Filtres" ; sleep 2 ; tap "Poutre" ; sleep 1 ; shot 1o-materiel
 tap "Poutre" ; sleep 1 ; tap "Fermer" ; sleep 2
+fi
+if want progression; then
 tap "Progression" ; sleep 3 ; shot 1d-progression
 tap "Costume et nom" ; sleep 2 ; shot 1d1-ma-carte
 tapcostume "Compétition" ; sleep 1 ; shot 1d1b-costume
@@ -212,7 +225,11 @@ tap "Comment faire monter mes stats" ; sleep 1 ; shot 1d1d-aide
 tap "Comment faire monter mes stats" ; sleep 1
 tap "Progression" ; sleep 2
 tap "Mes grimpes" ; sleep 2 ; shot 1e-mes-grimpes
+fi
+if want jeux; then
 tap "Entraînement" ; sleep 2 ; tap "Jeux" ; sleep 2 ; tap "Un jeu au hasard" ; sleep 1 ; shot 1f-jeux
+fi
+if want simulation; then
 tap "Simulation" ; sleep 4 ; shot 2-simulation
 tap "Essayer avec une voie d’exemple" ; sleep 6 ; shot 3-exemple
 tap "Méthode 3D" ; sleep 8 ; shot 4-3d-debut
@@ -230,6 +247,8 @@ tap "Recommencer" ; sleep 2 ; tap "Lecture" ; sleep 3 ; shot 9-devers
 scrolltop ; tap "Plein écran" ; sleep 6 ; shot 9b-plein-ecran
 tap "Lecture" ; sleep 4 ; shot 9c-plein-ecran-jeu
 tap "Quitter le plein écran" ; sleep 3
+fi
+if want parametres; then
 tap "Paramètres" ; sleep 4 ; shot 10-parametres
 tap "Nuit" ; sleep 6 ; shot 11-theme
 tap "Classique" ; sleep 6 ; shot 11b-classique
@@ -243,6 +262,7 @@ sleep 3
 tap "Connecter Google Drive" | tee "$OUT/drive.txt" ; sleep 8 ; shot 13-drive
 adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" >> "$OUT/drive.txt" || true
 adb shell input keyevent 4 ; sleep 3 ; shot 14-drive-retour
+fi
 echo "Application en vie : $(adb shell pidof $APP || echo NON)"
 adb logcat -d > "$OUT/logcat.txt"
 adb logcat -d -b crash > "$OUT/crash.txt" || true
