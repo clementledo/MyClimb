@@ -49,6 +49,12 @@ PY
   return 1
 }
 
+# Fait défiler vers le bas n fois (la grille des thèmes est longue).
+scrolldown() {
+  read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+  for _ in $(seq 1 "$1"); do adb shell input swipe $((W / 2)) $((H * 80 / 100)) $((W / 2)) $((H * 25 / 100)) 300; sleep 1; done
+}
+
 # Ferme le clavier s'il est ouvert (sinon le bouton retour fermerait l'écran).
 hidekb() {
   if adb shell dumpsys input_method | grep -q "mInputShown=true"; then adb shell input keyevent 4; sleep 1; fi
@@ -167,10 +173,13 @@ tap "Costume et nom" ; sleep 2 ; shot 1d1-ma-carte
 tapcostume "Compétition" ; sleep 1 ; shot 1d1b-costume
 tap "OK" ; sleep 2 ; scrolltop ; shot 1d1c-carte-costume
 tap "Ouvrir mes packs" ; sleep 3 ; shot 1p-pack
-tap "Ouvrir le pack" ; sleep 1 ; shot 1p1-pack-charge ; sleep 3 ; shot 1p2-cartes
-tap "Carte 1" ; sleep 2 ; shot 1p3-carte-1
-tap "Tout révéler" ; sleep 6 ; shot 1p4-revele
-tap "Continuer" ; sleep 3 ; tap "Tout révéler" ; sleep 6 ; tap "Continuer" ; sleep 3 ; shot 1p5-bilan
+# L'écran des packs bouge sans arrêt : uiautomator n'arrive pas à le lire, on touche par position.
+read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+pct() { adb shell input tap $((W * $1 / 100)) $((H * $2 / 100)); }
+pct 50 50 ; sleep 1 ; shot 1p1-pack-charge ; sleep 3 ; shot 1p2-cartes
+pct 18 42 ; sleep 2 ; shot 1p3-carte-1
+pct 50 92 ; sleep 5 ; shot 1p4-revele
+pct 50 50 ; sleep 4 ; pct 50 50 ; sleep 4 ; shot 1p5-bilan
 tap "Voir ma collection" ; sleep 3 ; shot 1q-collection
 tap "Contours" ; sleep 2 ; shot 1q1-contours
 tap "Célébrations" ; sleep 2 ; shot 1q2-celebrations
@@ -201,8 +210,8 @@ tap "Quitter le plein écran" ; sleep 3
 tap "Paramètres" ; sleep 4 ; shot 10-parametres
 tap "Nuit" ; sleep 6 ; shot 11-theme
 tap "Classique" ; sleep 6 ; shot 11b-classique
-tap "Manrope" ; sleep 6 ; shot 11c-manrope
-tap "Inter" ; sleep 6
+scrolldown 8 ; tap "Manrope" ; sleep 6 ; shot 11c-manrope
+scrolldown 8 ; tap "Inter" ; sleep 6
 adb shell input keyevent 4 ; sleep 4 ; shot 12-retour
 tap "Paramètres" ; sleep 4
 read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
