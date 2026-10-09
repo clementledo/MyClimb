@@ -169,7 +169,8 @@ tap "Lancer la compétition" ; sleep 3 ; shot 1m8-direct
 for k in 1 2 3 4 5 6; do
   sleep 4 ; pct 50 40 ; sleep 1 ; [ "$k" = 1 ] && shot 1m8b-jauge ; sleep 5
   timeout 30 adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 ; adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
-  grep -q 'text="Continuer"' "$OUT/ui.xml" && tap "Continuer"
+  # Bouton « Continuer » du mini-jeu (écran 3D illisible pour uiautomator) : touché par position.
+  pct 50 89 ; sleep 2
   grep -q 'text="Retour au club"' "$OUT/ui.xml" && break
 done
 sleep 2 ; shot 1m9-resultats ; scrolldown 2 ; shot 1m9b-pourquoi ; scrolltop

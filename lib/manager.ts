@@ -328,7 +328,7 @@ export type CompResult = {
 
 export const EVENTS = 4;
 /** Écart type du hasard sur une épreuve. */
-const SPREAD = 4;
+const SPREAD = 5;
 /** Malus quand un grimpeur enchaîne une 2ᵉ épreuve. */
 const DOUBLE = 6;
 /** Bonus du mini-jeu de jauge. */
@@ -375,7 +375,7 @@ function athleteOf(club: Club, c: Climber): Athlete {
 /** Les épreuves de la prochaine manche, connues à l'avance. */
 export function upcoming(club: Club): CompEvent[] {
   if (club.season.next?.length === EVENTS) return club.season.next;
-  const base = LEAGUES[club.league].base + 3 + club.season.round * 0.6;
+  const base = LEAGUES[club.league].base + club.season.round * 0.6;
   const types = (Object.keys(BLOCKS) as BlockType[]).sort(() => Math.random() - 0.5).slice(0, 3);
   const events: CompEvent[] = types.map((type, i) => ({ kind: 'bloc', type, difficulty: Math.round(base + i * 2.5 + rnd(-2, 3)) }));
   events.push({ kind: 'voie', type: null, difficulty: Math.round(base + 1 + rnd(-1, 2)) });
@@ -563,7 +563,7 @@ export function finishCompetition(club: Club, d: Draft, bonus: number[]): CompRe
 
 export function competitionPreview(club: Club) {
   const r = club.season.round;
-  return { round: r + 1, difficulty: Math.round(LEAGUES[club.league].base + 3 + r * 0.6) };
+  return { round: r + 1, difficulty: Math.round(LEAGUES[club.league].base + r * 0.6) };
 }
 
 export function standings(club: Club) {
