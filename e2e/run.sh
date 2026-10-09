@@ -142,12 +142,29 @@ tap "Démarrer la séance" ; sleep 3 ; shot 1c2-seance
 tap "Terminer la séance" ; sleep 2 ; shot 1c3-terminer
 tap "Terminer quand même" ; sleep 3
 tap "En salle" ; sleep 1
+read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+pct() { adb shell input tap $((W * $1 / 100)) $((H * $2 / 100)); }
+# MyClimb Manager : création du club, pack de bienvenue (écran animé, touché par position), une compétition.
+tap "Jeux" ; sleep 3 ; shot 1m1-jeux-hub
+tap "MyClimb Manager" ; sleep 3 ; shot 1m2-nouveau-club
+tap "Nom du club" ; sleep 1 ; adb shell input text "Test" ; sleep 1 ; hidekb
+tap "Créer mon club" ; sleep 3 ; shot 1m3-boutique
+tap "Ouvrir le pack" ; sleep 2 ; shot 1m4-walkout-1 ; sleep 2 ; shot 1m4-walkout-2
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do pct 50 50 ; sleep 2; done
+shot 1m5-bilan-pack
+tap "Voir mon équipe" ; sleep 3 ; shot 1m6-club
+scrolldown 2 ; shot 1m6b-equipe ; scrolltop
+tap "Jouer la compétition" ; sleep 3 ; shot 1m7-prepa
+tap "Lancer la compétition" ; sleep 3 ; shot 1m8-direct ; sleep 12 ; shot 1m9-resultats
+tap "Retour au club" ; sleep 3
+tap "Ligue" ; sleep 2 ; shot 1m10-ligue
+adb shell input keyevent 4 ; sleep 3
 tap "Entraînement" ; sleep 3 ; shot 1g-entrainement
 tap "Commencer" ; sleep 3 ; shot 1g2-routine
 tap "Marquer comme faite" ; sleep 2 ; tap "Enregistrer" ; sleep 2 ; shot 1g3-routine-faite
 adb shell input keyevent 4 ; sleep 3 ; shot 1g4-semaine
 tap "Rappel quotidien" ; sleep 2 ; shot 1g5-rappel ; tap "Fermer" ; sleep 2
-tap "Créer ma routine" ; sleep 3 ; tap "Ajouter des exercices" ; sleep 2
+scrolldown 5 ; tap "Créer ma routine" ; sleep 3 ; tap "Ajouter des exercices" ; sleep 2
 tap "Chercher un exercice" ; sleep 1 ; adb shell input text "planche" ; sleep 2 ; shot 1g6-recherche ; hidekb ; tap "Planche" ; sleep 1
 tap "Effacer la recherche" ; sleep 1 ; tap "Chercher un exercice" ; sleep 1 ; adb shell input text "pigeon" ; sleep 2 ; hidekb
 tap "Pigeon" ; sleep 1 ; shot 1g6-choix ; tap "Terminé (2)" ; sleep 2 ; shot 1g7-ma-routine
@@ -157,7 +174,7 @@ tap "Marquer comme faite" ; sleep 2 ; tap "Plus" ; sleep 1 ; tap "Juste" ; sleep
 tap "Enregistrer" ; sleep 2 ; shot 1j-enregistre
 adb shell input keyevent 4 ; sleep 3 ; shot 1k-historique
 scrolltop ; tap "Filtres" ; sleep 2 ; tap "Exercices" ; sleep 1 ; tap "Expert" ; sleep 1 ; shot 1l-filtres ; tap "Fermer" ; sleep 2 ; shot 1l2-experts
-tap "Tout effacer" ; sleep 2 ; tap "Doigts" ; sleep 2 ; shot 1m-doigts
+scrolltop ; tap "Tout effacer" ; sleep 2 ; tap "Doigts" ; sleep 2 ; shot 1m-doigts
 tap "Tout" ; sleep 1 ; tap "Tractions" ; sleep 3 ; tap "Dur" ; sleep 1 ; shot 1n-exercice-dur ; tap "Normal" ; sleep 1
 adb shell input keyevent 4 ; sleep 2
 tap "Planche" ; sleep 3 ; tap "Minuteur" ; sleep 7 ; shot 1n2-minuteur
@@ -187,21 +204,6 @@ tap "Comment faire monter mes stats" ; sleep 1 ; shot 1d1d-aide
 tap "Comment faire monter mes stats" ; sleep 1
 tap "Progression" ; sleep 2
 tap "Mes grimpes" ; sleep 2 ; shot 1e-mes-grimpes
-# MyClimb Manager : création du club, pack de bienvenue (écran animé, touché par position), une compétition.
-tap "Jeux" ; sleep 3 ; shot 1m1-jeux-hub
-tap "MyClimb Manager" ; sleep 3 ; shot 1m2-nouveau-club
-tap "Nom du club" ; sleep 1 ; adb shell input text "Test" ; sleep 1 ; hidekb
-tap "Créer mon club" ; sleep 3 ; shot 1m3-boutique
-tap "Ouvrir le pack" ; sleep 2 ; shot 1m4-walkout-1 ; sleep 2 ; shot 1m4-walkout-2
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do pct 50 50 ; sleep 2; done
-shot 1m5-bilan-pack
-tap "Voir mon équipe" ; sleep 3 ; shot 1m6-club
-scrolldown 2 ; shot 1m6b-equipe ; scrolltop
-tap "Jouer la compétition" ; sleep 3 ; shot 1m7-prepa
-tap "Lancer la compétition" ; sleep 3 ; shot 1m8-direct ; sleep 12 ; shot 1m9-resultats
-tap "Retour au club" ; sleep 3
-tap "Ligue" ; sleep 2 ; shot 1m10-ligue
-adb shell input keyevent 4 ; sleep 3
 tap "Entraînement" ; sleep 2 ; tap "Jeux" ; sleep 2 ; tap "Un jeu au hasard" ; sleep 1 ; shot 1f-jeux
 tap "Simulation" ; sleep 4 ; shot 2-simulation
 tap "Essayer avec une voie d’exemple" ; sleep 6 ; shot 3-exemple
