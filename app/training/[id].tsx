@@ -9,6 +9,7 @@ import { listTrainingLogs } from '@/lib/db';
 import { todayIso } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 import { EQUIPMENT, exerciseById, FOCUS, INTENSITY, sessionById, sessionEquipment } from '@/lib/training';
+import { scaled } from '@/lib/trainingScale';
 
 export default function SessionTypeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -68,7 +69,8 @@ export default function SessionTypeScreen() {
               if (st.kind === 'free') {
                 return <ListRow key={i} left={num} title={st.title} subtitle={`${st.minutes} min · ${st.detail}`} last={last} />;
               }
-              const x = exerciseById(st.id);
+              const found = exerciseById(st.id);
+              const x = found ? scaled(found) : null;
               if (!x) return null;
               return (
                 <ListRow

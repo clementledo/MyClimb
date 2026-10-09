@@ -10,18 +10,22 @@ import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 import {
   EQUIPMENT,
   EXERCISES,
+  exerciseById,
+  exerciseMinutes,
   FOCUS,
   INTENSITY,
   LEVELS,
+  levelTone,
   ROUTINE_KINDS,
+  routineLevel,
   ROUTINES,
-  sessionEquipment,
+  sessionExercises,
+  sessionLevel,
   SESSIONS,
   type Equipment,
   type Focus,
+  type Level,
   type Routine,
-  type RoutineKind,
-  type SessionType,
 } from '@/lib/training';
 import {
   canDoExercise,
@@ -37,10 +41,60 @@ import {
   type RoutinePick,
   type Suggestion,
 } from '@/lib/trainingPlan';
+import { scaled } from '@/lib/trainingScale';
 import { applyReminder, formatTime, readReminder, type Reminder } from '@/lib/reminder';
 import { todayIso } from '@/lib/stats';
 
-type Mode = 'routines' | 'sessions' | 'exercises' | 'jeux';
+type Kind = 'routine' | 'session' | 'exercise';
+type Length = 'short' | 'mid' | 'long';
+type Filters = { kind: Kind | null; level: Level | null; length: Length | null; where: 'maison' | 'salle' | null };
+const NO_FILTERS: Filters = { kind: null, level: null, length: null, where: null };
+
+const KINDS: { value: Kind; label: string; title: string }[] = [
+  { value: 'routine', label: 'Routines', title: 'Routines' },
+  { value: 'session', label: 'Séances', title: 'Séances complètes' },
+  { value: 'exercise', label: 'Exercices', title: 'Exercices' },
+];
+const LENGTHS: { value: Length; label: string }[] = [
+  { value: 'short', label: '15 min ou moins' },
+  { value: 'mid', label: '15 à 45 min' },
+  { value: 'long', label: 'Plus de 45 min' },
+];
+const lengthOf = (m: number): Length => (m <= 15 ? 'short' : m <= 45 ? 'mid' : 'long');
+
+/** Une ligne de la liste unique : routine, séance ou exercice. */
+type Item = {
+  key: string;
+  kind: Kind;
+  name: string;
+  icon: Parameters<typeof Icon>[0]['name'];
+  minutes: number;
+  level: Level;
+  focuses: Focus[];
+  where: 'maison' | 'salle';
+  subtitle: string;
+  href: string;
+  mine?: boolean;
+};
+
+const focusesOf = (ids: string[]) => [...new Set(ids.flatMap((id) => (exerciseById(id) ? [exerciseById(id)!.focus] : [])))];
+const whereOf = (ids: string[]) => (ids.some((id) => exerciseById(id)?.equipment === 'wall') ? 'salle' : 'maison');
+
+function routineItem(r: Routine, mine = false): Item {
+  return {
+    key: `r:${r.id}`,
+    kind: 'routine',
+    name: r.name,
+    icon: mine ? 'star' : r.icon,
+    minutes: r.minutes,
+    level: routineLevel(r),
+    focuses: focusesOf(r.items),
+    where: whereOf(r.items),
+    subtitle: `${r.minutes} min · ${mine ? `${r.items.length} exercices` : r.when}`,
+    href: `/training/routine/${r.id}`,
+    mine,
+  };
+}
 
 const shortDate = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);
@@ -49,11 +103,12 @@ const shortDate = (iso: string) => {
 
 export default function TrainingScreen() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>('routines');
+  const [tab, setTab] = useState<'train' | 'jeux'>('train');
   const scroll = useRef<ScrollView>(null);
   const [equipment, setEquipment] = useState<Equipment[]>(myEquipment);
   const [sheet, setSheet] = useState(false);
   const [focus, setFocus] = useState<Focus | null>(null);
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [logs, setLogs] = useState<TrainingLog[]>([]);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [daily, setDaily] = useState<RoutinePick | null>(null);
@@ -70,6 +125,7 @@ export default function TrainingScreen() {
     setDaily(routineOfDay(b, l, myEquipment()));
     setMine(customRoutines());
   }, []);
+  useFocusEffect(reload);
 
   const saveReminder = async (r: Reminder) => {
     setDraft(null);
@@ -81,7 +137,6 @@ export default function TrainingScreen() {
       Alert.alert('Rappel', e instanceof Error ? e.message : String(e));
     }
   };
-  useFocusEffect(reload);
 
   const openLog = (l: TrainingLog) =>
     Alert.alert(l.name, `${shortDate(l.date)} · ${l.minutes} min`, [
@@ -110,15 +165,56 @@ export default function TrainingScreen() {
     setSuggestion(suggest(listBlocks(), logs, next));
     setDaily(routineOfDay(listBlocks(), logs, next));
   };
+  const setFilter = <K extends keyof Filters>(k: K, v: Filters[K]) => setFilters((f) => ({ ...f, [k]: f[k] === v ? null : v }));
 
-  const all = equipment.length === EQUIPMENT.length;
-  const summary = all ? 'Tout le matériel' : equipment.length === 0 ? 'Poids du corps seulement' : EQUIPMENT.filter((e) => equipment.includes(e.id)).map((e) => e.label).join(', ');
-  const sessions = SESSIONS.filter((x) => canDoSession(x, equipment));
-  const exercises = EXERCISES.filter((x) => canDoExercise(x, equipment) && (!focus || x.focus === focus));
-  const focuses = (Object.keys(FOCUS) as Focus[]).filter((f) => exercises.some((x) => x.focus === f));
-  const routines = ROUTINES.filter((r) => canDoRoutine(r, equipment));
+  // La liste unique : mes routines, routines, séances et exercices faisables avec mon matériel.
+  const items: Item[] = [
+    ...mine.map((r) => routineItem(r, true)),
+    ...ROUTINES.filter((r) => canDoRoutine(r, equipment)).map((r) => routineItem(r)),
+    ...SESSIONS.filter((x) => canDoSession(x, equipment)).map(
+      (x): Item => ({
+        key: `s:${x.id}`,
+        kind: 'session',
+        name: x.name,
+        icon: x.icon,
+        minutes: x.minutes,
+        level: sessionLevel(x),
+        focuses: [...focusesOf(sessionExercises(x)), ...(x.where === 'salle' ? (['mur'] as Focus[]) : [])],
+        where: x.where,
+        subtitle: `${x.minutes} min · ${INTENSITY[x.intensity]} · ${x.where === 'salle' ? 'En salle' : 'À la maison'}`,
+        href: `/training/${x.id}`,
+      }),
+    ),
+    ...EXERCISES.filter((x) => canDoExercise(x, equipment)).map(
+      (x): Item => ({
+        key: `e:${x.id}`,
+        kind: 'exercise',
+        name: x.name,
+        icon: FOCUS[x.focus].icon,
+        minutes: exerciseMinutes(x),
+        level: x.level,
+        focuses: [x.focus],
+        where: x.equipment === 'wall' ? 'salle' : 'maison',
+        subtitle: scaled(x).doseText,
+        href: `/training/exercise/${x.id}`,
+      }),
+    ),
+  ];
+  const shown = items.filter(
+    (i) =>
+      (!focus || i.focuses.includes(focus)) &&
+      (!filters.kind || i.kind === filters.kind) &&
+      (!filters.level || i.level === filters.level) &&
+      (!filters.length || lengthOf(i.minutes) === filters.length) &&
+      (!filters.where || i.where === filters.where),
+  );
+  const filterCount = Object.values(filters).filter(Boolean).length;
+  const filtered = filterCount > 0 || focus !== null;
+
+  const allEq = equipment.length === EQUIPMENT.length;
+  const eqSummary = allEq ? 'Tout le matériel' : equipment.length === 0 ? 'Poids du corps seulement' : EQUIPMENT.filter((e) => equipment.includes(e.id)).map((e) => e.label).join(', ');
   const today = todayIso();
-  const doneToday = new Set(logs.filter((l) => l.kind === 'routine' && l.date === today).map((l) => l.ref));
+  const doneToday = new Set(logs.filter((l) => l.date === today).map((l) => `${l.kind === 'routine' ? 'r' : l.kind === 'session' ? 's' : 'e'}:${l.ref}`));
   const week = routineWeek(logs);
   const streak = routineStreak(logs);
 
@@ -127,87 +223,100 @@ export default function TrainingScreen() {
       <View style={s.switcher}>
         <Segmented
           options={[
-            { value: 'routines', label: 'Routines' },
-            { value: 'sessions', label: 'Séances' },
-            { value: 'exercises', label: 'Renfo' },
+            { value: 'train', label: 'Entraîner' },
             { value: 'jeux', label: 'Jeux' },
           ]}
-          value={mode}
-          onChange={(m) => {
-            // Chaque onglet s'ouvre en haut (filtres et matériel visibles), pas au milieu de la liste précédente.
-            setMode(m);
-            scroll.current?.scrollTo({ y: 0, animated: false });
-          }}
+          value={tab}
+          onChange={setTab}
         />
       </View>
-      {mode === 'jeux' ? (
+      {tab === 'jeux' ? (
         <Games />
       ) : (
-      <ScrollView ref={scroll} contentContainerStyle={s.content}>
-        <Pressable style={s.summary} onPress={() => setSheet(true)} accessibilityLabel="Matériel">
-          <Icon name="tune" size={18} color={colors.primary} />
-          <Text style={s.summaryText} numberOfLines={1}>
-            {summary}
-          </Text>
-          <Icon name="expand_more" size={18} color={colors.muted} />
-        </Pressable>
-
-        <Sheet visible={draft !== null} onClose={() => setDraft(null)} title="Rappel quotidien">
-          {draft && (
-            <>
-              <View style={s.switchRow}>
-                <Text style={s.switchText}>Me rappeler ma routine chaque jour</Text>
-                <Switch
-                  value={draft.on}
-                  onValueChange={(on) => setDraft({ ...draft, on })}
-                  trackColor={{ true: colors.primary, false: colors.border }}
-                  thumbColor={colors.card}
-                  accessibilityLabel="Activer le rappel"
-                />
-              </View>
-              <View style={[s.timeRow, !draft.on && s.dim]}>
-                <IconButton icon="remove" label="Plus tôt" onPress={() => setDraft(shift(draft, -15))} />
-                <Text style={s.time}>{formatTime(draft)}</Text>
-                <IconButton icon="add" label="Plus tard" onPress={() => setDraft(shift(draft, 15))} />
-              </View>
-              <Button label="Enregistrer" icon="check" onPress={() => saveReminder(draft)} />
-            </>
-          )}
-        </Sheet>
-
-        <Sheet visible={sheet} onClose={() => setSheet(false)} title="Mon matériel">
-          <Text style={s.sheetText}>Les séances et exercices s’adaptent à ce que tu as sous la main.</Text>
-          <View style={s.chips}>
-            {EQUIPMENT.filter((e) => e.id !== 'none').map((e) => (
-              <Chip key={e.id} label={e.label} icon={e.icon} selected={equipment.includes(e.id)} onPress={() => toggle(e.id)} />
-            ))}
-          </View>
-        </Sheet>
-
-        {mode === 'routines' ? (
-          <>
-            {daily && (
-              <Pressable onPress={() => router.push(`/training/routine/${daily.routine.id}`)} style={({ pressed }) => [s.hero, pressed && s.pressed]}>
-                <Text style={s.heroOver}>ROUTINE DU JOUR</Text>
-                <View style={s.heroHead}>
-                  <View style={s.heroIcon}>
-                    <Icon name={daily.routine.icon} size={26} color={colors.primary} />
-                  </View>
-                  <View style={s.heroBody}>
-                    <Text style={s.heroTitle}>{daily.routine.name}</Text>
-                    <Text style={s.heroMeta}>
-                      {daily.routine.minutes} min · {daily.routine.items.length} exercices · {ROUTINE_KINDS[daily.routine.kind].label}
-                    </Text>
-                  </View>
+        <ScrollView ref={scroll} contentContainerStyle={s.content}>
+          <Sheet visible={draft !== null} onClose={() => setDraft(null)} title="Rappel quotidien">
+            {draft && (
+              <>
+                <View style={s.switchRow}>
+                  <Text style={s.switchText}>Me rappeler ma routine chaque jour</Text>
+                  <Switch
+                    value={draft.on}
+                    onValueChange={(on) => setDraft({ ...draft, on })}
+                    trackColor={{ true: colors.primary, false: colors.border }}
+                    thumbColor={colors.card}
+                    accessibilityLabel="Activer le rappel"
+                  />
                 </View>
-                <Text style={s.heroReason}>{doneToday.has(daily.routine.id) ? 'Faite aujourd’hui, bravo !' : daily.reason}</Text>
-                <View style={s.heroCta}>
-                  <Text style={s.heroCtaText}>{doneToday.has(daily.routine.id) ? 'Revoir la routine' : 'Commencer'}</Text>
-                  <Icon name="arrow_forward" size={18} color={colors.onPrimary} />
+                <View style={[s.timeRow, !draft.on && s.dim]}>
+                  <IconButton icon="remove" label="Plus tôt" onPress={() => setDraft(shift(draft, -15))} />
+                  <Text style={s.time}>{formatTime(draft)}</Text>
+                  <IconButton icon="add" label="Plus tard" onPress={() => setDraft(shift(draft, 15))} />
                 </View>
-              </Pressable>
+                <Button label="Enregistrer" icon="check" onPress={() => saveReminder(draft)} />
+              </>
             )}
+          </Sheet>
 
+          <Sheet visible={sheet} onClose={() => setSheet(false)} title="Filtres">
+            <Text style={s.filterTitle}>Type</Text>
+            <View style={s.chips}>
+              {KINDS.map((k) => (
+                <Chip key={k.value} label={k.label} selected={filters.kind === k.value} onPress={() => setFilter('kind', k.value)} />
+              ))}
+            </View>
+            <Text style={s.filterTitle}>Niveau</Text>
+            <View style={s.chips}>
+              {([1, 2, 3, 4, 5] as Level[]).map((l) => (
+                <Chip key={l} label={LEVELS[l]} selected={filters.level === l} onPress={() => setFilter('level', l)} />
+              ))}
+            </View>
+            <Text style={s.filterTitle}>Durée</Text>
+            <View style={s.chips}>
+              {LENGTHS.map((l) => (
+                <Chip key={l.value} label={l.label} selected={filters.length === l.value} onPress={() => setFilter('length', l.value)} />
+              ))}
+            </View>
+            <Text style={s.filterTitle}>Lieu</Text>
+            <View style={s.chips}>
+              <Chip label="À la maison" icon="home" selected={filters.where === 'maison'} onPress={() => setFilter('where', 'maison')} />
+              <Chip label="En salle" icon="landscape" selected={filters.where === 'salle'} onPress={() => setFilter('where', 'salle')} />
+            </View>
+            <Text style={s.filterTitle}>Mon matériel</Text>
+            <Text style={s.sheetText}>{eqSummary}</Text>
+            <View style={s.chips}>
+              {EQUIPMENT.filter((e) => e.id !== 'none').map((e) => (
+                <Chip key={e.id} label={e.label} icon={e.icon} selected={equipment.includes(e.id)} onPress={() => toggle(e.id)} />
+              ))}
+            </View>
+            <View style={s.sheetButtons}>
+              {filterCount > 0 && <Button label="Effacer" variant="secondary" style={s.flex} onPress={() => setFilters(NO_FILTERS)} />}
+              <Button label={`Voir ${shown.length} résultat${shown.length > 1 ? 's' : ''}`} style={s.flex} onPress={() => setSheet(false)} />
+            </View>
+          </Sheet>
+
+          {!filtered && daily && (
+            <Pressable onPress={() => router.push(`/training/routine/${daily.routine.id}`)} style={({ pressed }) => [s.hero, pressed && s.pressed]}>
+              <Text style={s.heroOver}>ROUTINE DU JOUR</Text>
+              <View style={s.heroHead}>
+                <View style={s.heroIcon}>
+                  <Icon name={daily.routine.icon} size={26} color={colors.primary} />
+                </View>
+                <View style={s.heroBody}>
+                  <Text style={s.heroTitle}>{daily.routine.name}</Text>
+                  <Text style={s.heroMeta}>
+                    {daily.routine.minutes} min · {daily.routine.items.length} exercices · {ROUTINE_KINDS[daily.routine.kind].label}
+                  </Text>
+                </View>
+              </View>
+              <Text style={s.heroReason}>{doneToday.has(`r:${daily.routine.id}`) ? 'Faite aujourd’hui, bravo !' : daily.reason}</Text>
+              <View style={s.heroCta}>
+                <Text style={s.heroCtaText}>{doneToday.has(`r:${daily.routine.id}`) ? 'Revoir la routine' : 'Commencer'}</Text>
+                <Icon name="arrow_forward" size={18} color={colors.onPrimary} />
+              </View>
+            </Pressable>
+          )}
+
+          {!filtered && (
             <Card style={s.weekCard}>
               <View style={s.weekHead}>
                 <Text style={s.weekTitle}>Ma semaine</Text>
@@ -230,94 +339,87 @@ export default function TrainingScreen() {
                   </View>
                 ))}
               </View>
+              {suggestion && (
+                <Pressable style={s.reminder} onPress={() => router.push(`/training/${suggestion.session.id}`)} accessibilityLabel="Voir la séance">
+                  <Icon name={suggestion.session.icon} size={20} color={colors.primary} />
+                  <View style={s.flex}>
+                    <Text style={s.reminderText}>Séance conseillée : {suggestion.session.name}</Text>
+                    <Text style={s.suggestReason} numberOfLines={2}>
+                      {suggestion.reason}
+                    </Text>
+                  </View>
+                  <Icon name="chevron_right" size={18} color={colors.muted} />
+                </Pressable>
+              )}
               <Pressable style={s.reminder} onPress={() => setDraft(reminder)} accessibilityLabel="Rappel quotidien">
                 <Icon name={reminder.on ? 'notifications_active' : 'notifications_off'} size={20} color={reminder.on ? colors.primary : colors.muted} />
-                <Text style={s.reminderText}>Rappel quotidien</Text>
+                <Text style={[s.reminderText, s.flex]}>Rappel quotidien</Text>
                 <Text style={[s.reminderValue, reminder.on && { color: colors.primary }]}>{reminder.on ? formatTime(reminder) : 'Désactivé'}</Text>
                 <Icon name="chevron_right" size={18} color={colors.muted} />
               </Pressable>
             </Card>
+          )}
 
-            <Section title="Mes routines">
-              {mine.length > 0 && (
-                <View style={s.listCard}>
-                  {mine.map((r, i, arr) => (
-                    <ListRow
-                      key={r.id}
-                      icon="star"
-                      title={r.name}
-                      subtitle={`${r.minutes} min · ${r.items.length} exercices`}
-                      right={doneToday.has(r.id) ? <Badge label="Faite" tone="success" /> : undefined}
-                      onPress={() => router.push(`/training/routine/${r.id}`)}
-                      last={i === arr.length - 1}
-                    />
-                  ))}
-                </View>
-              )}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.focusRow}>
+            <Pressable
+              onPress={() => setSheet(true)}
+              accessibilityLabel="Filtres"
+              style={({ pressed }) => [s.filterBtn, filterCount > 0 && s.filterBtnOn, pressed && s.pressed]}>
+              <Icon name="tune" size={18} color={filterCount > 0 ? colors.onPrimary : colors.primary} />
+              <Text style={[s.filterBtnText, filterCount > 0 && { color: colors.onPrimary }]}>Filtres{filterCount > 0 ? ` (${filterCount})` : ''}</Text>
+            </Pressable>
+            <Chip label="Tout" selected={!focus} onPress={() => setFocus(null)} />
+            {(Object.keys(FOCUS) as Focus[]).map((f) => (
+              <Chip key={f} label={FOCUS[f].label} selected={focus === f} onPress={() => setFocus(focus === f ? null : f)} />
+            ))}
+          </ScrollView>
+
+          {filtered && (
+            <View style={s.resultRow}>
+              <Text style={s.muted}>
+                {shown.length} résultat{shown.length > 1 ? 's' : ''}
+              </Text>
               <Button
-                label="Créer ma routine"
-                icon="add"
-                variant="secondary"
-                style={mine.length > 0 ? s.createBtn : undefined}
-                onPress={() => router.push('/training/routine-edit')}
+                label="Tout effacer"
+                variant="ghost"
+                onPress={() => {
+                  setFocus(null);
+                  setFilters(NO_FILTERS);
+                }}
               />
-            </Section>
+            </View>
+          )}
 
-            {(Object.keys(ROUTINE_KINDS) as RoutineKind[]).map((k) => {
-              const list = routines.filter((r) => r.kind === k);
-              if (list.length === 0) return null;
-              return (
-                <Section key={k} title={ROUTINE_KINDS[k].label}>
+          {shown.length === 0 && <Empty icon="fitness_center" text="Rien ne correspond. Change un filtre ou ajoute du matériel." />}
+
+          {KINDS.map((k) => {
+            const list = shown.filter((i) => i.kind === k.value).sort((a, b) => Number(!!b.mine) - Number(!!a.mine) || a.level - b.level);
+            if (list.length === 0 && !(k.value === 'routine' && !filtered)) return null;
+            return (
+              <Section key={k.value} title={`${k.title} (${list.length})`}>
+                {list.length > 0 && (
                   <View style={s.listCard}>
-                    {list.map((r, i, arr) => (
+                    {list.map((i, n) => (
                       <ListRow
-                        key={r.id}
-                        icon={r.icon}
-                        title={r.name}
-                        subtitle={`${r.minutes} min · ${r.when}`}
-                        right={doneToday.has(r.id) ? <Badge label="Faite" tone="success" /> : undefined}
-                        onPress={() => router.push(`/training/routine/${r.id}`)}
-                        last={i === arr.length - 1}
+                        key={i.key}
+                        icon={i.icon}
+                        title={i.name}
+                        subtitle={i.subtitle}
+                        right={doneToday.has(i.key) ? <Badge label="Fait" tone="success" /> : <Badge label={LEVELS[i.level]} tone={levelTone(i.level)} />}
+                        onPress={() => router.push(i.href as never)}
+                        last={n === list.length - 1}
                       />
                     ))}
                   </View>
-                </Section>
-              );
-            })}
-            {routines.length === 0 && <Empty icon="fitness_center" text="Aucune routine avec ce matériel." />}
-          </>
-        ) : mode === 'sessions' ? (
-          <>
-            {suggestion && (
-              <Pressable onPress={() => router.push(`/training/${suggestion.session.id}`)} style={({ pressed }) => [s.hero, pressed && s.pressed]}>
-                <Text style={s.heroOver}>POUR TOI AUJOURD’HUI</Text>
-                <View style={s.heroHead}>
-                  <View style={s.heroIcon}>
-                    <Icon name={suggestion.session.icon} size={26} color={colors.primary} />
-                  </View>
-                  <View style={s.heroBody}>
-                    <Text style={s.heroTitle}>{suggestion.session.name}</Text>
-                    <Text style={s.heroMeta}>
-                      {suggestion.session.minutes} min · {INTENSITY[suggestion.session.intensity]} · {suggestion.session.where === 'salle' ? 'En salle' : 'À la maison'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={s.heroReason}>{suggestion.reason}</Text>
-                <View style={s.heroCta}>
-                  <Text style={s.heroCtaText}>Voir la séance</Text>
-                  <Icon name="arrow_forward" size={18} color={colors.onPrimary} />
-                </View>
-              </Pressable>
-            )}
+                )}
+                {k.value === 'routine' && !filtered && (
+                  <Button label="Créer ma routine" icon="add" variant="secondary" style={list.length > 0 ? s.createBtn : undefined} onPress={() => router.push('/training/routine-edit')} />
+                )}
+              </Section>
+            );
+          })}
 
-            <Section title="Séances types">
-              {sessions.length === 0 ? (
-                <Empty icon="fitness_center" text="Aucune séance avec ce matériel. Ajoute du matériel avec le bouton du haut." />
-              ) : (
-                sessions.map((x) => <SessionCard key={x.id} session={x} onPress={() => router.push(`/training/${x.id}`)} />)
-              )}
-            </Section>
-
+          {!filtered && (
             <Section title="Mes entraînements">
               {logs.length === 0 ? (
                 <Card>
@@ -325,7 +427,7 @@ export default function TrainingScreen() {
                 </Card>
               ) : (
                 <View style={s.listCard}>
-                  {(allLogs ? logs : logs.slice(0, 5)).map((l, i, arr) => (
+                  {(allLogs ? logs : logs.slice(0, 3)).map((l, i, arr) => (
                     <ListRow
                       key={l.id}
                       icon={l.kind === 'session' ? 'event_available' : l.kind === 'routine' ? 'repeat' : 'fitness_center'}
@@ -338,45 +440,10 @@ export default function TrainingScreen() {
                   ))}
                 </View>
               )}
-              {logs.length > 5 && (
-                <Button
-                  label={allLogs ? 'Voir moins' : `Voir tout (${logs.length})`}
-                  variant="ghost"
-                  onPress={() => setAllLogs(!allLogs)}
-                />
-              )}
+              {logs.length > 3 && <Button label={allLogs ? 'Voir moins' : `Voir tout (${logs.length})`} variant="ghost" onPress={() => setAllLogs(!allLogs)} />}
             </Section>
-          </>
-        ) : (
-          <>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.focusRow}>
-              <Chip label="Tous" selected={!focus} onPress={() => setFocus(null)} />
-              {(Object.keys(FOCUS) as Focus[]).map((f) => (
-                <Chip key={f} label={FOCUS[f].label} selected={focus === f} onPress={() => setFocus(f)} />
-              ))}
-            </ScrollView>
-            {exercises.length === 0 && <Empty icon="fitness_center" text="Aucun exercice avec ce matériel." />}
-            {focuses.map((f) => (
-              <Section key={f} title={FOCUS[f].label}>
-                <View style={s.listCard}>
-                  {exercises
-                    .filter((x) => x.focus === f)
-                    .map((x, i, arr) => (
-                      <ListRow
-                        key={x.id}
-                        icon={FOCUS[f].icon}
-                        title={x.name}
-                        subtitle={`${x.doseText} · ${LEVELS[x.level]}`}
-                        onPress={() => router.push(`/training/exercise/${x.id}`)}
-                        last={i === arr.length - 1}
-                      />
-                    ))}
-                </View>
-              </Section>
-            ))}
-          </>
-        )}
-      </ScrollView>
+          )}
+        </ScrollView>
       )}
     </View>
   );
@@ -386,30 +453,6 @@ export default function TrainingScreen() {
 function shift(r: Reminder, minutes: number): Reminder {
   const total = (r.hour * 60 + r.minute + minutes + 24 * 60) % (24 * 60);
   return { ...r, hour: Math.floor(total / 60), minute: total % 60 };
-}
-
-function SessionCard({ session, onPress }: { session: SessionType; onPress: () => void }) {
-  const eq = sessionEquipment(session).filter((e) => e !== 'wall');
-  return (
-    <Card onPress={onPress} style={s.sessionCard}>
-      <View style={s.sessionIcon}>
-        <Icon name={session.icon} size={24} color={colors.primary} />
-      </View>
-      <View style={s.sessionBody}>
-        <Text style={s.sessionName}>{session.name}</Text>
-        <Text style={s.sessionGoal}>{session.goal}</Text>
-        <View style={s.badges}>
-          <Badge label={`${session.minutes} min`} tone="neutral" />
-          <Badge label={INTENSITY[session.intensity]} tone={session.intensity === 3 ? 'danger' : session.intensity === 2 ? 'primary' : 'success'} />
-          <Badge label={session.where === 'salle' ? 'En salle' : 'À la maison'} tone="neutral" />
-          {eq.map((e) => (
-            <Badge key={e} label={EQUIPMENT.find((x) => x.id === e)?.label ?? e} tone="neutral" />
-          ))}
-        </View>
-      </View>
-      <Icon name="chevron_right" size={20} color={colors.muted} />
-    </Card>
-  );
 }
 
 const s = themedStyles({
@@ -441,7 +484,15 @@ const s = themedStyles({
   heroCtaText: { fontSize: 15, fontWeight: '700', color: colors.onPrimary },
   muted: { ...type.body, color: colors.muted },
   listCard: { borderRadius: radius.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-  focusRow: { gap: space.sm, paddingRight: space.lg },
+  focusRow: { gap: space.sm, paddingRight: space.lg, alignItems: 'center' },
+  filterBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.primarySoft },
+  filterBtnOn: { backgroundColor: colors.primary },
+  filterBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  filterTitle: { ...type.headline, marginTop: space.sm },
+  sheetButtons: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
+  flex: { flex: 1 },
+  resultRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: -space.sm },
+  suggestReason: { fontSize: 13, lineHeight: 18, color: colors.muted },
   sessionCard: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
   sessionIcon: { width: 48, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
   sessionBody: { flex: 1, gap: 4 },

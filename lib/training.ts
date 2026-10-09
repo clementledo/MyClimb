@@ -49,8 +49,10 @@ export type Exercise = {
   name: string;
   focus: Focus;
   equipment: Equipment;
-  /** 1 = accessible, 2 = intermédiaire, 3 = avancé. */
-  level: 1 | 2 | 3;
+  /** 1 = accessible, 2 = intermédiaire, 3 = avancé, 4 = expert, 5 = élite. */
+  level: Level;
+  /** Animation d'un autre exercice à réutiliser (même geste). */
+  anim?: string;
   /** Ce que ça travaille, en une ligne. */
   goal: string;
   how: string;
@@ -61,7 +63,11 @@ export type Exercise = {
   warning?: string;
 };
 
-export const LEVELS = ['', 'Accessible', 'Intermédiaire', 'Avancé'] as const;
+export type Level = 1 | 2 | 3 | 4 | 5;
+export const LEVELS = ['', 'Accessible', 'Intermédiaire', 'Avancé', 'Expert', 'Élite'] as const;
+export const levelTone = (l: number) => (l >= 4 ? 'danger' : l === 3 ? 'primary' : l === 2 ? 'neutral' : 'success') as 'danger' | 'primary' | 'neutral' | 'success';
+/** Identifiant de l'animation d'un exercice. */
+export const animOf = (x: Exercise) => x.anim ?? x.id;
 
 export const EXERCISES: Exercise[] = [
   /* ---------- Doigts ---------- */
@@ -661,6 +667,195 @@ export const EXERCISES: Exercise[] = [
     doseText: '5 montées, repos 3 min',
     warning: 'Très traumatisant pour les doigts : réservé aux grimpeurs confirmés, jamais sans échauffement complet.',
   },
+  /* ---------- Expert et Élite ---------- */
+  {
+    id: 'weighted-max-hangs',
+    name: 'Suspensions max lestées 15 mm',
+    focus: 'doigts',
+    equipment: 'hangboard',
+    level: 4,
+    anim: 'max-hangs',
+    goal: 'Force maximale des doigts sur petites réglettes',
+    how: 'Sur une réglette de 15 mm, tiens 7 s avec un lest qui te laisse 2–3 s de marge. Augmente le lest de 1 à 2 kg quand les 6 séries passent.',
+    cues: ['Semi-arqué, jamais arqué à fond', 'Épaules engagées du début à la fin', 'Lest ajouté petit à petit'],
+    dose: { sets: 6, reps: 1, work: 7, rest: 180 },
+    doseText: '6 × 7 s lesté, repos 3 min',
+    warning: 'Après au moins 3 ans de grimpe et de poutre régulière. Jamais deux jours de suite.',
+  },
+  {
+    id: 'min-edge',
+    name: 'Réglette minimale 10 mm',
+    focus: 'doigts',
+    equipment: 'hangboard',
+    level: 4,
+    anim: 'max-hangs',
+    goal: 'Tenir les toutes petites prises des blocs durs',
+    how: 'Au poids du corps sur une réglette de 10 mm (ou la plus petite que tu tiens 10 s), suspends-toi 10 s. Descends la taille de la réglette au fil des semaines.',
+    cues: ['Prise propre, pas de pouce', 'Peau sèche, magnésie', 'Arrête si la peau du bout des doigts brûle'],
+    dose: { sets: 5, reps: 1, work: 10, rest: 180 },
+    doseText: '5 × 10 s, repos 3 min',
+    warning: 'Très exigeant pour les poulies : seulement si les suspensions max 18 mm sont faciles.',
+  },
+  {
+    id: 'one-arm-hang',
+    name: 'Suspension à un bras',
+    focus: 'doigts',
+    equipment: 'hangboard',
+    level: 5,
+    anim: 'max-hangs',
+    goal: 'Force de doigts de très haut niveau, un bras à la fois',
+    how: 'Sur une grande réglette (20 mm), suspends-toi d’un bras, l’autre main peut s’aider d’un élastique ou d’une poulie au début. Tiens 5 à 7 s.',
+    cues: ['Épaule active, pas pendu dans l’articulation', 'Bassin immobile, pas de rotation', 'Assistance retirée petit à petit'],
+    dose: { sets: 5, reps: 1, work: 6, rest: 180, sides: true },
+    doseText: '5 × 6 s par bras, repos 3 min',
+    warning: 'Niveau élite : seulement après des années de poutre et sans aucune douleur aux doigts.',
+  },
+  {
+    id: 'weighted-pullups',
+    name: 'Tractions lestées',
+    focus: 'tirage',
+    equipment: 'bar',
+    level: 4,
+    anim: 'pullups',
+    goal: 'Force maximale de tirage',
+    how: 'Avec un lest (sac à dos ou ceinture), fais des séries de 4 à 5 tractions propres. Le lest doit laisser 1 à 2 répétitions de marge.',
+    cues: ['Bras tendus en bas', 'Menton au-dessus de la barre', 'Descente contrôlée en 2 s'],
+    dose: { sets: 5, reps: 5, work: 0, rest: 180 },
+    doseText: '5 × 5 lestées, repos 3 min',
+  },
+  {
+    id: 'typewriter',
+    name: 'Tractions machine à écrire',
+    focus: 'tirage',
+    equipment: 'bar',
+    level: 4,
+    anim: 'pullups',
+    goal: 'Préparer la traction à un bras, blocages latéraux',
+    how: 'Monte en traction mains larges, puis glisse d’un côté à l’autre en gardant le menton au niveau de la barre : le bras d’un côté plie, l’autre s’allonge.',
+    cues: ['Menton toujours à hauteur de la barre', 'Le bras tendu sert juste d’appui', 'Mouvement lent'],
+    dose: { sets: 4, reps: 6, work: 0, rest: 150 },
+    doseText: '4 × 6 allers-retours, repos 2 min 30',
+  },
+  {
+    id: 'one-arm-negatives',
+    name: 'Négatives à un bras',
+    focus: 'tirage',
+    equipment: 'bar',
+    level: 4,
+    anim: 'pullups',
+    goal: 'Force excentrique pour la traction à un bras',
+    how: 'Monte à deux bras, lâche une main et redescends d’un seul bras le plus lentement possible (au moins 5 s).',
+    cues: ['Coude près du corps', 'Descente régulière, pas de chute', 'Arrête quand tu ne contrôles plus'],
+    dose: { sets: 4, reps: 3, work: 0, rest: 180, sides: true },
+    doseText: '4 × 3 par bras, repos 3 min',
+    warning: 'Coudes et épaules très sollicités : pas plus de 2 fois par semaine.',
+  },
+  {
+    id: 'one-arm-pullup',
+    name: 'Traction à un bras',
+    focus: 'tirage',
+    equipment: 'bar',
+    level: 5,
+    anim: 'pullups',
+    goal: 'Le graal du tirage',
+    how: 'Prise en supination, l’autre main libre (ou deux doigts sur une serviette au début). Monte d’un bras jusqu’au menton, redescends contrôlé.',
+    cues: ['Bras tendu mais épaule active au départ', 'Jambes groupées pour éviter de tourner', 'Qualité avant quantité'],
+    dose: { sets: 5, reps: 1, work: 0, rest: 240, sides: true },
+    doseText: '5 × 1 par bras, repos 4 min',
+    warning: 'Niveau élite : seulement si les négatives à un bras de 5 s sont faciles.',
+  },
+  {
+    id: 'front-lever-one-leg',
+    name: 'Front lever une jambe',
+    focus: 'gainage',
+    equipment: 'bar',
+    level: 4,
+    anim: 'front-lever',
+    goal: 'Gainage complet pour les dévers et les toits',
+    how: 'Depuis le front lever groupé, tends une jambe à l’horizontale, l’autre reste pliée. Tiens en gardant le corps à plat.',
+    cues: ['Bras tendus, omoplates basses', 'Bassin à hauteur des épaules', 'Change de jambe à chaque série'],
+    dose: { sets: 5, reps: 1, work: 8, rest: 120 },
+    doseText: '5 × 8 s, repos 2 min',
+  },
+  {
+    id: 'front-lever-full',
+    name: 'Front lever complet',
+    focus: 'gainage',
+    equipment: 'bar',
+    level: 5,
+    anim: 'front-lever',
+    goal: 'Gainage de très haut niveau',
+    how: 'Corps entièrement tendu à l’horizontale sous la barre, bras tendus. Tiens le plus longtemps possible en restant parfaitement droit.',
+    cues: ['Corps gainé comme une planche', 'Pieds à hauteur des épaules', 'Arrête dès que le bassin tombe'],
+    dose: { sets: 5, reps: 1, work: 6, rest: 180 },
+    doseText: '5 × 6 s, repos 3 min',
+  },
+  {
+    id: 'toes-to-bar',
+    name: 'Pieds à la barre',
+    focus: 'gainage',
+    equipment: 'bar',
+    level: 4,
+    anim: 'leg-raises',
+    goal: 'Gainage pour remonter les pieds dans le dévers',
+    how: 'Suspendu à la barre, monte les pieds tendus jusqu’à toucher la barre, sans élan, et redescends lentement.',
+    cues: ['Pas de balancier', 'Jambes tendues', 'Descente en 2 s'],
+    dose: { sets: 4, reps: 8, work: 0, rest: 120 },
+    doseText: '4 × 8, repos 2 min',
+  },
+  {
+    id: 'dragon-flag',
+    name: 'Dragon flag',
+    focus: 'gainage',
+    equipment: 'none',
+    level: 5,
+    anim: 'hollow',
+    goal: 'Gainage total, du cou aux pieds',
+    how: 'Allongé sur un banc, accroché derrière la tête, monte le corps tendu à la verticale en appui sur les épaules, puis redescends droit sans plier les hanches.',
+    cues: ['Corps droit comme une planche', 'Descente très lente', 'Commence jambes groupées'],
+    dose: { sets: 4, reps: 5, work: 0, rest: 150 },
+    doseText: '4 × 5, repos 2 min 30',
+  },
+  {
+    id: 'archer-pushups',
+    name: 'Pompes archer',
+    focus: 'antagonistes',
+    equipment: 'none',
+    level: 4,
+    anim: 'pushups',
+    goal: 'Équilibrer les épaules, pousser fort d’un bras',
+    how: 'Mains très écartées, descends vers une main pendant que l’autre bras reste tendu sur le côté. Alterne les côtés.',
+    cues: ['Corps gainé', 'Coude du bras qui pousse près du corps', 'Bras tendu vraiment tendu'],
+    dose: { sets: 4, reps: 6, work: 0, rest: 90, sides: true },
+    doseText: '4 × 6 par côté, repos 1 min 30',
+  },
+  {
+    id: 'pistol',
+    name: 'Pistol squat complet',
+    focus: 'jambes',
+    equipment: 'none',
+    level: 4,
+    anim: 'pistol-assist',
+    goal: 'Force et équilibre pour les grandes montées de pied',
+    how: 'Sur une jambe, l’autre tendue devant, descends jusqu’en bas et remonte sans aide.',
+    cues: ['Talon au sol', 'Genou dans l’axe du pied', 'Bras devant pour l’équilibre'],
+    dose: { sets: 4, reps: 6, work: 0, rest: 90, sides: true },
+    doseText: '4 × 6 par jambe, repos 1 min 30',
+  },
+  {
+    id: 'campus-doubles',
+    name: 'Pan Güllich : sauts doubles',
+    focus: 'mur',
+    equipment: 'wall',
+    level: 5,
+    anim: 'campus-ladders',
+    goal: 'Puissance explosive des deux mains',
+    how: 'Sur le pan, lâche les deux mains en même temps pour monter d’un barreau, puis redescends de la même façon. Commence par de petits écarts.',
+    cues: ['Réception souple, doigts déjà placés', 'Arrête au premier contact raté', 'Très peu de répétitions'],
+    dose: { sets: 4, reps: 1, work: 0, rest: 240 },
+    doseText: '4 séries, repos 4 min',
+    warning: 'Niveau élite, très traumatisant pour les doigts : seulement si les échelles sont faciles.',
+  },
 ];
 
 export const exerciseById = (id: string) => EXERCISES.find((e) => e.id === id) ?? null;
@@ -678,6 +873,8 @@ export type SessionType = {
   icon: AndroidSymbol;
   minutes: number;
   intensity: 1 | 2 | 3;
+  /** Niveau demandé ; à défaut, celui du plus dur de ses exercices. */
+  level?: Level;
   where: 'salle' | 'maison';
   /** Points faibles (profils, prises, mouvements de Progression) que la séance travaille. */
   targets: string[];
@@ -818,6 +1015,28 @@ export const SESSIONS: SessionType[] = [
     where: 'salle',
     targets: [],
     steps: [{ kind: 'exercise', id: 'arc' }, { kind: 'exercise', id: 'forearm-stretch' }, { kind: 'exercise', id: 'frog' }],
+  },
+  {
+    id: 'elite-force',
+    name: 'Force élite',
+    goal: 'Doigts et tirage au maximum, pour les blocs 7B et plus',
+    icon: 'military_tech',
+    minutes: 70,
+    intensity: 3,
+    where: 'maison',
+    targets: ['Réglettes', 'Dévers', 'Toit', 'Blocage'],
+    steps: [WARMUP_HOME, { kind: 'exercise', id: 'weighted-max-hangs' }, { kind: 'exercise', id: 'one-arm-negatives' }, { kind: 'exercise', id: 'front-lever-one-leg' }, { kind: 'exercise', id: 'external-rotation' }],
+  },
+  {
+    id: 'power-campus',
+    name: 'Puissance au pan',
+    goal: 'Jetés et mouvements explosifs',
+    icon: 'rocket_launch',
+    minutes: 75,
+    intensity: 3,
+    where: 'salle',
+    targets: ['Dynamique', 'Jeté', 'Coordination'],
+    steps: [WARMUP_WALL, { kind: 'exercise', id: 'campus-ladders' }, { kind: 'exercise', id: 'campus-doubles' }, { kind: 'exercise', id: 'typewriter' }, COOLDOWN],
   },
 ];
 
@@ -1045,6 +1264,35 @@ export const ROUTINES: Routine[] = [
     daily: true,
     items: ['cat-cow', 'child-pose', 'forearm-stretch', 'pigeon', 'breathing'],
   },
+  {
+    id: 'expert-tirage',
+    name: 'Tirage expert',
+    goal: 'Vers la traction à un bras',
+    icon: 'military_tech',
+    minutes: 25,
+    kind: 'force',
+    when: 'Deux fois par semaine',
+    daily: false,
+    items: ['scap-pulls', 'weighted-pullups', 'typewriter', 'one-arm-negatives'],
+  },
+  {
+    id: 'expert-gainage',
+    name: 'Gainage expert',
+    goal: 'Les pieds qui restent collés dans le toit',
+    icon: 'bolt',
+    minutes: 20,
+    kind: 'force',
+    when: 'Un jour sur deux',
+    daily: false,
+    items: ['toes-to-bar', 'front-lever-one-leg', 'dragon-flag'],
+  },
 ];
 
 export const routineById = (id: string) => ROUTINES.find((r) => r.id === id) ?? null;
+
+/* ---------- Niveaux des routines et séances ---------- */
+
+const maxLevel = (ids: string[]): Level => Math.max(1, ...ids.map((id) => exerciseById(id)?.level ?? 1)) as Level;
+export const routineLevel = (r: Routine): Level => maxLevel(r.items);
+export const sessionExercises = (s: SessionType) => s.steps.flatMap((x) => (x.kind === 'exercise' ? [x.id] : []));
+export const sessionLevel = (s: SessionType): Level => s.level ?? maxLevel(sessionExercises(s));

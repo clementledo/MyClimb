@@ -10,6 +10,7 @@ import { listTrainingLogs } from '@/lib/db';
 import { todayIso } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
 import { exerciseById, ROUTINE_KINDS, type Exercise } from '@/lib/training';
+import { scaled } from '@/lib/trainingScale';
 import { findRoutine, isCustomRoutine, routineChecks, setRoutineChecks } from '@/lib/trainingPlan';
 
 export default function RoutineScreen() {
@@ -70,7 +71,8 @@ export default function RoutineScreen() {
         <Section title={`Exercices · ${count}/${routine.items.length}`}>
           <View style={s.listCard}>
             {routine.items.map((xid, i, arr) => {
-              const x = exerciseById(xid);
+              const found = exerciseById(xid);
+              const x = found ? scaled(found) : null;
               if (!x) return null;
               const on = checked.includes(xid);
               return (

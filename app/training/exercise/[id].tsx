@@ -6,17 +6,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExerciseAnim } from '@/components/ExerciseAnim';
 import { HoldTimer, hasTimer } from '@/components/HoldTimer';
 import { TrainingDone } from '@/components/TrainingDone';
-import { Badge, Banner, Button, Card, Empty, Icon, Section } from '@/components/ui';
+import { Badge, Banner, Button, Card, Empty, Icon, Section, Segmented } from '@/components/ui';
 import { listTrainingLogs } from '@/lib/db';
 import { HAS_ANIMATION } from '@/lib/exercisePoses';
 import { todayIso } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
-import { EQUIPMENT, exerciseById, exerciseMinutes, exerciseSeconds, FOCUS, formatSeconds, LEVELS } from '@/lib/training';
+import { animOf, EQUIPMENT, exerciseById, exerciseMinutes, exerciseSeconds, FOCUS, formatSeconds, LEVELS, levelTone } from '@/lib/training';
+import { scaled, scaleOf, SCALES, setScale, type Scale } from '@/lib/trainingScale';
 
 export default function ExerciseScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { bottom } = useSafeAreaInsets();
-  const x = exerciseById(String(id));
+  const base = exerciseById(String(id));
+  const [scale, setScaleState] = useState<Scale>(() => scaleOf(String(id)));
+  const x = base ? scaled(base, scale) : null;
   const [sheet, setSheet] = useState(false);
   const [timer, setTimer] = useState(false);
   const [doneToday, setDoneToday] = useState(false);
@@ -32,9 +35,9 @@ export default function ExerciseScreen() {
       <Stack.Screen options={{ title: x.name }} />
       <ScrollView contentContainerStyle={s.content}>
         <View style={s.head}>
-          {HAS_ANIMATION(x.id) ? (
+          {HAS_ANIMATION(animOf(x)) ? (
             <View style={s.anim} accessibilityLabel={`Animation : ${x.name}`}>
-              <ExerciseAnim id={x.id} size={210} />
+              <ExerciseAnim id={animOf(x)} size={210} />
             </View>
           ) : (
             <View style={s.icon}>
@@ -45,7 +48,7 @@ export default function ExerciseScreen() {
           <Text style={s.goal}>{x.goal}</Text>
           <View style={s.badges}>
             <Badge label={FOCUS[x.focus].label} />
-            <Badge label={LEVELS[x.level]} tone={x.level === 3 ? 'danger' : x.level === 2 ? 'primary' : 'success'} />
+            <Badge label={LEVELS[x.level]} tone={levelTone(x.level)} />
             <Badge label={EQUIPMENT.find((e) => e.id === x.equipment)?.label ?? ''} tone="neutral" />
           </View>
         </View>
@@ -62,6 +65,14 @@ export default function ExerciseScreen() {
             {secs > 0 && <Text style={s.muted}>Environ {formatSeconds(secs)} avec les repos{hasTimer(x) ? ' · minuteur disponible' : ''}</Text>}
           </View>
         </Card>
+        <Segmented
+          options={SCALES}
+          value={scale}
+          onChange={(v) => {
+            setScaleState(v);
+            setScale(x.id, v);
+          }}
+        />
 
         <Section title="Comment faire">
           <Card>

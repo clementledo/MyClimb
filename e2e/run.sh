@@ -152,21 +152,20 @@ tap "Chercher un exercice" ; sleep 1 ; adb shell input text "planche" ; sleep 2 
 tap "Effacer la recherche" ; sleep 1 ; tap "Chercher un exercice" ; sleep 1 ; adb shell input text "pigeon" ; sleep 2 ; hidekb
 tap "Pigeon" ; sleep 1 ; shot 1g6-choix ; tap "Terminé (2)" ; sleep 2 ; shot 1g7-ma-routine
 tap "Enregistrer la routine" ; sleep 3 ; shot 1g8-mes-routines
-tap "Séances" ; sleep 2
-tap "Voir la séance" ; sleep 3 ; shot 1h-seance
+scrolltop ; tap "Voir la séance" ; sleep 3 ; shot 1h-seance
 tap "Marquer comme faite" ; sleep 2 ; tap "Plus" ; sleep 1 ; tap "Juste" ; sleep 1 ; shot 1i-fait
 tap "Enregistrer" ; sleep 2 ; shot 1j-enregistre
 adb shell input keyevent 4 ; sleep 3 ; shot 1k-historique
-tap "Renfo" ; sleep 2 ; shot 1l-renforcement
-tap "Doigts" ; sleep 2 ; shot 1m-doigts
-tap "Tous" ; sleep 1 ; tap "Tractions" ; sleep 3 ; shot 1n-exercice
+scrolltop ; tap "Filtres" ; sleep 2 ; tap "Exercices" ; sleep 1 ; tap "Expert" ; sleep 1 ; shot 1l-filtres ; tap "Fermer" ; sleep 2 ; shot 1l2-experts
+tap "Tout effacer" ; sleep 2 ; tap "Doigts" ; sleep 2 ; shot 1m-doigts
+tap "Tout" ; sleep 1 ; tap "Tractions" ; sleep 3 ; tap "Dur" ; sleep 1 ; shot 1n-exercice-dur ; tap "Normal" ; sleep 1
 adb shell input keyevent 4 ; sleep 2
 tap "Planche" ; sleep 3 ; tap "Minuteur" ; sleep 7 ; shot 1n2-minuteur
 # Le minuteur se rafraîchit sans arrêt : uiautomator ne peut pas lire l'écran, on touche « Passer » par sa position.
 read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
 adb shell input tap $((W * 3 / 4)) $((H * 91 / 100)) ; sleep 2 ; shot 1n3-minuteur-suite
 adb shell input keyevent 4 ; sleep 2 ; adb shell input keyevent 4 ; sleep 2
-scrolltop ; tap "Matériel" ; sleep 2 ; tap "Poutre" ; sleep 1 ; shot 1o-materiel
+scrolltop ; tap "Filtres" ; sleep 2 ; tap "Poutre" ; sleep 1 ; shot 1o-materiel
 tap "Poutre" ; sleep 1 ; tap "Fermer" ; sleep 2
 tap "Progression" ; sleep 3 ; shot 1d-progression
 tap "Costume et nom" ; sleep 2 ; shot 1d1-ma-carte
@@ -186,7 +185,6 @@ tap "Célébrations" ; sleep 2 ; shot 1q2-celebrations
 adb shell input keyevent 4 ; sleep 3 ; scrolltop
 tap "Comment faire monter mes stats" ; sleep 1 ; shot 1d1d-aide
 tap "Comment faire monter mes stats" ; sleep 1
-tap "Voir mes entraînements" ; sleep 1 ; shot 1d2-progression-entrainement
 tap "Progression" ; sleep 2
 tap "Mes grimpes" ; sleep 2 ; shot 1e-mes-grimpes
 tap "Entraînement" ; sleep 2 ; tap "Jeux" ; sleep 2 ; tap "Un jeu au hasard" ; sleep 1 ; shot 1f-jeux
