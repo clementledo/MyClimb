@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
+import Games from '@/components/Games';
 import { Badge, Button, Card, Chip, Empty, Icon, IconButton, ListRow, Section, Segmented, Sheet } from '@/components/ui';
 import { FEEL_LABELS } from '@/lib/climbing';
 import { deleteTrainingLog, listBlocks, listTrainingLogs, type TrainingLog } from '@/lib/db';
@@ -39,7 +40,7 @@ import {
 import { applyReminder, formatTime, readReminder, type Reminder } from '@/lib/reminder';
 import { todayIso } from '@/lib/stats';
 
-type Mode = 'routines' | 'sessions' | 'exercises';
+type Mode = 'routines' | 'sessions' | 'exercises' | 'jeux';
 
 const shortDate = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);
@@ -128,7 +129,8 @@ export default function TrainingScreen() {
           options={[
             { value: 'routines', label: 'Routines' },
             { value: 'sessions', label: 'Séances' },
-            { value: 'exercises', label: 'Renforcement' },
+            { value: 'exercises', label: 'Renfo' },
+            { value: 'jeux', label: 'Jeux' },
           ]}
           value={mode}
           onChange={(m) => {
@@ -138,6 +140,9 @@ export default function TrainingScreen() {
           }}
         />
       </View>
+      {mode === 'jeux' ? (
+        <Games />
+      ) : (
       <ScrollView ref={scroll} contentContainerStyle={s.content}>
         <Pressable style={s.summary} onPress={() => setSheet(true)} accessibilityLabel="Matériel">
           <Icon name="tune" size={18} color={colors.primary} />
@@ -372,6 +377,7 @@ export default function TrainingScreen() {
           </>
         )}
       </ScrollView>
+      )}
     </View>
   );
 }

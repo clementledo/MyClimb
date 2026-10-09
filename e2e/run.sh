@@ -157,7 +157,7 @@ tap "Voir la séance" ; sleep 3 ; shot 1h-seance
 tap "Marquer comme faite" ; sleep 2 ; tap "Plus" ; sleep 1 ; tap "Juste" ; sleep 1 ; shot 1i-fait
 tap "Enregistrer" ; sleep 2 ; shot 1j-enregistre
 adb shell input keyevent 4 ; sleep 3 ; shot 1k-historique
-tap "Renforcement" ; sleep 2 ; shot 1l-renforcement
+tap "Renfo" ; sleep 2 ; shot 1l-renforcement
 tap "Doigts" ; sleep 2 ; shot 1m-doigts
 tap "Tous" ; sleep 1 ; tap "Tractions" ; sleep 3 ; shot 1n-exercice
 adb shell input keyevent 4 ; sleep 2
@@ -189,7 +189,7 @@ tap "Comment faire monter mes stats" ; sleep 1
 tap "Voir mes entraînements" ; sleep 1 ; shot 1d2-progression-entrainement
 tap "Progression" ; sleep 2
 tap "Mes grimpes" ; sleep 2 ; shot 1e-mes-grimpes
-tap "Jeux" ; sleep 2 ; tap "Un jeu au hasard" ; sleep 1 ; shot 1f-jeux
+tap "Entraînement" ; sleep 2 ; tap "Jeux" ; sleep 2 ; tap "Un jeu au hasard" ; sleep 1 ; shot 1f-jeux
 tap "Simulation" ; sleep 4 ; shot 2-simulation
 tap "Essayer avec une voie d’exemple" ; sleep 6 ; shot 3-exemple
 tap "Méthode 3D" ; sleep 8 ; shot 4-3d-debut
