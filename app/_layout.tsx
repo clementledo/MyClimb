@@ -140,6 +140,10 @@ export default function RootLayout() {
           <Stack.Screen name="training/routine/[id]" options={{ title: 'Routine' }} />
           <Stack.Screen name="training/routine-edit" options={{ title: 'Nouvelle routine', presentation: 'modal' }} />
           <Stack.Screen name="collection/index" options={{ title: 'Ma collection' }} />
+          <Stack.Screen name="manager/index" options={{ headerShown: false }} />
+          <Stack.Screen name="manager/climber/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="manager/compet" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="manager/packs" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="collection/packs" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
         </Stack>
       </ThemeProvider>

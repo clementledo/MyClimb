@@ -187,6 +187,21 @@ tap "Comment faire monter mes stats" ; sleep 1 ; shot 1d1d-aide
 tap "Comment faire monter mes stats" ; sleep 1
 tap "Progression" ; sleep 2
 tap "Mes grimpes" ; sleep 2 ; shot 1e-mes-grimpes
+# MyClimb Manager : création du club, pack de bienvenue (écran animé, touché par position), une compétition.
+tap "Jeux" ; sleep 3 ; shot 1m1-jeux-hub
+tap "MyClimb Manager" ; sleep 3 ; shot 1m2-nouveau-club
+tap "Nom du club" ; sleep 1 ; adb shell input text "Test" ; sleep 1 ; hidekb
+tap "Créer mon club" ; sleep 3 ; shot 1m3-boutique
+tap "Ouvrir le pack" ; sleep 2 ; shot 1m4-walkout-1 ; sleep 2 ; shot 1m4-walkout-2
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do pct 50 50 ; sleep 2; done
+shot 1m5-bilan-pack
+tap "Voir mon équipe" ; sleep 3 ; shot 1m6-club
+scrolldown 2 ; shot 1m6b-equipe ; scrolltop
+tap "Jouer la compétition" ; sleep 3 ; shot 1m7-prepa
+tap "Lancer la compétition" ; sleep 3 ; shot 1m8-direct ; sleep 12 ; shot 1m9-resultats
+tap "Retour au club" ; sleep 3
+tap "Ligue" ; sleep 2 ; shot 1m10-ligue
+adb shell input keyevent 4 ; sleep 3
 tap "Entraînement" ; sleep 2 ; tap "Jeux" ; sleep 2 ; tap "Un jeu au hasard" ; sleep 1 ; shot 1f-jeux
 tap "Simulation" ; sleep 4 ; shot 2-simulation
 tap "Essayer avec une voie d’exemple" ; sleep 6 ; shot 3-exemple

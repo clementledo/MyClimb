@@ -47,7 +47,7 @@ export function useSvgIds() {
 }
 
 /** Fond de la carte : dégradé, reflets, et le filet intérieur quand il n'y a pas de contour. */
-const CardBase = memo(function CardBase({ c, W, ids, inner }: { c: Look; W: number; ids: (k: string) => string; inner: boolean }) {
+export const CardBase = memo(function CardBase({ c, W, ids, inner }: { c: Look; W: number; ids: (k: string) => string; inner: boolean }) {
   return (
     <Svg width={W} height={W * CARD_RATIO} viewBox="0 0 100 142" style={s.fill}>
       <Defs>

@@ -75,6 +75,7 @@ export default function TabLayout() {
         name="simulation"
         options={{ title: 'Simulation', tabBarIcon: ({ color }) => <TabIcon name="view_in_ar" color={color} /> }}
       />
+      <Tabs.Screen name="jeux" options={{ title: 'Jeux', tabBarIcon: ({ color }) => <TabIcon name="sports_esports" color={color} /> }} />
     </Tabs>
   );
 }
