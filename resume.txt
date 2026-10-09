@@ -1,0 +1,200 @@
+10-09 21:03:42.211  2977  3060 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:03:42.211  2977  3060 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:03:43.899  2977  3935 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:03:43.903  2977  3935 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:03:45.453  2977  3539 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:03:45.454  2977  3539 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:03:45.736  1435  3295 W libc    : Access denied finding property "ro.hardware.chipname"
+10-09 21:03:46.705  2977  3935 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:03:46.705  2977  3935 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:03:48.330  1042  1079 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:48.366  1042  1079 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:48.387  1042  1079 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:49.720  1042  1065 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:49.724  1042  1379 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:49.745  1042  1065 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:49.753  1042  1065 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:49.799  1042  1065 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:49.818  1042  1065 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:49.835  1042  1065 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:49.965  1042  1379 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:50.472  1042  1379 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:50.513  1042  1379 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:50.647  1042  1379 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:50.773  1042  1379 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:51.094  1042  1379 W libc    : Access denied finding property "ro.vendor.aware_available"
+10-09 21:03:52.321  2977  3539 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:03:52.326  2977  3539 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:03:57.411  5074  5074 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:03:57.428  5074  5074 I AndroidRuntime: Using default boot image
+10-09 21:03:57.428  5074  5074 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:03:57.541  2977  3539 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:03:57.543  2977  3539 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:03:57.702  5074  5074 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:03:57.702  5074  5074 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:03:57.702  5074  5074 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:03:57.723  5074  5074 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:03:58.902  5074  5074 D AndroidRuntime: Shutting down VM
+10-09 21:04:00.550  2977  3539 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:04:00.551  2977  3539 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:04:03.177  5190  5190 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:04:03.182  5190  5190 I AndroidRuntime: Using default boot image
+10-09 21:04:03.182  5190  5190 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:04:03.307  5190  5190 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:04:03.310  5190  5190 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:04:03.311  5190  5190 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:04:03.311  5190  5190 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:04:04.363  5190  5190 D AndroidRuntime: Shutting down VM
+10-09 21:04:05.658  2977  3935 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:04:05.658  2977  3935 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:04:08.769  5432  5432 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:04:08.785  5432  5432 I AndroidRuntime: Using default boot image
+10-09 21:04:08.785  5432  5432 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:04:08.870  5432  5432 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:04:08.870  5432  5432 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:04:08.870  5432  5432 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:04:08.871  5432  5432 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:04:09.840  2977  3539 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:04:09.845  2977  3539 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:04:09.976  5432  5432 D AndroidRuntime: Shutting down VM
+10-09 21:04:10.343  5354  5464 W libc    : Access denied finding property "ro.hardware.chipname"
+10-09 21:04:14.150  5623  5623 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:04:14.157  5623  5623 I AndroidRuntime: Using default boot image
+10-09 21:04:14.157  5623  5623 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:04:14.312  5623  5623 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:04:14.313  5623  5623 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:04:14.313  5623  5623 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:04:14.314  5623  5623 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:04:15.365  5623  5623 D AndroidRuntime: Shutting down VM
+10-09 21:04:16.709  2977  3935 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:04:16.713  2977  3935 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:04:16.850  5354  5642 W libc    : Access denied finding property "ro.hardware.chipname"
+10-09 21:04:17.549  2977  3935 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:04:17.569  2977  3935 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:04:20.268  5810  5810 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:04:20.274  5810  5810 I AndroidRuntime: Using default boot image
+10-09 21:04:20.274  5810  5810 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:04:20.406  5810  5810 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:04:20.406  5810  5810 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:04:20.406  5810  5810 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:04:20.407  5810  5810 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:04:21.517  5810  5810 D AndroidRuntime: Shutting down VM
+10-09 21:04:24.938  5910  5910 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:04:24.942  5910  5910 I AndroidRuntime: Using default boot image
+10-09 21:04:24.942  5910  5910 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:04:25.037  5910  5910 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:04:25.037  5910  5910 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:04:25.037  5910  5910 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:04:25.038  5910  5910 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:04:26.064  5910  5910 D AndroidRuntime: Shutting down VM
+10-09 21:04:29.435  5939  5939 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:04:29.438  5939  5939 I AndroidRuntime: Using default boot image
+10-09 21:04:29.438  5939  5939 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:04:29.526  5939  5939 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:04:29.527  5939  5939 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:04:29.527  5939  5939 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:04:29.527  5939  5939 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:04:30.546  5939  5939 D AndroidRuntime: Shutting down VM
+10-09 21:04:34.552  5970  5970 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:04:34.555  5970  5970 I AndroidRuntime: Using default boot image
+10-09 21:04:34.556  5970  5970 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:04:34.621  5970  5970 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:04:34.621  5970  5970 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:04:34.622  5970  5970 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:04:34.622  5970  5970 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:04:35.649  5970  5970 D AndroidRuntime: Shutting down VM
+10-09 21:05:05.403  6156  6156 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:05:05.406  6156  6156 I AndroidRuntime: Using default boot image
+10-09 21:05:05.406  6156  6156 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:05:05.475  6156  6156 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:05:05.477  6156  6156 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:05:05.477  6156  6156 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:05:05.477  6156  6156 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:05:06.517  6156  6156 D AndroidRuntime: Shutting down VM
+10-09 21:05:10.022  5354  6208 W libc    : Access denied finding property "ro.hardware.chipname"
+10-09 21:05:10.245  2977  6191 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:05:10.245  2977  6191 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:05:21.443  6313  6313 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:05:21.446  6313  6313 I AndroidRuntime: Using default boot image
+10-09 21:05:21.446  6313  6313 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:05:21.518  6313  6313 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:05:21.518  6313  6313 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:05:21.518  6313  6313 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:05:21.518  6313  6313 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:05:22.569  6313  6313 D AndroidRuntime: Shutting down VM
+10-09 21:05:26.502  6366  6366 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:05:26.505  6366  6366 I AndroidRuntime: Using default boot image
+10-09 21:05:26.505  6366  6366 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:05:26.565  6366  6366 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:05:26.565  6366  6366 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:05:26.565  6366  6366 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:05:26.565  6366  6366 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:05:27.601  6366  6366 D AndroidRuntime: Shutting down VM
+10-09 21:05:29.602  6394  6394 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:05:29.605  6394  6394 I AndroidRuntime: Using default boot image
+10-09 21:05:29.605  6394  6394 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:05:29.670  6394  6394 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:05:29.670  6394  6394 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:05:29.670  6394  6394 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:05:29.670  6394  6394 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:05:30.692  6394  6394 D AndroidRuntime: Shutting down VM
+10-09 21:05:43.433  6474  6474 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:05:43.436  6474  6474 I AndroidRuntime: Using default boot image
+10-09 21:05:43.436  6474  6474 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:05:43.499  6474  6474 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:05:43.499  6474  6474 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:05:43.499  6474  6474 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:05:43.500  6474  6474 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:05:44.541  6474  6474 D AndroidRuntime: Shutting down VM
+10-09 21:05:57.766  2977  6538 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:05:57.766  2977  6538 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:06:10.802  2977  6549 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+10-09 21:06:10.803  2977  6549 W libc    : Access denied finding property "service.adb.tls.port"
+10-09 21:06:23.582  6615  6615 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:06:23.584  6615  6615 I AndroidRuntime: Using default boot image
+10-09 21:06:23.584  6615  6615 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:06:23.644  6615  6615 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:06:23.644  6615  6615 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:06:23.644  6615  6615 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:06:23.645  6615  6615 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:06:24.680  6615  6615 D AndroidRuntime: Shutting down VM
+10-09 21:06:28.586  6641  6641 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:06:28.588  6641  6641 I AndroidRuntime: Using default boot image
+10-09 21:06:28.588  6641  6641 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:06:28.641  6641  6641 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:06:28.641  6641  6641 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:06:28.641  6641  6641 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:06:28.642  6641  6641 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:06:29.681  6641  6641 D AndroidRuntime: Shutting down VM
+10-09 21:06:33.028  6669  6669 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:06:33.031  6669  6669 I AndroidRuntime: Using default boot image
+10-09 21:06:33.031  6669  6669 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:06:33.090  6669  6669 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:06:33.090  6669  6669 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:06:33.090  6669  6669 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:06:33.090  6669  6669 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:06:34.122  6669  6669 D AndroidRuntime: Shutting down VM
+10-09 21:06:37.447  6697  6697 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:06:37.449  6697  6697 I AndroidRuntime: Using default boot image
+10-09 21:06:37.449  6697  6697 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:06:37.505  6697  6697 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:06:37.505  6697  6697 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:06:37.505  6697  6697 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:06:37.506  6697  6697 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:06:38.564  6697  6697 D AndroidRuntime: Shutting down VM
+10-09 21:06:41.879  6724  6724 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:06:41.881  6724  6724 I AndroidRuntime: Using default boot image
+10-09 21:06:41.881  6724  6724 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:06:41.936  6724  6724 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:06:41.939  6724  6724 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:06:41.940  6724  6724 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:06:41.940  6724  6724 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:06:42.972  6724  6724 D AndroidRuntime: Shutting down VM
+10-09 21:06:56.698  6808  6808 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-09 21:06:56.701  6808  6808 I AndroidRuntime: Using default boot image
+10-09 21:06:56.701  6808  6808 I AndroidRuntime: Leaving lock profiling enabled
+10-09 21:06:56.758  6808  6808 W libc    : Access denied finding property "ro.product.name_for_attestation"
+10-09 21:06:56.758  6808  6808 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+10-09 21:06:56.758  6808  6808 W libc    : Access denied finding property "ro.product.model_for_attestation"
+10-09 21:06:56.759  6808  6808 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-09 21:06:57.833  6808  6808 D AndroidRuntime: Shutting down VM

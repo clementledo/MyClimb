@@ -1,0 +1,14 @@
+Touché « Commencer » en 160 552
+Touché « Jeux » en 288 624
+Touché « MyClimb Manager » en 160 224
+Touché « Nom du club » en 160 349
+Touché « Créer mon club » en 160 582
+Touché « Ouvrir le pack » en 160 416
+Touché « Voir mon équipe » en 160 422
+Touché « Jouer la compétition » en 160 279
+Touché « Aide : La compétition » en 269 143
+Touché « Fermer l’aide » en 160 320
+Touché « Lancer la compétition » en 160 602
+Touché « Retour au club » en 86 602
+Touché « Ligue » en 253 635
+Touché « Légendes » en 235 588
