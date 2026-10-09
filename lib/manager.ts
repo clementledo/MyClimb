@@ -11,8 +11,6 @@ import { SKINS, type SkinId } from './skins';
 
 export type Tier = 'bronze' | 'argent' | 'or' | 'legende';
 export type Program = MStat | 'repos';
-export type Attitude = 'forcer' | 'assurer' | 'economiser';
-export type Reading = 'court' | 'long';
 export type ItemKind = 'materiel' | 'boost' | 'coach' | 'sponsor' | 'competence';
 
 export type Climber = {
@@ -63,7 +61,7 @@ export type Club = {
   climbers: Climber[];
   items: Item[];
   league: 0 | 1 | 2;
-  season: { n: number; round: number; points: Record<string, number>; rivals: Rival[] };
+  season: { n: number; round: number; points: Record<string, number>; rivals: Rival[]; next?: CompEvent[] };
   energy: { day: string; used: number };
   daily: { last: string; streak: number };
   packs: PackKind[];
@@ -75,14 +73,14 @@ export type Club = {
 /* ---------- Réglages du jeu ---------- */
 
 export const LEAGUES = [
-  { name: 'Ligue régionale', short: 'Régionale', base: 57, color: '#43A047', reward: 1 },
+  { name: 'Ligue régionale', short: 'Régionale', base: 59, color: '#43A047', reward: 1 },
   { name: 'Ligue nationale', short: 'Nationale', base: 69, color: '#1E88E5', reward: 1.6 },
   { name: 'Coupe du monde', short: 'Coupe du monde', base: 80, color: '#E9A100', reward: 2.4 },
 ] as const;
 export const ROUNDS = 10;
 export const ENERGY_PER_DAY = 10;
 export const MAX_CLIMBERS = 12;
-export const TEAM_SIZE = 3;
+export const TEAM_SIZE = 4;
 const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 const PRIZE = [450, 350, 280, 230, 195, 165, 140, 120, 105, 95];
 
@@ -101,7 +99,6 @@ export const PROGRAMS: { id: Program; name: string }[] = [...MSTATS.map((s) => (
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 1.15;
 const uid = () => Math.random().toString(36).slice(2, 10);
 export const dayOf = (t = Date.now()) => {
   const d = new Date(t);
@@ -310,14 +307,18 @@ export function claimDaily(club: Club) {
 
 /* ---------- Compétition ---------- */
 
-export type Pick = { id: string; attitude: Attitude; reading: Reading };
-export type BlockResult = { type: BlockType; top: boolean; zone: boolean; tries: number; points: number };
-export type ClimberResult = { name: string; flag: string; skin: SkinId; club: string; mine: boolean; blocks: BlockResult[]; lead: number; total: number; id?: string };
+/** Une épreuve : 3 blocs puis une voie. Un grimpeur par épreuve. */
+export type CompEvent = { kind: 'bloc' | 'voie'; type: BlockType | null; difficulty: number };
+export type Lineup = (string | null)[];
+export type EventRow = { name: string; flag: string; skin: SkinId; club: string; mine: boolean; id?: string; top: boolean; zone: boolean; tries: number; height: number; points: number };
 export type Moment = { text: string; climber: string; skin: SkinId; kind: 'flash' | 'top' | 'chute' | 'record' };
+export type Roll = { teamId: string; name: string; flag: string; skin: SkinId; club: string; mine: boolean; id?: string; perf: number; eff: number };
+export type Draft = { events: CompEvent[]; rolls: Roll[][]; cruxes: number[]; boost: number; lineup: Lineup };
 export type CompResult = {
-  blocks: { type: BlockType; difficulty: number }[];
-  climbers: ClimberResult[];
-  teams: { id: string; name: string; color: string; total: number; mine: boolean }[];
+  events: CompEvent[];
+  rows: EventRow[][];
+  teams: { id: string; name: string; color: string; total: number; mine: boolean; perEvent: number[] }[];
+  lines: { event: number; name: string; skin: SkinId; text: string; good: boolean }[];
   rank: number;
   coins: number;
   xp: number;
@@ -325,129 +326,244 @@ export type CompResult = {
   seasonEnd?: { rank: number; up: boolean; down: boolean; pack: PackKind | null; coins: number };
 };
 
-const ATT = { forcer: { bonus: 4, spread: 9, tire: 18 }, assurer: { bonus: 0, spread: 4, tire: 12 }, economiser: { bonus: -3, spread: 6, tire: 7 } };
+export const EVENTS = 4;
+/** Écart type du hasard sur une épreuve. */
+const SPREAD = 4;
+/** Malus quand un grimpeur enchaîne une 2ᵉ épreuve. */
+const DOUBLE = 6;
+/** Bonus du mini-jeu de jauge. */
+export const CRUX_BONUS = { parfait: 8, bien: 5, juste: 2, rate: 0 };
 
-type Athlete = { stats: Record<MStat, number>; skills: SkillId[]; fatigue: number; attitude: Attitude; reading: Reading; boost: number };
-
-function blockPerf(a: Athlete, type: BlockType) {
-  const b = BLOCKS[type];
-  let eff = b.stats.reduce((s, k) => s + a.stats[k], 0) / b.stats.length;
-  if (a.skills.includes(b.skill)) eff += 8;
-  if (a.reading === 'long') eff += a.skills.includes('lecture') ? 5 : 2;
-  eff += (a.stats.mental - 60) * 0.08 + a.boost - Math.max(0, a.fatigue - 45) * 0.3;
-  const att = ATT[a.attitude];
-  return eff + att.bonus + gauss() * att.spread;
+const normal = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+// Fonction de répartition de la loi normale (approximation d'Abramowitz-Stegun).
+function phi(x: number) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989423 * Math.exp((-x * x) / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  return x > 0 ? 1 - p : p;
 }
 
-function leadPerf(a: Athlete) {
-  let eff = (a.stats.endurance * 2 + a.stats.doigts + a.stats.mental + a.stats.technique) / 5;
-  if (a.skills.includes('lolotte')) eff += 5;
-  // Lire longtemps les blocs coûte du temps et de la fraîcheur pour la voie.
-  if (a.reading === 'long') eff -= 2;
-  eff += a.boost - Math.max(0, a.fatigue - 45) * 0.35;
-  const att = ATT[a.attitude];
-  return eff + att.bonus * 0.7 + gauss() * att.spread;
+export function eventName(e: CompEvent) {
+  return e.kind === 'voie' ? 'Voie' : BLOCKS[e.type!].name;
 }
 
-function climb(a: Athlete, blocks: { type: BlockType; difficulty: number }[], leadDiff: number) {
-  const res: BlockResult[] = blocks.map(({ type, difficulty }) => {
-    const p = blockPerf(a, type);
-    const top = p >= difficulty;
-    const zone = p >= difficulty - 9;
-    const tries = top ? clamp(1 + Math.floor((difficulty + 8 - p) / 3.5), 1, 5) : clamp(2 + Math.floor((difficulty - p) / 4), 2, 6);
-    const points = top ? 25 - (tries - 1) * 0.1 : zone ? 10 - (tries - 1) * 0.1 : 0;
-    return { type, top, zone, tries, points: Math.max(0, Math.round(points * 10) / 10) };
-  });
-  const lp = leadPerf(a);
-  const lead = lp >= leadDiff + 9 ? 100 : Math.round(clamp((lp - (leadDiff - 30)) / 39, 0, 0.99) * 100 * 10) / 10;
-  return { blocks: res, lead, total: Math.round((res.reduce((s, b) => s + b.points, 0) + lead) * 10) / 10 };
+/** Stats utiles pour une épreuve. */
+export function eventStats(e: CompEvent): MStat[] {
+  return e.kind === 'voie' ? ['endurance', 'doigts', 'mental', 'technique'] : BLOCKS[e.type!].stats;
 }
 
-export function competitionPreview(club: Club) {
-  const L = LEAGUES[club.league];
-  const r = club.season.round;
-  // Les blocs durcissent au fil de la saison.
-  return { round: r + 1, difficulty: Math.round(L.base + 6 + r * 0.6) };
-}
+type Athlete = { stats: Record<MStat, number>; skills: SkillId[]; fatigue: number };
 
-export function runCompetition(club: Club, picks: Pick[], boostId: string | null): CompResult {
-  tick(club);
-  const L = LEAGUES[club.league];
-  const round = club.season.round;
-  const types = (Object.keys(BLOCKS) as BlockType[]).sort(() => Math.random() - 0.5).slice(0, 4);
-  const base = L.base + 6 + round * 0.6;
-  const blocks = types.map((type, i) => ({ type, difficulty: Math.round(base + i * 2.5 + rnd(-2, 3)) }));
-  const leadDiff = Math.round(base + 4);
-  const boost = boostId ? (club.items.find((i) => i.id === boostId && i.kind === 'boost')?.value ?? 0) : 0;
-
-  const climbers: ClimberResult[] = [];
-  for (const p of picks) {
-    const c = club.climbers.find((x) => x.id === p.id);
-    if (!c) continue;
-    const stats = Object.fromEntries(MSTATS.map((s) => [s.id, statWithGear(club, c, s.id)])) as Record<MStat, number>;
-    const r = climb({ stats, skills: c.skills, fatigue: c.fatigue, attitude: p.attitude, reading: p.reading, boost }, blocks, leadDiff);
-    climbers.push({ ...r, name: nameOf(c), flag: c.flag, skin: c.skin, club: club.name, mine: true, id: c.id });
+function effOf(a: Athlete, e: CompEvent, boost: number, double: boolean) {
+  let eff: number;
+  if (e.kind === 'voie') {
+    eff = (a.stats.endurance * 2 + a.stats.doigts + a.stats.mental + a.stats.technique) / 5;
+    if (a.skills.includes('lolotte')) eff += 5;
+  } else {
+    const b = BLOCKS[e.type!];
+    eff = b.stats.reduce((s, k) => s + a.stats[k], 0) / b.stats.length;
+    if (a.skills.includes(b.skill)) eff += 8;
+    if (a.skills.includes('lecture')) eff += 3;
   }
-  for (const rv of club.season.rivals) {
-    // Les rivaux progressent un peu à chaque manche.
-    const lift = round * 0.35;
-    for (const rc of rv.climbers) {
-      const stats = Object.fromEntries(MSTATS.map((s) => [s.id, rc.stats[s.id] + lift])) as Record<MStat, number>;
-      const r = climb({ stats, skills: rc.skills, fatigue: 10, attitude: pick(['forcer', 'assurer', 'assurer', 'economiser'] as Attitude[]), reading: pick(['court', 'long'] as Reading[]), boost: 0 }, blocks, leadDiff);
-      climbers.push({ ...r, name: rc.name, flag: rc.flag, skin: rc.skin, club: rv.name, mine: false });
+  return eff + (a.stats.mental - 60) * 0.08 + boost - Math.max(0, a.fatigue - 45) * 0.3 - (double ? DOUBLE : 0);
+}
+
+function athleteOf(club: Club, c: Climber): Athlete {
+  return { stats: Object.fromEntries(MSTATS.map((s) => [s.id, statWithGear(club, c, s.id)])) as Record<MStat, number>, skills: c.skills, fatigue: c.fatigue };
+}
+
+/** Les épreuves de la prochaine manche, connues à l'avance. */
+export function upcoming(club: Club): CompEvent[] {
+  if (club.season.next?.length === EVENTS) return club.season.next;
+  const base = LEAGUES[club.league].base + 3 + club.season.round * 0.6;
+  const types = (Object.keys(BLOCKS) as BlockType[]).sort(() => Math.random() - 0.5).slice(0, 3);
+  const events: CompEvent[] = types.map((type, i) => ({ kind: 'bloc', type, difficulty: Math.round(base + i * 2.5 + rnd(-2, 3)) }));
+  events.push({ kind: 'voie', type: null, difficulty: Math.round(base + 1 + rnd(-1, 2)) });
+  club.season.next = events;
+  saveClub(club);
+  return events;
+}
+
+/** Chance de réussir (top) une épreuve, de 0 à 1. */
+export function chanceOf(club: Club, id: string, event: number, lineup: Lineup, boost = 0) {
+  const c = club.climbers.find((x) => x.id === id);
+  if (!c) return 0;
+  const e = upcoming(club)[event];
+  const double = lineup.findIndex((x) => x === id) !== event && lineup.includes(id);
+  return phi((effOf(athleteOf(club, c), e, boost, double) - e.difficulty) / SPREAD);
+}
+
+/** Meilleure composition : chaque grimpeur au plus une fois si possible. */
+export function autoLineup(club: Club, boost = 0): Lineup {
+  const events = upcoming(club);
+  const team = club.climbers.filter((c) => c.program !== 'repos' || club.climbers.length <= EVENTS);
+  const pool = (team.length >= Math.min(EVENTS, club.climbers.length) ? team : club.climbers).map((c) => ({ c, a: athleteOf(club, c) }));
+  const score = (i: number, a: Athlete, double: boolean) => phi((effOf(a, events[i], boost, double) - events[i].difficulty) / SPREAD) + 0.02 * (effOf(a, events[i], boost, double) - events[i].difficulty) / SPREAD;
+  let best: Lineup = [null, null, null, null];
+  let bestScore = -Infinity;
+  const go = (i: number, cur: string[], total: number) => {
+    if (i === EVENTS) {
+      if (total > bestScore) [bestScore, best] = [total, [...cur]];
+      return;
     }
-  }
-  const teams = [
-    { id: 'me', name: club.name, color: club.colors[0], total: climbers.filter((c) => c.mine).reduce((s, c) => s + c.total, 0), mine: true },
-    ...club.season.rivals.map((rv) => ({ id: rv.id, name: rv.name, color: rv.color, total: climbers.filter((c) => !c.mine && c.club === rv.name).reduce((s, c) => s + c.total, 0), mine: false })),
-  ]
-    .map((t) => ({ ...t, total: Math.round(t.total * 10) / 10 }))
-    .sort((a, b) => b.total - a.total);
-  const rank = teams.findIndex((t) => t.mine) + 1;
-  climbers.sort((a, b) => b.total - a.total);
+    for (const { c, a } of pool) {
+      const used = cur.includes(c.id);
+      if (used && pool.length >= EVENTS) continue;
+      cur.push(c.id);
+      go(i + 1, cur, total + score(i, a, used));
+      cur.pop();
+    }
+  };
+  go(0, [], 0);
+  return best;
+}
 
-  // Points de ligue, gains, fatigue, expérience.
+/** Lance la manche : tire le hasard de chacun. Consomme l'énergie et le boost. */
+export function startCompetition(club: Club, lineup: Lineup, boostId: string | null): Draft {
+  tick(club);
+  const events = upcoming(club);
+  const boost = boostId ? (club.items.find((i) => i.id === boostId && i.kind === 'boost')?.value ?? 0) : 0;
+  const lift = club.season.round * 0.35;
+  const rolls: Roll[][] = events.map(() => []);
+  const roll = (teamId: string, clubName: string, mine: boolean, who: { name: string; flag: string; skin: SkinId; id?: string; a: Athlete }, i: number, double: boolean, b: number) => {
+    const eff = effOf(who.a, events[i], b, double);
+    rolls[i].push({ teamId, name: who.name, flag: who.flag, skin: who.skin, club: clubName, mine, id: who.id, eff, perf: eff + normal() * SPREAD });
+  };
+  lineup.forEach((id, i) => {
+    const c = club.climbers.find((x) => x.id === id);
+    if (c) roll('me', club.name, true, { name: nameOf(c), flag: c.flag, skin: c.skin, id: c.id, a: athleteOf(club, c) }, i, lineup.indexOf(id) !== i, boost);
+  });
+  for (const rv of club.season.rivals) {
+    // Les rivaux progressent un peu à chaque manche et placent leurs spécialistes.
+    const pool = rv.climbers.map((rc) => ({ ...rc, a: { stats: Object.fromEntries(MSTATS.map((s) => [s.id, rc.stats[s.id] + lift])) as Record<MStat, number>, skills: rc.skills, fatigue: 10 } }));
+    const used = new Set<number>();
+    events.forEach((e, i) => {
+      const free = pool.map((p, k) => k).filter((k) => !used.has(k));
+      const cands = free.length ? free : pool.map((p, k) => k);
+      const k = cands.reduce((m, x) => (effOf(pool[x].a, e, 0, false) > effOf(pool[m].a, e, 0, false) ? x : m), cands[0]);
+      roll(rv.id, rv.name, false, pool[k], i, used.has(k), 0);
+      used.add(k);
+    });
+  }
+  // Mini-jeu quand mon grimpeur est en difficulté mais encore sauvable.
+  const cruxes = events.map((e, i) => i).filter((i) => {
+    const r = rolls[i].find((x) => x.mine);
+    return r && r.perf < events[i].difficulty && r.perf >= events[i].difficulty - 9;
+  });
+  if (boostId) club.items = club.items.filter((i) => i.id !== boostId);
+  if (club.energy.day !== dayOf()) club.energy = { day: dayOf(), used: 0 };
+  club.energy.used += 1;
+  saveClub(club);
+  return { events, rolls, cruxes, boost, lineup };
+}
+
+function scoreRoll(e: CompEvent, perf: number) {
+  const top = perf >= e.difficulty;
+  if (e.kind === 'voie') {
+    const height = top ? 100 : Math.round(clamp((perf - (e.difficulty - 30)) / 30, 0, 0.99) * 1000) / 10;
+    return { top, zone: height >= 60, tries: 1, height, points: Math.round(height * 0.25 * 10) / 10 };
+  }
+  const zone = perf >= e.difficulty - 9;
+  const tries = top ? clamp(1 + Math.floor((e.difficulty + 8 - perf) / 3.5), 1, 5) : clamp(2 + Math.floor((e.difficulty - perf) / 4), 2, 6);
+  const points = top ? 25 - (tries - 1) * 0.1 : zone ? 10 - (tries - 1) * 0.1 : 0;
+  return { top, zone, tries, height: 0, points: Math.max(0, Math.round(points * 10) / 10) };
+}
+
+/** Résultats d'une épreuve, avec le bonus du mini-jeu pour mon grimpeur. */
+export function eventRows(d: Draft, i: number, bonus = 0): EventRow[] {
+  return d.rolls[i]
+    .map((r) => ({ name: r.name, flag: r.flag, skin: r.skin, club: r.club, mine: r.mine, id: r.id, ...scoreRoll(d.events[i], r.perf + (r.mine ? bonus : 0)) }))
+    .sort((a, b) => b.points - a.points);
+}
+
+/** Totaux des équipes après les épreuves 0..upto-1. */
+export function teamTotals(club: Club, d: Draft, upto: number, bonus: number[]) {
+  const teams = [{ id: 'me', name: club.name, color: club.colors[0], mine: true }, ...club.season.rivals.map((rv) => ({ id: rv.id, name: rv.name, color: rv.color, mine: false }))];
+  return teams
+    .map((t) => {
+      const perEvent = d.events.map((e, i) => {
+        if (i >= upto) return 0;
+        const r = d.rolls[i].find((x) => x.teamId === t.id);
+        return r ? scoreRoll(e, r.perf + (r.mine ? (bonus[i] ?? 0) : 0)).points : 0;
+      });
+      return { ...t, perEvent, total: Math.round(perEvent.reduce((a, b) => a + b, 0) * 10) / 10 };
+    })
+    .sort((a, b) => b.total - a.total);
+}
+
+/** Pourquoi mon grimpeur a réussi ou raté. */
+function explain(club: Club, d: Draft, i: number, bonus: number) {
+  const r = d.rolls[i].find((x) => x.mine);
+  const c = club.climbers.find((x) => x.id === r?.id);
+  if (!r || !c) return null;
+  const e = d.events[i];
+  const res = scoreRoll(e, r.perf + bonus);
+  const a = athleteOf(club, c);
+  const stats = eventStats(e).map((k) => ({ k, v: Math.round(a.stats[k]), name: MSTATS.find((m) => m.id === k)!.name }));
+  const best = stats.reduce((m, x) => (x.v > m.v ? x : m));
+  const worst = stats.reduce((m, x) => (x.v < m.v ? x : m));
+  const where = e.kind === 'voie' ? 'la voie' : `le bloc ${eventName(e)}`;
+  const parts: string[] = [];
+  if (res.top) parts.push(`${c.first} sort ${where}${res.tries === 1 && e.kind === 'bloc' ? ' du premier coup' : ''} : ${best.name} ${best.v} au rendez-vous.`);
+  else parts.push(`${c.first} ${e.kind === 'voie' ? `tombe à ${res.height} %` : res.zone ? 'atteint la zone' : 'rate'} ${e.kind === 'voie' ? 'de la voie' : `sur ${where}`} (niveau ${e.difficulty}) : ${worst.name} ${worst.v} trop juste.`);
+  if (e.kind === 'bloc' && !c.skills.includes(BLOCKS[e.type!].skill) && !res.top) parts.push(`La compétence ${SKILLS[BLOCKS[e.type!].skill].name} aurait aidé.`);
+  if (c.fatigue > 45) parts.push(`Fatigue ${Math.round(c.fatigue)} : il grimpe moins bien.`);
+  if (d.lineup.indexOf(c.id) !== i) parts.push('2ᵉ épreuve pour lui, il a moins de jus.');
+  if (d.cruxes.includes(i)) parts.push(bonus >= CRUX_BONUS.bien ? `Ton timing l’a aidé (+${bonus}).` : bonus > 0 ? `Timing juste (+${bonus}).` : 'Timing raté sur le passage clé.');
+  else if (r.perf - r.eff > SPREAD * 1.2) parts.push('Jour de grâce, il a dépassé son niveau.');
+  else if (r.eff - r.perf > SPREAD * 1.2 && !res.top) parts.push('Pas dans un bon jour.');
+  return { event: i, name: nameOf(c), skin: c.skin, text: parts.join(' '), good: res.top };
+}
+
+/** Termine la manche : points, gains, fatigue, expérience. */
+export function finishCompetition(club: Club, d: Draft, bonus: number[]): CompResult {
+  const L = LEAGUES[club.league];
+  const rows = d.events.map((e, i) => eventRows(d, i, bonus[i] ?? 0));
+  const teams = teamTotals(club, d, EVENTS, bonus);
+  const rank = teams.findIndex((t) => t.mine) + 1;
   teams.forEach((t, i) => (club.season.points[t.id] = (club.season.points[t.id] ?? 0) + (POINTS[i] ?? 0)));
   const sponsor = club.items.filter((i) => i.kind === 'sponsor').reduce((s, i) => s + i.value, 0);
   const coins = Math.round((PRIZE[rank - 1] ?? 150) * L.reward) + sponsor;
   club.coins += coins;
   const xp = 30 + (10 - rank) * 6;
-  for (const p of picks) {
-    const c = club.climbers.find((x) => x.id === p.id);
-    const r = climbers.find((x) => x.id === p.id);
-    if (!c || !r) continue;
-    c.fatigue = clamp(c.fatigue + ATT[p.attitude].tire, 0, 100);
-    c.comps += 1;
-    c.tops += r.blocks.filter((b) => b.top).length + (r.lead === 100 ? 1 : 0);
+  const lines = d.events.map((e, i) => explain(club, d, i, bonus[i] ?? 0)).filter((x) => x !== null);
+  const done = new Set<string>();
+  d.lineup.forEach((id, i) => {
+    const c = club.climbers.find((x) => x.id === id);
+    const row = rows[i].find((x) => x.mine);
+    if (!c || !row) return;
+    c.fatigue = clamp(c.fatigue + 12, 0, 100);
+    c.tops += row.top ? 1 : 0;
     const before = Math.floor(c.xp / 100);
-    c.xp += xp + r.blocks.filter((b) => b.top).length * 8;
+    c.xp += (done.has(c.id) ? 0 : xp) + (row.top ? 10 : 0);
     c.potential = Math.min(99, c.potential + Math.floor(c.xp / 100) - before);
-  }
-  if (boostId) club.items = club.items.filter((i) => i.id !== boostId);
-  if (club.energy.day !== dayOf()) club.energy = { day: dayOf(), used: 0 };
-  club.energy.used += 1;
+    if (!done.has(c.id)) c.comps += 1;
+    done.add(c.id);
+  });
 
-  // Moments clés pour la 3D : le top du bloc le plus dur, une voie au sommet, une chute rageante.
+  // Moments clés pour la 3D.
   const moments: Moment[] = [];
-  const mine = climbers.filter((c) => c.mine);
-  const hardest = blocks.reduce((m, b, i) => (b.difficulty > blocks[m].difficulty ? i : m), 0);
-  const flash = mine.find((c) => c.blocks[hardest].top && c.blocks[hardest].tries === 1);
-  const topper = mine.find((c) => c.blocks[hardest].top);
-  if (flash) moments.push({ kind: 'flash', climber: flash.name, skin: flash.skin, text: `${flash.name} flashe le bloc le plus dur (${BLOCKS[blocks[hardest].type].name}) !` });
-  else if (topper) moments.push({ kind: 'top', climber: topper.name, skin: topper.skin, text: `${topper.name} sort le bloc le plus dur (${BLOCKS[blocks[hardest].type].name}).` });
-  const leadTop = mine.find((c) => c.lead === 100);
-  if (leadTop) moments.push({ kind: 'record', climber: leadTop.name, skin: leadTop.skin, text: `${leadTop.name} enchaîne la voie jusqu’au sommet !` });
-  const fall = mine.find((c) => c.lead >= 80 && c.lead < 100);
-  if (fall) moments.push({ kind: 'chute', climber: fall.name, skin: fall.skin, text: `${fall.name} tombe tout près du sommet de la voie (${fall.lead} points).` });
+  const hard = [0, 1, 2].reduce((m, i) => (d.events[i].difficulty > d.events[m].difficulty ? i : m), 0);
+  const hr = rows[hard].find((x) => x.mine);
+  if (hr?.top) moments.push({ kind: hr.tries === 1 ? 'flash' : 'top', climber: hr.name, skin: hr.skin, text: `${hr.name} ${hr.tries === 1 ? 'flashe' : 'sort'} le bloc le plus dur (${eventName(d.events[hard])}) !` });
+  const lr = rows[3].find((x) => x.mine);
+  if (lr?.top) moments.push({ kind: 'record', climber: lr.name, skin: lr.skin, text: `${lr.name} enchaîne la voie jusqu’au sommet !` });
+  else if (lr && lr.height >= 80) moments.push({ kind: 'chute', climber: lr.name, skin: lr.skin, text: `${lr.name} tombe tout près du sommet de la voie (${lr.height} %).` });
 
   club.season.round += 1;
-  club.history = [{ date: dayOf(), rank, total: teams.find((t) => t.mine)!.total, league: club.league }, ...club.history].slice(0, 20);
+  club.season.next = undefined;
+  const total = teams.find((t) => t.mine)!.total;
+  club.history = [{ date: dayOf(), rank, total, league: club.league }, ...club.history].slice(0, 20);
   if (rank < club.best.rank || club.league > club.best.league) club.best = { rank, league: club.league };
-
-  const result: CompResult = { blocks, climbers, teams, rank, coins, xp, moments };
+  const result: CompResult = { events: d.events, rows, teams, lines, rank, coins, xp, moments };
   if (club.season.round >= ROUNDS) result.seasonEnd = endSeason(club);
   saveClub(club);
   return result;
+}
+
+export function competitionPreview(club: Club) {
+  const r = club.season.round;
+  return { round: r + 1, difficulty: Math.round(LEAGUES[club.league].base + 3 + r * 0.6) };
 }
 
 export function standings(club: Club) {
