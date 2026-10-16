@@ -1,0 +1,34 @@
+Touché « Commencer » en 160 552
+Touché « Filtres » en 136 169
+Touché « Extérieur » en 242 114
+Touché « Démarrer une séance ici » en 174 384
+Touché « Nom du spot » en 160 320
+Touché « Démarrer la séance » en 173 492
+Touché « Ajouter une grimpe » en 173 447
+Touché « Terminer la séance » en 173 582
+Touché « Terminer quand même » en 199 384
+Touché « En salle » en 101 114
+Touché « Entraînement » en 96 621
+Touché « 4 séances » en 188 505
+Touché « Démarrer le programme » en 174 420
+Touché « Séances » en 125 171
+Touché « Gainage de grimpeur » en 170 518
+Touché « Commencer la séance » en 174 602
+Touché « Exercices » en 195 158
+Touché « Doigts » en 143 205
+Touché « Suspensions répétées 7/3 » en 174 552
+Touché « Avancé » en 254 589
+Touché « Lancer le minuteur » en 174 602
+Touché « Entraîner » en 89 118
+Touché « Souplesse » en 266 171
+Touché « Hanches de grimpeur » en 170 346
+Touché « Commencer la routine » en 173 602
+Touché « Passer » en 246 607
+Touché « Passer » en 246 607
+Touché « Passer » en 246 607
+Touché « Passer » en 246 607
+Touché « Passer » en 246 607
+Touché « Passer » en 246 607
+Touché « Facile » en 50 525
+Touché « Enregistrer » en 174 594
+Introuvable : « Programme »
