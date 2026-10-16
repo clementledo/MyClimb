@@ -3,36 +3,38 @@ import { useCallback, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { TrainingDone } from '@/components/TrainingDone';
-import { Badge, Banner, Button, Empty, Icon, ListRow, Section } from '@/components/ui';
+import { ExerciseAnim } from '@/components/ExerciseAnim';
+import { Badge, Banner, Button, Card, Empty, Icon, ListRow, Section, Segmented } from '@/components/ui';
+import { levelOf } from '@/lib/coach';
 import { listTrainingLogs } from '@/lib/db';
+import { HAS_ANIMATION } from '@/lib/exercisePoses';
 import { todayIso } from '@/lib/stats';
 import { colors, radius, space, themedStyles, type } from '@/lib/theme';
-import { EQUIPMENT, exerciseById, FOCUS, INTENSITY, sessionById, sessionEquipment } from '@/lib/training';
-import { scaled } from '@/lib/trainingScale';
+import { animOf, CATS, doseText, isStretch, LEVELS, sessionById, sessionItems, sessionMinutes, WHERE, ZONES, type Lv } from '@/lib/training';
 
-export default function SessionTypeScreen() {
+const STRETCH_LEVELS = ['', 'Doux', 'Normal', 'Profond'];
+
+export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
   const session = sessionById(String(id));
-  const [sheet, setSheet] = useState(false);
+  const [level, setLevel] = useState<Lv>(() => (session ? levelOf(session.cat) : 2));
   const [doneToday, setDoneToday] = useState(false);
-  const refresh = useCallback(() => {
-    setDoneToday(listTrainingLogs().some((l) => l.ref === String(id) && l.date === todayIso()));
-  }, [id]);
-  useFocusEffect(refresh);
+  useFocusEffect(
+    useCallback(() => {
+      setDoneToday(listTrainingLogs().some((l) => l.ref === String(id) && l.date === todayIso()));
+    }, [id]),
+  );
   if (!session) return <Empty icon="error" text="Séance introuvable." />;
-
-  const eq = sessionEquipment(session);
-  const warnings = session.steps
-    .map((st) => (st.kind === 'exercise' ? exerciseById(st.id)?.warning : undefined))
-    .filter((w): w is string => !!w);
+  const stretch = isStretch(session);
+  const items = sessionItems(session, level);
+  const names = stretch ? STRETCH_LEVELS : LEVELS;
 
   return (
     <View style={s.container}>
-      <Stack.Screen options={{ title: session.name }} />
-      <ScrollView contentContainerStyle={s.content}>
+      <Stack.Screen options={{ title: stretch ? 'Routine' : 'Séance' }} />
+      <ScrollView contentContainerStyle={[s.content, { paddingBottom: bottom + 100 }]}>
         <View style={s.head}>
           <View style={s.icon}>
             <Icon name={session.icon} size={30} color={colors.primary} />
@@ -40,83 +42,55 @@ export default function SessionTypeScreen() {
           <Text style={s.title}>{session.name}</Text>
           <Text style={s.goal}>{session.goal}</Text>
           <View style={s.badges}>
-            <Badge label={`${session.minutes} min`} tone="neutral" />
-            <Badge label={INTENSITY[session.intensity]} tone={session.intensity === 3 ? 'danger' : session.intensity === 2 ? 'primary' : 'success'} />
-            <Badge label={session.where === 'salle' ? 'En salle' : 'À la maison'} tone="neutral" />
-            {eq
-              .filter((e) => e !== 'wall')
-              .map((e) => (
-                <Badge key={e} label={EQUIPMENT.find((x) => x.id === e)?.label ?? e} tone="neutral" />
-              ))}
+            <Badge label={`${sessionMinutes(session, level)} min`} />
+            <Badge label={session.zone && session.zone !== 'tout' ? ZONES[session.zone].label : CATS[session.cat].label} tone="neutral" />
+            <Badge label={WHERE[session.where].label} tone="neutral" />
           </View>
         </View>
 
-        {doneToday && <Banner tone="success" icon="check_circle" title="Fait aujourd’hui" text="Enregistré dans tes entraînements et dans Progression." />}
+        {doneToday && <Banner tone="success" icon="check_circle" title="Faite aujourd’hui" text="Enregistrée dans tes entraînements." />}
 
-        {warnings.map((w) => (
-          <Banner key={w} tone="danger" icon="warning" title="Attention" text={w} />
-        ))}
-
-        <Section title="Déroulé">
-          <View style={s.listCard}>
-            {session.steps.map((st, i, arr) => {
-              const last = i === arr.length - 1;
-              const num = (
-                <View style={s.num}>
-                  <Text style={s.numText}>{i + 1}</Text>
-                </View>
-              );
-              if (st.kind === 'free') {
-                return <ListRow key={i} left={num} title={st.title} subtitle={`${st.minutes} min · ${st.detail}`} last={last} />;
-              }
-              const found = exerciseById(st.id);
-              const x = found ? scaled(found) : null;
-              if (!x) return null;
-              return (
-                <ListRow
-                  key={i}
-                  left={num}
-                  title={x.name}
-                  subtitle={`${FOCUS[x.focus].label} · ${x.doseText}`}
-                  onPress={() => router.push(`/training/exercise/${x.id}`)}
-                  last={last}
-                />
-              );
-            })}
-          </View>
+        <Section title={stretch ? 'Intensité' : 'Niveau'}>
+          <Segmented options={([1, 2, 3] as Lv[]).map((l) => ({ value: String(l), label: names[l] }))} value={String(level)} onChange={(v) => setLevel(Number(v) as Lv)} />
+          {!stretch && level === levelOf(session.cat) && <Text style={s.muted}>C’est ton niveau actuel en {CATS[session.cat].label.toLowerCase()}. Il monte après deux séances notées « Facile ».</Text>}
         </Section>
+
+        <Section title={`Déroulé · ${items.length} étapes`}>
+          <Card style={{ paddingVertical: 0 }}>
+            {items.map((it, i) =>
+              it.kind === 'free' ? (
+                <ListRow key={`f${i}`} icon={it.icon} title={it.title} subtitle={`${it.minutes} min · ${it.detail}`} last={i === items.length - 1} />
+              ) : (
+                <ListRow
+                  key={`${it.exercise.id}${i}`}
+                  left={HAS_ANIMATION(animOf(it.exercise)) ? <ExerciseAnim id={animOf(it.exercise)} size={44} playing={false} /> : undefined}
+                  icon={CATS[it.exercise.cat].icon}
+                  title={it.exercise.name}
+                  subtitle={`${doseText(it.dose)}${it.note ? ` · ${it.note}` : ''}`}
+                  onPress={() => router.push(`/training/exercise/${it.exercise.id}`)}
+                  last={i === items.length - 1}
+                />
+              ),
+            )}
+          </Card>
+        </Section>
+        {session.source && <Text style={s.muted}>Inspiré de : {session.source}</Text>}
       </ScrollView>
-      <View style={[s.bar, { paddingBottom: bottom + space.md }]}>
-        <Button
-          label={doneToday ? 'Refaite ? L’enregistrer encore' : 'Marquer comme faite'}
-          icon="check"
-          variant={doneToday ? 'secondary' : 'primary'}
-          onPress={() => setSheet(true)}
-        />
+      <View style={[s.footer, { paddingBottom: bottom + space.md }]}>
+        <Button label={stretch ? 'Commencer la routine' : 'Commencer la séance'} icon="play_arrow" onPress={() => router.push(`/training/play?id=${session.id}&level=${level}`)} />
       </View>
-      <TrainingDone
-        visible={sheet}
-        onClose={() => setSheet(false)}
-        onSaved={() => {
-          setSheet(false);
-          refresh();
-        }}
-        entry={{ kind: 'session', ref: session.id, name: session.name, minutes: session.minutes, intensity: session.intensity }}
-      />
     </View>
   );
 }
 
 const s = themedStyles({
-  container: { flex: 1 },
-  content: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl },
-  head: { gap: space.sm },
-  icon: { width: 60, height: 60, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft, marginBottom: space.xs },
-  title: { ...type.title },
-  goal: { ...type.body, color: colors.muted },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: space.xs },
-  listCard: { borderRadius: radius.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-  num: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
-  numText: { fontSize: 15, fontWeight: '800', color: colors.primary },
-  bar: { paddingHorizontal: space.lg, paddingTop: space.md, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: space.lg, gap: space.lg },
+  head: { alignItems: 'center', gap: space.sm },
+  icon: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  title: { ...type.title, textAlign: 'center' },
+  goal: { fontSize: 15, color: colors.muted, textAlign: 'center', lineHeight: 21 },
+  badges: { flexDirection: 'row', gap: space.sm, flexWrap: 'wrap', justifyContent: 'center' },
+  muted: { fontSize: 13, color: colors.muted, lineHeight: 19, marginTop: space.sm },
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: space.lg, paddingTop: space.md, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border, borderRadius: radius.sm },
 });

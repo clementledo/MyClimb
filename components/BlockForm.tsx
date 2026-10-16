@@ -18,6 +18,7 @@ import {
   MOVE_TYPES,
   RESULT_LABELS,
   ROPE_LABELS,
+  SENSATIONS,
   STYLES,
   type BlockResult,
   type Discipline,
@@ -92,6 +93,11 @@ export function BlockForm({
   const [attempts, setAttempts] = useState(initial?.attempts ?? 1);
   const [date, setDate] = useState(initial?.date ?? today());
   const [note, setNote] = useState(initial?.note ?? '');
+  const [sector, setSector] = useState(initial?.sector ?? '');
+  const [setter, setSetter] = useState(initial?.setter ?? '');
+  const [crux, setCrux] = useState(initial?.crux ?? '');
+  const [beta, setBeta] = useState(initial?.beta ?? '');
+  const [sensations, setSensations] = useState<string[]>(initial?.sensations ?? []);
 
   const kind = discipline === 'bloc' ? 'bloc' : 'voie';
   const insets = useSafeAreaInsets();
@@ -184,6 +190,11 @@ export function BlockForm({
       attempts: isFirstTry(result) ? 1 : attempts,
       date,
       note: note.trim() || null,
+      sector: sector.trim() || null,
+      setter: outdoor ? null : setter.trim() || null,
+      crux: crux.trim() || null,
+      beta: beta.trim() || null,
+      sensations,
     });
   };
 
@@ -338,7 +349,7 @@ export function BlockForm({
           </FormCard>
         )}
 
-        <FormCard title="Détails" hint="facultatif">
+        <FormCard title="Description" hint="facultatif">
           <TextInput
             style={ui.input}
             value={name}
@@ -346,15 +357,55 @@ export function BlockForm({
             placeholder={discipline === 'bloc' ? 'Nom du bloc' : 'Nom de la voie'}
             placeholderTextColor={colors.muted}
           />
+          <View style={s.row}>
+            <TextInput
+              style={[ui.input, { flex: 1 }]}
+              value={sector}
+              onChangeText={setSector}
+              placeholder={outdoor ? 'Bloc ou voie voisine' : 'Mur ou secteur'}
+              placeholderTextColor={colors.muted}
+            />
+            {!outdoor && (
+              <TextInput
+                style={[ui.input, { flex: 1 }]}
+                value={setter}
+                onChangeText={setSetter}
+                placeholder="Ouvreur"
+                placeholderTextColor={colors.muted}
+              />
+            )}
+          </View>
           <ChipGroup title="Profil du mur" items={STYLES} selected={styles} onChange={setStyles} />
           <ChipGroup title="Types de prises" items={HOLD_TYPES} selected={holds} onChange={setHolds} />
           <ChipGroup title="Mouvements" items={MOVE_TYPES} selected={moves} onChange={setMoves} />
+          <Text style={s.subTitle}>Passage clé</Text>
+          <TextInput
+            style={[ui.input, { minHeight: 64, textAlignVertical: 'top' }]}
+            value={crux}
+            onChangeText={setCrux}
+            placeholder="Ex. le jeté vers la réglette du haut"
+            placeholderTextColor={colors.muted}
+            multiline
+          />
+          <Text style={s.subTitle}>Méthode</Text>
+          <TextInput
+            style={[ui.input, { minHeight: 64, textAlignVertical: 'top' }]}
+            value={beta}
+            onChangeText={setBeta}
+            placeholder="Ex. pied droit sur le volume, croisé main gauche"
+            placeholderTextColor={colors.muted}
+            multiline
+          />
+        </FormCard>
+
+        <FormCard title="Ressenti" hint="facultatif">
           <Text style={s.subTitle}>Cotation ressentie</Text>
           <View style={s.wrap}>
             {(Object.keys(FEEL_LABELS) as Feel[]).map((f) => (
               <Chip key={f} label={FEEL_LABELS[f]} selected={feel === f} onPress={() => setFeel(feel === f ? null : f)} />
             ))}
           </View>
+          <ChipGroup title="Sensations" items={SENSATIONS} selected={sensations} onChange={setSensations} />
           {!session && (
             <>
               <Text style={s.subTitle}>Date</Text>
@@ -372,7 +423,7 @@ export function BlockForm({
             style={[ui.input, { minHeight: 96, textAlignVertical: 'top' }]}
             value={note}
             onChangeText={setNote}
-            placeholder="Méthode, sensations…"
+            placeholder="Ce que tu veux retenir, à retravailler…"
             placeholderTextColor={colors.muted}
             multiline
           />

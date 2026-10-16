@@ -5,7 +5,7 @@ import { Text, Vibration, View } from 'react-native';
 import { ExerciseAnim } from '@/components/ExerciseAnim';
 import { Button, Sheet } from '@/components/ui';
 import { colors, radius, space, themedStyles } from '@/lib/theme';
-import { animOf, formatSeconds, type Dose, type Exercise } from '@/lib/training';
+import { formatSeconds, type Dose } from '@/lib/training';
 
 type Phase = { kind: 'prep' | 'work' | 'restRep' | 'rest' | 'switch'; seconds: number; set: number; rep: number; side?: string };
 
@@ -35,12 +35,23 @@ function phasesOf(d: Dose): Phase[] {
 }
 
 /** Les exercices qu'on tient un certain temps (planche, suspensions, étirements) ont un minuteur. */
-export const hasTimer = (x: Exercise) => x.dose.work > 0;
+export const hasTimer = (d: Dose) => d.work > 0;
 
-/** Minuteur facultatif, dans un panneau : vibre à chaque changement et garde l'écran allumé. */
-export function HoldTimer({ exercise, onClose, onDone }: { exercise: Exercise; onClose: () => void; onDone?: () => void }) {
+type TimerProps = { title: string; dose: Dose; anim: string; onClose: () => void; onDone?: () => void };
+
+/** Minuteur dans un panneau. */
+export function HoldTimer(p: TimerProps) {
+  return (
+    <Sheet visible onClose={p.onClose} title={p.title}>
+      <TimerView {...p} />
+    </Sheet>
+  );
+}
+
+/** Minuteur : vibre à chaque changement et garde l'écran allumé. */
+export function TimerView({ dose, anim, onClose, onDone, closeLabel = 'Fermer' }: TimerProps & { closeLabel?: string }) {
   useKeepAwake();
-  const phases = useMemo(() => phasesOf(exercise.dose), [exercise]);
+  const phases = useMemo(() => phasesOf(dose), [dose]);
   const [index, setIndex] = useState(0);
   const [start, setStart] = useState(() => Date.now());
   const [pausedAt, setPausedAt] = useState<number | null>(null);
@@ -91,7 +102,7 @@ export function HoldTimer({ exercise, onClose, onDone }: { exercise: Exercise; o
     return () => clearInterval(timer);
   }, [done, pausedAt, phases, goTo]);
 
-  const d = exercise.dose;
+  const d = dose;
   const tint = phase.kind === 'work' ? colors.primary : phase.kind === 'prep' || phase.kind === 'switch' ? colors.text : colors.success;
   const counter = [
     d.sets > 1 ? `Série ${phase.set}/${d.sets}` : null,
@@ -102,17 +113,17 @@ export function HoldTimer({ exercise, onClose, onDone }: { exercise: Exercise; o
     .join(' · ');
 
   return (
-    <Sheet visible onClose={onClose} title={exercise.name}>
+    <>
       {done ? (
         <View style={s.center}>
           <Text style={[s.phase, { color: colors.success }]}>TERMINÉ</Text>
           <Text style={s.big}>Bravo !</Text>
-          <Button label="Fermer" icon="check" onPress={onClose} />
+          <Button label={closeLabel} icon="check" onPress={onClose} />
         </View>
       ) : (
         <View style={s.center}>
           {/* Le mouvement à faire, qui ne bouge que pendant l'effort. */}
-          <ExerciseAnim id={animOf(exercise)} size={140} playing={pausedAt === null && phase.kind === 'work'} />
+          <ExerciseAnim id={anim} size={140} playing={pausedAt === null && phase.kind === 'work'} />
           <Text style={[s.phase, { color: tint }]}>{LABEL[phase.kind].toUpperCase()}</Text>
           <Text style={[s.big, { color: tint }]}>{left >= 60 ? formatSeconds(Math.ceil(left)) : Math.ceil(left)}</Text>
           <View style={s.track}>
@@ -137,7 +148,7 @@ export function HoldTimer({ exercise, onClose, onDone }: { exercise: Exercise; o
           </View>
         </View>
       )}
-    </Sheet>
+    </>
   );
 }
 

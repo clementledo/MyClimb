@@ -65,10 +65,13 @@ export default function BlockScreen() {
       onPress: gymId ? () => router.push({ pathname: '/gym/[id]', params: { id: gymId } }) : undefined,
     },
     { label: 'Date', value: formatDate(block.date) },
+    ...(block.sector ? [{ label: block.outdoor ? 'Secteur' : 'Mur', value: block.sector }] : []),
+    ...(block.setter ? [{ label: 'Ouvreur', value: block.setter }] : []),
     ...(block.styles.length ? [{ label: 'Profil du mur', value: block.styles.join(', ') }] : []),
     ...(block.holds.length ? [{ label: 'Types de prises', value: block.holds.join(', ') }] : []),
     ...(block.moves.length ? [{ label: 'Mouvements', value: block.moves.join(', ') }] : []),
     ...(block.feel ? [{ label: 'Cotation ressentie', value: FEEL_LABELS[block.feel] }] : []),
+    ...(block.sensations.length ? [{ label: 'Sensations', value: block.sensations.join(', ') }] : []),
   ];
 
   return (
@@ -105,11 +108,19 @@ export default function BlockScreen() {
           ))}
         </Card>
 
-        {block.note && (
-          <Card style={s.noteCard}>
-            <Text style={s.noteTitle}>Note</Text>
-            <Text style={s.note}>{block.note}</Text>
-          </Card>
+        {(
+          [
+            ['Passage clé', block.crux],
+            ['Méthode', block.beta],
+            ['Note', block.note],
+          ] as const
+        ).map(([title, text]) =>
+          text ? (
+            <Card key={title} style={s.noteCard}>
+              <Text style={s.noteTitle}>{title}</Text>
+              <Text style={s.note}>{text}</Text>
+            </Card>
+          ) : null,
         )}
 
         <View style={s.actions}>

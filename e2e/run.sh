@@ -146,6 +146,8 @@ tap "Extérieur" ; sleep 3 ; shot 1c-exterieur
 tap "Démarrer une séance ici" ; sleep 8
 tap "Nom du spot" ; sleep 1 ; adb shell input text "Test" ; sleep 1 ; hidekb
 tap "Démarrer la séance" ; sleep 3 ; shot 1c2-seance
+tap "Ajouter une grimpe" ; sleep 3 ; scrolldown 4 ; shot 1c2b-description ; scrolldown 3 ; shot 1c2c-ressenti
+adb shell input keyevent 4 ; sleep 2
 tap "Terminer la séance" ; sleep 2 ; shot 1c3-terminer
 tap "Terminer quand même" ; sleep 3
 tap "En salle" ; sleep 1
@@ -176,31 +178,24 @@ adb shell input keyevent 4 ; sleep 2
 adb shell input keyevent 4 ; sleep 3
 fi
 if want entrainement; then
-tap "Entraînement" ; sleep 3 ; shot 1g-entrainement
-tap "Commencer" ; sleep 3 ; shot 1g2-routine
-tap "Marquer comme faite" ; sleep 2 ; tap "Enregistrer" ; sleep 2 ; shot 1g3-routine-faite
-adb shell input keyevent 4 ; sleep 3 ; shot 1g4-semaine
-tap "Rappel quotidien" ; sleep 2 ; shot 1g5-rappel ; tap "Fermer" ; sleep 2
-scrolldown 5 ; tap "Créer ma routine" ; sleep 3 ; tap "Ajouter des exercices" ; sleep 2
-tap "Chercher un exercice" ; sleep 1 ; adb shell input text "planche" ; sleep 2 ; shot 1g6-recherche ; hidekb ; tap "Planche" ; sleep 1
-tap "Effacer la recherche" ; sleep 1 ; tap "Chercher un exercice" ; sleep 1 ; adb shell input text "pigeon" ; sleep 2 ; hidekb
-tap "Pigeon" ; sleep 1 ; shot 1g6-choix ; tap "Terminé (2)" ; sleep 2 ; shot 1g7-ma-routine
-tap "Enregistrer la routine" ; sleep 3 ; shot 1g8-mes-routines
-scrolltop ; tap "Voir la séance" ; sleep 3 ; shot 1h-seance
-tap "Marquer comme faite" ; sleep 2 ; tap "Plus" ; sleep 1 ; tap "Juste" ; sleep 1 ; shot 1i-fait
-tap "Enregistrer" ; sleep 2 ; shot 1j-enregistre
-adb shell input keyevent 4 ; sleep 3 ; shot 1k-historique
-scrolltop ; tap "Filtres" ; sleep 2 ; tap "Exercices" ; sleep 1 ; tap "Expert" ; sleep 1 ; shot 1l-filtres ; tap "Fermer" ; sleep 2 ; shot 1l2-experts
-scrolltop ; tap "Tout effacer" ; sleep 2 ; tap "Doigts" ; sleep 2 ; shot 1m-doigts
-tap "Tout" ; sleep 1 ; tap "Tractions" ; sleep 3 ; tap "Dur" ; sleep 1 ; shot 1n-exercice-dur ; tap "Normal" ; sleep 1
-adb shell input keyevent 4 ; sleep 2
-tap "Planche" ; sleep 3 ; tap "Minuteur" ; sleep 7 ; shot 1n2-minuteur
-# Le minuteur se rafraîchit sans arrêt : uiautomator ne peut pas lire l'écran, on touche « Passer » par sa position.
-read -r W H < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
-adb shell input tap $((W * 3 / 4)) $((H * 91 / 100)) ; sleep 2 ; shot 1n3-minuteur-suite
+tap "Entraînement" ; sleep 3 ; shot 1g-programme
+tap "4 séances" ; sleep 1 ; tap "Démarrer le programme" ; sleep 3 ; shot 1g2-semaine
+scrolldown 2 ; shot 1g3-semaine-bas ; scrolltop
+tap "Séances" ; sleep 2 ; shot 1h-seances
+tap "Gainage de grimpeur" ; sleep 3 ; shot 1h2-detail ; scrolldown 2 ; shot 1h3-deroule ; scrolltop
+tap "Commencer la séance" ; sleep 3 ; shot 1h4-etape
 adb shell input keyevent 4 ; sleep 2 ; adb shell input keyevent 4 ; sleep 2
-scrolltop ; tap "Filtres" ; sleep 2 ; tap "Poutre" ; sleep 1 ; shot 1o-materiel
-tap "Poutre" ; sleep 1 ; tap "Fermer" ; sleep 2
+tap "Exercices" ; sleep 2 ; shot 1i-exercices
+tap "Doigts" ; sleep 2 ; shot 1i2-doigts
+tap "Suspensions répétées 7/3" ; sleep 3 ; shot 1i3-exercice ; tap "Avancé" ; sleep 1 ; shot 1i4-avance
+tap "Lancer le minuteur" ; sleep 6 ; shot 1i5-minuteur
+adb shell input keyevent 4 ; sleep 2 ; adb shell input keyevent 4 ; sleep 2
+tap "Souplesse" ; sleep 2 ; shot 1j-souplesse
+tap "Hanches de grimpeur" ; sleep 3 ; shot 1j2-routine
+tap "Commencer la routine" ; sleep 3 ; shot 1j3-etape
+for _ in 1 2 3 4 5 6; do tap "Passer" ; sleep 2; done
+shot 1j4-fin ; tap "Facile" ; sleep 1 ; tap "Enregistrer" ; sleep 3
+tap "Programme" ; sleep 2 ; scrolldown 3 ; shot 1k-historique ; scrolltop
 fi
 if want progression; then
 tap "Progression" ; sleep 3 ; shot 1d-progression

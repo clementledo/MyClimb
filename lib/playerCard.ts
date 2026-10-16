@@ -12,7 +12,6 @@ import { GRADES, isFirstTry, isSent, type GradeSystem } from './climbing';
 import type { Block, TrainingLog } from './db';
 import { validatedDays } from './stats';
 import { exerciseById, sessionById, type Focus } from './training';
-import { findRoutine } from './trainingPlan';
 
 export type StatId = 'force' | 'doigts' | 'technique' | 'endurance' | 'souplesse' | 'mental';
 
@@ -77,6 +76,9 @@ const TAGS: Record<string, W> = {
   Toit: { force: 1.2, mental: 0.2 },
   Dièdre: { technique: 0.7, souplesse: 0.6 },
   Arête: { technique: 0.8, souplesse: 0.2 },
+  'Léger dévers': { force: 0.6, doigts: 0.4 },
+  Proue: { force: 1, technique: 0.3 },
+  Fissure: { technique: 0.8, mental: 0.3 },
   // Prises
   Réglettes: { doigts: 1.2 },
   Plats: { doigts: 0.6, force: 0.3, technique: 0.2 },
@@ -85,9 +87,19 @@ const TAGS: Record<string, W> = {
   Inversées: { force: 0.4, technique: 0.4 },
   Trous: { doigts: 0.9 },
   Volumes: { technique: 0.6, souplesse: 0.2 },
+  'Bi-doigts': { doigts: 1.1 },
+  Gastons: { force: 0.6, doigts: 0.3 },
+  'Pieds fins': { technique: 0.9 },
   // Mouvements
   Dynamique: { force: 1, mental: 0.4 },
   Statique: { force: 0.5, technique: 0.4 },
+  Jeté: { force: 1.1, mental: 0.5 },
+  Bloquage: { force: 1 },
+  Croisé: { force: 0.4, technique: 0.6 },
+  Lolotte: { technique: 0.8, souplesse: 0.3 },
+  Opposition: { force: 0.5, technique: 0.6 },
+  'Grand écart': { souplesse: 1.1 },
+  'Départ assis': { force: 0.6 },
   Compression: { force: 1 },
   Talon: { souplesse: 1, technique: 0.4 },
   Pointe: { souplesse: 0.9, technique: 0.4 },
@@ -103,9 +115,10 @@ const FOCUS_W: Record<Focus, W> = {
   tirage: { force: 1.5 },
   gainage: { force: 0.9, technique: 0.3 },
   antagonistes: { force: 0.4, mental: 0.3 },
-  jambes: { technique: 0.6, souplesse: 0.5 },
-  mobilite: { souplesse: 1.5 },
-  mur: { technique: 1, endurance: 0.6 },
+  puissance: { force: 1, doigts: 0.5 },
+  endurance: { endurance: 1.5 },
+  technique: { technique: 1.2 },
+  souplesse: { souplesse: 1.5 },
 };
 /** Pratique qui donne les deux tiers du bonus maximal (les stats moins travaillées en demandent moins). */
 const TAU: Record<StatId, number> = { force: 120, doigts: 120, technique: 130, endurance: 110, souplesse: 70, mental: 100 };
@@ -144,21 +157,18 @@ function climbWork(b: Block, level: number | null): W {
 /** Ce qu'un entraînement apporte, d'après ses exercices et ce qu'il cible, sa durée et son intensité. */
 function trainingWork(l: TrainingLog): W {
   const focuses: Focus[] = [];
-  let targets: string[] = [];
   const exercise = (id: string) => {
     const x = exerciseById(id);
-    if (x) focuses.push(x.focus);
+    if (x) focuses.push(x.cat);
   };
   if (l.kind === 'exercise') exercise(l.ref);
-  else if (l.kind === 'routine') findRoutine(l.ref)?.items.forEach(exercise);
   else {
     const session = sessionById(l.ref);
-    session?.steps.forEach((st) => st.kind === 'exercise' && exercise(st.id));
-    targets = (session?.targets ?? []).filter((t) => TAGS[t]);
+    session?.steps.forEach((st) => st.kind === 'ex' && exercise(typeof st.ids === 'string' ? st.ids : st.ids[0]));
+    if (!session) focuses.push(l.kind === 'routine' ? 'souplesse' : 'gainage');
   }
   const w: W = { mental: 0.15 };
   focuses.forEach((f) => addTo(w, FOCUS_W[f], 1 / focuses.length));
-  targets.forEach((t) => addTo(w, TAGS[t], 0.5 / targets.length));
   const k = 1.5 * clamp((l.minutes || 15) / 20, 0.3, 2) * (0.7 + 0.15 * clamp(l.intensity || 2, 1, 3));
   for (const id of IDS) if (w[id]) w[id] = (w[id] ?? 0) * k;
   return w;

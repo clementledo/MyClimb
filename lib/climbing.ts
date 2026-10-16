@@ -54,13 +54,19 @@ export const HOLD_COLORS: { name: string; hex: string }[] = [
 ];
 
 /** Profil du mur. */
-export const STYLES = ['Dalle', 'Vertical', 'Dévers', 'Toit', 'Dièdre', 'Arête'];
+export const STYLES = ['Dalle', 'Vertical', 'Léger dévers', 'Dévers', 'Toit', 'Dièdre', 'Arête', 'Proue', 'Fissure'];
 
-export const HOLD_TYPES = ['Réglettes', 'Plats', 'Pinces', 'Bacs', 'Inversées', 'Trous', 'Volumes'];
+export const HOLD_TYPES = ['Réglettes', 'Plats', 'Pinces', 'Bacs', 'Inversées', 'Trous', 'Bi-doigts', 'Gastons', 'Volumes', 'Pieds fins'];
 
 export const MOVE_TYPES = [
   'Dynamique',
+  'Jeté',
   'Statique',
+  'Bloquage',
+  'Croisé',
+  'Lolotte',
+  'Opposition',
+  'Grand écart',
   'Compression',
   'Talon',
   'Pointe',
@@ -68,6 +74,21 @@ export const MOVE_TYPES = [
   'Coordination',
   'Équilibre',
   'Résistance',
+  'Départ assis',
+];
+
+/** Ressenti pendant la grimpe. */
+export const SENSATIONS = [
+  'En forme',
+  'Fatigué',
+  'Doigts douloureux',
+  'Peur de tomber',
+  'Lecture difficile',
+  'Méthode trouvée',
+  'Morpho grand',
+  'Morpho petit',
+  'Pieds qui zippent',
+  'Bonne fluidité',
 ];
 
 export type Rope = 'toprope' | 'lead';

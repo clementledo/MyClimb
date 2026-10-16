@@ -94,6 +94,20 @@ if ((db.getFirstSync<{ user_version: number }>('PRAGMA user_version')?.user_vers
   });
 }
 
+// Version 2 : description détaillée (secteur, ouvreur, passage clé, méthode, sensations).
+if ((db.getFirstSync<{ user_version: number }>('PRAGMA user_version')?.user_version ?? 0) < 2) {
+  db.withTransactionSync(() => {
+    db.execSync(`
+      ALTER TABLE blocks ADD COLUMN sector TEXT;
+      ALTER TABLE blocks ADD COLUMN setter TEXT;
+      ALTER TABLE blocks ADD COLUMN crux TEXT;
+      ALTER TABLE blocks ADD COLUMN beta TEXT;
+      ALTER TABLE blocks ADD COLUMN sensations TEXT NOT NULL DEFAULT '[]';
+      PRAGMA user_version = 2;
+    `);
+  });
+}
+
 export type Gym = {
   id: string;
   name: string;
@@ -129,6 +143,16 @@ export type Block = {
   attempts: number;
   date: string;
   note: string | null;
+  /** Mur ou secteur dans la salle. */
+  sector: string | null;
+  /** Ouvreur ou ouvreuse. */
+  setter: string | null;
+  /** Passage clé. */
+  crux: string | null;
+  /** Méthode qui marche. */
+  beta: string | null;
+  /** Ressenti physique et mental. */
+  sensations: string[];
 };
 
 export type BlockInput = Omit<Block, 'id' | 'gymName'>;
@@ -154,6 +178,11 @@ type BlockRow = {
   attempts: number;
   date: string;
   note: string | null;
+  sector: string | null;
+  setter: string | null;
+  crux: string | null;
+  beta: string | null;
+  sensations: string | null;
 };
 
 function toBlock(r: BlockRow): Block {
@@ -178,6 +207,11 @@ function toBlock(r: BlockRow): Block {
     attempts: r.attempts,
     date: r.date,
     note: r.note,
+    sector: r.sector ?? null,
+    setter: r.setter ?? null,
+    crux: r.crux ?? null,
+    beta: r.beta ?? null,
+    sensations: r.sensations ? JSON.parse(r.sensations) : [],
   };
 }
 
@@ -234,6 +268,7 @@ export function countBlocksByGym(): Record<string, number> {
 const BLOCK_COLUMNS = [
   'discipline', 'outdoor', 'gym_id', 'site', 'name', 'photo_uri', 'color', 'grade', 'grade_system',
   'styles', 'holds', 'moves', 'rope', 'feel', 'result', 'attempts', 'date', 'note',
+  'sector', 'setter', 'crux', 'beta', 'sensations',
 ];
 
 function blockValues(b: BlockInput) {
@@ -241,6 +276,7 @@ function blockValues(b: BlockInput) {
     b.discipline, b.outdoor ? 1 : 0, b.gymId, b.site, b.name, b.photoUri, b.color, b.grade, b.gradeSystem,
     JSON.stringify(b.styles), JSON.stringify(b.holds), JSON.stringify(b.moves), b.rope, b.feel,
     b.result, b.attempts, b.date, b.note,
+    b.sector, b.setter, b.crux, b.beta, JSON.stringify(b.sensations),
   ];
 }
 

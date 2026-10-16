@@ -18,7 +18,7 @@ export function TrainingDone({
 }: {
   visible: boolean;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (feel: Feel | null) => void;
   entry: Pick<TrainingLog, 'kind' | 'ref' | 'name' | 'minutes' | 'intensity'>;
 }) {
   const [minutes, setMinutes] = useState(entry.minutes);
@@ -35,7 +35,7 @@ export function TrainingDone({
   const save = () => {
     insertTrainingLog({ ...entry, minutes, feel, date: todayIso() });
     reset();
-    onSaved();
+    onSaved(feel);
     // Trois jours d'entraînement dans la semaine : un pack.
     const added = syncFromJournal();
     if (added.length) {
