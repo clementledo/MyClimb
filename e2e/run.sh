@@ -190,7 +190,7 @@ tap "Doigts" ; sleep 2 ; shot 1i2-doigts
 tap "Suspensions répétées 7/3" ; sleep 3 ; shot 1i3-exercice ; tap "Avancé" ; sleep 1 ; shot 1i4-avance
 tap "Lancer le minuteur" ; sleep 6 ; shot 1i5-minuteur
 adb shell input keyevent 4 ; sleep 2 ; adb shell input keyevent 4 ; sleep 2
-tap "Souplesse" ; sleep 2 ; shot 1j-souplesse
+scrolltop ; tap "Entraîner" ; sleep 2 ; tap "Souplesse" ; sleep 2 ; shot 1j-souplesse
 tap "Hanches de grimpeur" ; sleep 3 ; shot 1j2-routine
 tap "Commencer la routine" ; sleep 3 ; shot 1j3-etape
 for _ in 1 2 3 4 5 6; do tap "Passer" ; sleep 2; done
